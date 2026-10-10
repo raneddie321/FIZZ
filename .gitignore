@@ -1,0 +1,21 @@
+# dependencies
+node_modules/
+# Next.js
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+# local data (uploads, sandbox workdirs)
+.data/
+# Monaco runtime is copied on install
+public/monaco/
+# env files — never commit secrets
+.env
+.env.*
+!.env.example
+# misc
+.DS_Store
+coverage/
+test-results/
+playwright-report/
+npm-debug.log*

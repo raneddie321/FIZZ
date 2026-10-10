@@ -1,0 +1,940 @@
+// FIZZ / FIZZ DEV — database schema
+// PostgreSQL via Prisma. Monetary amounts are stored as integer minor units (cents).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Identity (RANEDDIE ID)
+// ─────────────────────────────────────────────────────────────
+
+enum Role {
+  USER
+  SUPPORT
+  ADMIN
+  SUPERADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+model User {
+  id                     String     @id @default(cuid())
+  email                  String     @unique
+  emailVerifiedAt        DateTime?
+  passwordHash           String?
+  displayName            String
+  avatarUrl              String?
+  role                   Role       @default(USER)
+  status                 UserStatus @default(ACTIVE)
+  theme                  String     @default("system")
+  language               String     @default("en")
+  /// Notification preferences, default model, UI preferences.
+  preferences            Json       @default("{}")
+  twoFactorEnabled       Boolean    @default(false)
+  /// AES-256-GCM encrypted TOTP secret.
+  twoFactorSecret        String?
+  /// SHA-256 hashes of unused recovery codes.
+  twoFactorRecoveryCodes String[]   @default([])
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime   @updatedAt
+  lastLoginAt            DateTime?
+
+  identities         IdentityMapping[]
+  sessions           Session[]
+  verificationTokens VerificationToken[]
+  conversations      Conversation[]
+  attachments        Attachment[]
+  projects           Project[]
+  agentTasks         AgentTask[]
+  terminalSessions   TerminalSession[]
+  usageRecords       UsageRecord[]
+  subscription       Subscription?
+  wallet             Wallet?
+  purchaseRequests   PurchaseRequest[]
+  purchaseApprovals  PurchaseApproval[]
+  transactions       Transaction[]
+  auditLogs          AuditLog[]
+  notifications      Notification[]
+  supportRequests    SupportRequest[]
+  supportReplies     SupportReply[]
+  abuseReports       AbuseReport[]       @relation("reporter")
+  resolvedReports    AbuseReport[]       @relation("resolver")
+  connectedServices  ConnectedService[]
+
+  @@index([role])
+  @@index([status])
+  @@index([createdAt])
+}
+
+/// Maps a local user to an external identity (e.g. RANEDDIE ID OIDC subject).
+model IdentityMapping {
+  id        String   @id @default(cuid())
+  userId    String
+  provider  String
+  issuer    String
+  subject   String
+  email     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, issuer, subject])
+  @@index([userId])
+}
+
+model Session {
+  id                String    @id @default(cuid())
+  /// SHA-256 of the opaque session token stored in the cookie.
+  tokenHash         String    @unique
+  userId            String
+  createdAt         DateTime  @default(now())
+  lastSeenAt        DateTime  @default(now())
+  expiresAt         DateTime
+  /// Hard upper bound regardless of activity.
+  absoluteExpiresAt DateTime
+  ipAddress         String?
+  userAgent         String?
+  twoFactorVerified Boolean   @default(false)
+  authMethod        String    @default("password")
+  revokedAt         DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+enum VerificationTokenType {
+  EMAIL_VERIFY
+  PASSWORD_RESET
+  EMAIL_CHANGE
+}
+
+model VerificationToken {
+  id        String                @id @default(cuid())
+  userId    String
+  type      VerificationTokenType
+  tokenHash String                @unique
+  data      Json?
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime              @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type])
+}
+
+/// Every transactional email the platform attempted to send.
+model OutboundEmail {
+  id        String   @id @default(cuid())
+  to        String
+  subject   String
+  text      String
+  html      String?
+  /// SENT (delivered to provider), LOGGED (no provider configured; development only), FAILED
+  status    String
+  provider  String
+  error     String?
+  createdAt DateTime @default(now())
+
+  @@index([to, createdAt])
+}
+
+model ConnectedService {
+  id             String   @id @default(cuid())
+  userId         String
+  service        String
+  accountLabel   String?
+  /// Encrypted credential payload (never returned to clients).
+  encryptedToken String?
+  scopes         String[] @default([])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, service])
+}
+
+// ─────────────────────────────────────────────────────────────
+// FIZZ Chat
+// ─────────────────────────────────────────────────────────────
+
+model Conversation {
+  id            String    @id @default(cuid())
+  userId        String
+  title         String    @default("New conversation")
+  titleLocked   Boolean   @default(false)
+  model         String?
+  archivedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastMessageAt DateTime  @default(now())
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages    Message[]
+  attachments Attachment[]
+
+  @@index([userId, archivedAt, lastMessageAt])
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+}
+
+enum MessageStatus {
+  COMPLETE
+  STREAMING
+  STOPPED
+  ERROR
+}
+
+model Message {
+  id             String        @id @default(cuid())
+  conversationId String
+  role           MessageRole
+  content        String        @db.Text
+  status         MessageStatus @default(COMPLETE)
+  model          String?
+  provider       String?
+  error          String?
+  /// Sources from web search, tool metadata, etc.
+  metadata       Json          @default("{}")
+  inputTokens    Int?
+  outputTokens   Int?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  attachments  Attachment[]
+
+  @@index([conversationId, createdAt])
+}
+
+enum AttachmentKind {
+  IMAGE
+  DOCUMENT
+  OTHER
+}
+
+model Attachment {
+  id             String         @id @default(cuid())
+  userId         String
+  conversationId String?
+  messageId      String?
+  fileName       String
+  mimeType       String
+  size           Int
+  kind           AttachmentKind
+  storageKey     String         @unique
+  sha256         String
+  /// Text content extracted for text-like documents.
+  extractedText  String?        @db.Text
+  generated      Boolean        @default(false)
+  createdAt      DateTime       @default(now())
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  message      Message?      @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([messageId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// FIZZ DEV — projects, files, git
+// ─────────────────────────────────────────────────────────────
+
+enum ProjectType {
+  WEBSITE
+  WEB_APP
+  MOBILE_APP
+  DESKTOP_APP
+  GAME
+  DASHBOARD
+  SAAS
+  API
+  AUTOMATION
+  ECOMMERCE
+  PORTFOLIO
+  BUSINESS
+  OTHER
+}
+
+model Project {
+  id           String      @id @default(cuid())
+  ownerId      String
+  name         String
+  description  String      @default("")
+  type         ProjectType
+  stack        String
+  template     String
+  /// Workspace preferences (agent mode, approvals, preview entry, etc.)
+  settings     Json        @default("{}")
+  archivedAt   DateTime?
+  lastOpenedAt DateTime    @default(now())
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  owner            User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  files            ProjectFile[]
+  revisions        FileRevision[]
+  gitConnection    GitConnection?
+  agentTasks       AgentTask[]
+  terminalSessions TerminalSession[]
+  purchaseRequests PurchaseRequest[]
+
+  @@index([ownerId, archivedAt, lastOpenedAt])
+}
+
+model ProjectFile {
+  id        String   @id @default(cuid())
+  projectId String
+  path      String
+  content   String   @db.Text
+  /// "utf8" for text files, "base64" for binary assets.
+  encoding  String   @default("utf8")
+  size      Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, path])
+}
+
+enum RevisionOperation {
+  CREATE
+  UPDATE
+  DELETE
+  RENAME
+}
+
+enum ChangeAuthor {
+  USER
+  AGENT
+  TERMINAL
+  DESIGN
+  SYSTEM
+}
+
+/// Append-only history of file changes. Enables diff, version history and revert.
+model FileRevision {
+  id              String            @id @default(cuid())
+  projectId       String
+  path            String
+  previousPath    String?
+  operation       RevisionOperation
+  content         String?           @db.Text
+  previousContent String?           @db.Text
+  encoding        String            @default("utf8")
+  author          ChangeAuthor
+  userId          String?
+  agentTaskId     String?
+  message         String?
+  revertedAt      DateTime?
+  createdAt       DateTime          @default(now())
+
+  project   Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  agentTask AgentTask? @relation(fields: [agentTaskId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, path, createdAt])
+  @@index([projectId, createdAt])
+  @@index([agentTaskId])
+}
+
+model GitConnection {
+  id             String    @id @default(cuid())
+  projectId      String    @unique
+  provider       String    @default("github")
+  repoOwner      String
+  repoName       String
+  branch         String    @default("main")
+  lastSyncedAt   DateTime?
+  lastCommitSha  String?
+  lastSyncStatus String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+// ─────────────────────────────────────────────────────────────
+// FIZZ DEV — agents
+// ─────────────────────────────────────────────────────────────
+
+enum AgentTaskStatus {
+  QUEUED
+  PLANNING
+  RUNNING
+  AWAITING_APPROVAL
+  PAUSED
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model AgentTask {
+  id              String          @id @default(cuid())
+  projectId       String
+  userId          String
+  objective       String          @db.Text
+  status          AgentTaskStatus @default(QUEUED)
+  model           String
+  provider        String
+  /// Planned steps: [{ title, description, role }]
+  plan            Json            @default("[]")
+  currentStep     Int             @default(0)
+  /// Provider-native conversation state used to resume after approvals/pauses.
+  state           Json            @default("{}")
+  summary         String?         @db.Text
+  error           String?
+  inputTokens     Int             @default(0)
+  outputTokens    Int             @default(0)
+  toolCallCount   Int             @default(0)
+  pauseRequested  Boolean         @default(false)
+  cancelRequested Boolean         @default(false)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  startedAt       DateTime?
+  completedAt     DateTime?
+
+  project   Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  steps     AgentStep[]
+  toolCalls AgentToolCall[]
+  events    AgentEvent[]
+  revisions FileRevision[]
+
+  @@index([projectId, createdAt])
+  @@index([userId, status])
+}
+
+enum AgentRole {
+  PLANNER
+  CODER
+  DESIGNER
+  TESTER
+  DEBUGGER
+  REVIEWER
+  RESEARCHER
+  DEPLOYER
+}
+
+enum AgentStepStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
+model AgentStep {
+  id          String          @id @default(cuid())
+  taskId      String
+  index       Int
+  role        AgentRole
+  title       String
+  description String          @db.Text
+  status      AgentStepStatus @default(PENDING)
+  result      String?         @db.Text
+  attempts    Int             @default(0)
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  task      AgentTask       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  toolCalls AgentToolCall[]
+
+  @@unique([taskId, index])
+}
+
+enum ToolCallStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+model AgentToolCall {
+  id               String         @id @default(cuid())
+  taskId           String
+  stepId           String?
+  providerCallId   String
+  toolName         String
+  input            Json
+  output           String?        @db.Text
+  status           ToolCallStatus
+  requiresApproval Boolean        @default(false)
+  approvalReason   String?
+  decidedById      String?
+  decidedAt        DateTime?
+  error            String?
+  createdAt        DateTime       @default(now())
+  completedAt      DateTime?
+
+  task AgentTask  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  step AgentStep? @relation(fields: [stepId], references: [id], onDelete: SetNull)
+
+  @@index([taskId, createdAt])
+  @@index([status])
+}
+
+/// Durable, replayable event log for the agent activity feed.
+model AgentEvent {
+  id        String   @id @default(cuid())
+  taskId    String
+  seq       Int
+  type      String
+  data      Json
+  createdAt DateTime @default(now())
+
+  task AgentTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, seq])
+}
+
+// ─────────────────────────────────────────────────────────────
+// FIZZ DEV — terminal / sandbox
+// ─────────────────────────────────────────────────────────────
+
+enum TerminalStatus {
+  STARTING
+  ACTIVE
+  CLOSED
+  ERROR
+}
+
+model TerminalSession {
+  id             String         @id @default(cuid())
+  projectId      String
+  userId         String
+  name           String         @default("Terminal")
+  provider       String
+  sandboxId      String?
+  status         TerminalStatus @default(STARTING)
+  error          String?
+  createdAt      DateTime       @default(now())
+  lastActivityAt DateTime       @default(now())
+  closedAt       DateTime?
+
+  project  Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  commands TerminalCommand[]
+
+  @@index([projectId, status])
+  @@index([userId, status])
+}
+
+/// Doubles as command history and execution audit log.
+model TerminalCommand {
+  id         String    @id @default(cuid())
+  sessionId  String
+  command    String    @db.Text
+  initiator  String    @default("user")
+  exitCode   Int?
+  output     String?   @db.Text
+  timedOut   Boolean   @default(false)
+  durationMs Int?
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+
+  session TerminalSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, startedAt])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Plans, subscriptions, usage, models
+// ─────────────────────────────────────────────────────────────
+
+model Plan {
+  id                   String   @id @default(cuid())
+  key                  String   @unique
+  name                 String
+  description          String   @default("")
+  /// null = price not decided / not for sale yet.
+  priceMonthlyCents    Int?
+  priceYearlyCents     Int?
+  currency             String   @default("USD")
+  stripePriceMonthlyId String?
+  stripePriceYearlyId  String?
+  isPublic             Boolean  @default(true)
+  active               Boolean  @default(true)
+  sortOrder            Int      @default(0)
+  /// See src/lib/plans.ts (PlanLimits) for the shape.
+  limits               Json
+  features             String[] @default([])
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  subscriptions Subscription[]
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  TRIALING
+  PAST_DUE
+  CANCELED
+  INCOMPLETE
+}
+
+model Subscription {
+  id                     String             @id @default(cuid())
+  userId                 String             @unique
+  planId                 String
+  status                 SubscriptionStatus @default(ACTIVE)
+  /// "none" (free / admin-granted) or "stripe"
+  provider               String             @default("none")
+  providerCustomerId     String?
+  providerSubscriptionId String?            @unique
+  currentPeriodStart     DateTime?
+  currentPeriodEnd       DateTime?
+  cancelAtPeriodEnd      Boolean            @default(false)
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan Plan @relation(fields: [planId], references: [id])
+
+  @@index([providerCustomerId])
+}
+
+enum UsageKind {
+  CHAT_MESSAGE
+  AGENT_RUN
+  AGENT_TOOL_CALL
+  TOKENS
+  UPLOAD
+  IMAGE_GENERATION
+  WEB_SEARCH
+  TERMINAL_SECONDS
+  BROWSER_ACTION
+}
+
+model UsageRecord {
+  id           String    @id @default(cuid())
+  userId       String
+  kind         UsageKind
+  quantity     Int       @default(1)
+  provider     String?
+  model        String?
+  inputTokens  Int?
+  outputTokens Int?
+  metadata     Json      @default("{}")
+  createdAt    DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, kind, createdAt])
+  @@index([kind, createdAt])
+}
+
+model AiModel {
+  id                String   @id
+  provider          String
+  displayName       String
+  description       String   @default("")
+  enabled           Boolean  @default(true)
+  isDefault         Boolean  @default(false)
+  /// Plans allowed to use this model; empty = every plan.
+  allowedPlans      String[] @default([])
+  supportsVision    Boolean  @default(false)
+  supportsTools     Boolean  @default(true)
+  supportsDocuments Boolean  @default(false)
+  contextWindow     Int?
+  maxOutputTokens   Int      @default(16000)
+  sortOrder         Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────────────────────
+// FIZZ Wallet & purchasing
+// ─────────────────────────────────────────────────────────────
+
+enum MoneyMode {
+  DEMO
+  LIVE
+}
+
+model Wallet {
+  id                     String    @id @default(cuid())
+  userId                 String    @unique
+  currency               String    @default("USD")
+  mode                   MoneyMode @default(DEMO)
+  perPurchaseLimitCents  Int       @default(5000)
+  monthlyLimitCents      Int       @default(20000)
+  agentPurchasingEnabled Boolean   @default(false)
+  frozen                 Boolean   @default(false)
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entries      LedgerEntry[]
+  transactions Transaction[]
+}
+
+enum LedgerEntryType {
+  DEPOSIT
+  HOLD
+  HOLD_RELEASE
+  PURCHASE
+  REFUND
+  ADJUSTMENT
+}
+
+/// Append-only, double-entry style ledger. Balance = sum(amountCents) per mode.
+model LedgerEntry {
+  id             String          @id @default(cuid())
+  walletId       String
+  type           LedgerEntryType
+  /// Signed amount: positive credits, negative debits.
+  amountCents    Int
+  currency       String
+  mode           MoneyMode
+  description    String
+  referenceType  String?
+  referenceId    String?
+  providerRef    String?
+  idempotencyKey String?         @unique
+  createdAt      DateTime        @default(now())
+
+  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@index([walletId, mode, createdAt])
+  @@index([referenceType, referenceId])
+}
+
+enum PurchaseStatus {
+  PENDING_APPROVAL
+  APPROVED
+  PROCESSING
+  COMPLETED
+  REQUIRES_MANUAL_CHECKOUT
+  FAILED
+  REJECTED
+  EXPIRED
+  CANCELLED
+}
+
+model PurchaseRequest {
+  id                   String         @id @default(cuid())
+  userId               String
+  projectId            String?
+  agentTaskId          String?
+  connector            String
+  merchant             String
+  itemType             String
+  itemName             String
+  details              Json           @default("{}")
+  amountCents          Int
+  currency             String
+  recurring            Boolean        @default(false)
+  recurringInterval    String?
+  recurringAmountCents Int?
+  status               PurchaseStatus @default(PENDING_APPROVAL)
+  mode                 MoneyMode
+  createdBy            String
+  failureReason        String?
+  manualCheckoutUrl    String?
+  expiresAt            DateTime
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project     Project?           @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  approvals   PurchaseApproval[]
+  transaction Transaction?
+
+  @@index([userId, status, createdAt])
+}
+
+model PurchaseApproval {
+  id                   String   @id @default(cuid())
+  purchaseRequestId    String
+  userId               String
+  decision             String
+  confirmedAmountCents Int
+  confirmedMerchant    String
+  confirmedRecurring   Boolean
+  ipAddress            String?
+  userAgent            String?
+  createdAt            DateTime @default(now())
+
+  purchaseRequest PurchaseRequest @relation(fields: [purchaseRequestId], references: [id], onDelete: Cascade)
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([purchaseRequestId])
+}
+
+enum TransactionStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+model Transaction {
+  id                    String            @id @default(cuid())
+  purchaseRequestId     String?           @unique
+  userId                String
+  walletId              String
+  kind                  String
+  provider              String
+  providerTransactionId String?
+  status                TransactionStatus
+  amountCents           Int
+  refundedCents         Int               @default(0)
+  currency              String
+  mode                  MoneyMode
+  receipt               Json              @default("{}")
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  purchaseRequest PurchaseRequest? @relation(fields: [purchaseRequestId], references: [id], onDelete: SetNull)
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wallet          Wallet           @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([provider, providerTransactionId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Platform operations
+// ─────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  actorType  String
+  action     String
+  targetType String?
+  targetId   String?
+  metadata   Json     @default("{}")
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+  @@index([targetType, targetId])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  type      String
+  title     String
+  body      String    @default("")
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+}
+
+enum SupportStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+model SupportRequest {
+  id        String        @id @default(cuid())
+  userId    String?
+  email     String
+  name      String
+  subject   String
+  category  String        @default("general")
+  message   String        @db.Text
+  status    SupportStatus @default(OPEN)
+  priority  String        @default("normal")
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  user    User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  replies SupportReply[]
+
+  @@index([status, createdAt])
+  @@index([userId])
+}
+
+model SupportReply {
+  id        String   @id @default(cuid())
+  requestId String
+  authorId  String?
+  isStaff   Boolean  @default(false)
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+
+  request SupportRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  author  User?          @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([requestId, createdAt])
+}
+
+model AbuseReport {
+  id           String    @id @default(cuid())
+  reporterId   String?
+  targetType   String
+  targetId     String
+  reason       String
+  details      String    @default("")
+  status       String    @default("OPEN")
+  resolution   String?
+  resolvedById String?
+  resolvedAt   DateTime?
+  createdAt    DateTime  @default(now())
+
+  reporter   User? @relation("reporter", fields: [reporterId], references: [id], onDelete: SetNull)
+  resolvedBy User? @relation("resolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+}
+
+model FeatureFlag {
+  key         String   @id
+  description String   @default("")
+  enabled     Boolean  @default(false)
+  updatedAt   DateTime @updatedAt
+}
+
+model ErrorLog {
+  id        String   @id @default(cuid())
+  level     String   @default("error")
+  source    String
+  message   String
+  stack     String?  @db.Text
+  context   Json     @default("{}")
+  userId    String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([source, createdAt])
+}
+
+model SystemSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}

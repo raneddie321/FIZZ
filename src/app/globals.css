@@ -1,0 +1,259 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ── Design tokens ─────────────────────────────────────────── */
+:root {
+  --background: #ffffff;
+  --foreground: #0b1220;
+  --surface: #f7f8fa;
+  --surface-2: #f1f3f6;
+  --card: #ffffff;
+  --popover: #ffffff;
+  --muted: #f1f3f6;
+  --muted-foreground: #5b6474;
+  --border: #e4e7ec;
+  --input: #d5dae2;
+  --ring: #2f6fed;
+  --primary: #1f5eea;
+  --primary-hover: #1a50c8;
+  --primary-foreground: #ffffff;
+  --primary-soft: #eaf1fe;
+  --accent: #eef1f6;
+  --accent-foreground: #0b1220;
+  --dev: #0b8fa8;
+  --dev-hover: #097a8f;
+  --dev-soft: #e5f6f9;
+  --success: #15803d;
+  --success-soft: #e8f6ed;
+  --warning: #b45309;
+  --warning-soft: #fdf3e3;
+  --destructive: #dc2626;
+  --destructive-soft: #fdecec;
+  --code-bg: #f6f8fa;
+  --shadow-color: 220 30% 10%;
+  --radius: 10px;
+  color-scheme: light;
+}
+
+.dark {
+  --background: #0b0e14;
+  --foreground: #e6e9ef;
+  --surface: #10141b;
+  --surface-2: #151a23;
+  --card: #11151d;
+  --popover: #141922;
+  --muted: #161b25;
+  --muted-foreground: #8d96a8;
+  --border: #232a36;
+  --input: #2c3443;
+  --ring: #5b93ff;
+  --primary: #4d8bff;
+  --primary-hover: #6b9fff;
+  --primary-foreground: #06101f;
+  --primary-soft: #14223d;
+  --accent: #1a202b;
+  --accent-foreground: #e6e9ef;
+  --dev: #2bc4dc;
+  --dev-hover: #52d2e6;
+  --dev-soft: #0f2a31;
+  --success: #3fbf6f;
+  --success-soft: #11291b;
+  --warning: #f0a647;
+  --warning-soft: #2d2212;
+  --destructive: #f26464;
+  --destructive-soft: #301617;
+  --code-bg: #0f131a;
+  --shadow-color: 220 40% 2%;
+  color-scheme: dark;
+}
+
+/* FIZZ DEV uses cyan as its primary accent while sharing every other token. */
+[data-product="dev"] {
+  --primary: var(--dev);
+  --primary-hover: var(--dev-hover);
+  --primary-soft: var(--dev-soft);
+  --ring: var(--dev);
+}
+.dark [data-product="dev"],
+.dark[data-product="dev"] {
+  --primary-foreground: #031418;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-card: var(--card);
+  --color-popover: var(--popover);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-soft: var(--primary-soft);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-dev: var(--dev);
+  --color-dev-soft: var(--dev-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-destructive: var(--destructive);
+  --color-destructive-soft: var(--destructive-soft);
+  --color-code: var(--code-bg);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --animate-fade-in: fade-in 160ms ease-out;
+  --animate-slide-up: slide-up 180ms ease-out;
+  --animate-pulse-dot: pulse-dot 1.2s ease-in-out infinite;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 1; }
+}
+
+/* ── Base ──────────────────────────────────────────────────── */
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01", "cv11";
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--primary) 25%, transparent);
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Scrollbars ────────────────────────────────────────────── */
+.thin-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--muted-foreground) 35%, transparent) transparent;
+}
+
+/* ── Markdown (chat) ───────────────────────────────────────── */
+.fizz-prose {
+  font-size: 0.95rem;
+  line-height: 1.7;
+}
+.fizz-prose > :first-child { margin-top: 0; }
+.fizz-prose > :last-child { margin-bottom: 0; }
+.fizz-prose p { margin: 0.75em 0; }
+.fizz-prose h1, .fizz-prose h2, .fizz-prose h3, .fizz-prose h4 {
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 1.4em 0 0.5em;
+}
+.fizz-prose h1 { font-size: 1.35em; }
+.fizz-prose h2 { font-size: 1.2em; }
+.fizz-prose h3 { font-size: 1.05em; }
+.fizz-prose ul, .fizz-prose ol { margin: 0.75em 0; padding-left: 1.4em; }
+.fizz-prose ul { list-style: disc; }
+.fizz-prose ol { list-style: decimal; }
+.fizz-prose li { margin: 0.25em 0; }
+.fizz-prose li::marker { color: var(--muted-foreground); }
+.fizz-prose a { color: var(--primary); text-decoration: underline; text-underline-offset: 2px; }
+.fizz-prose blockquote {
+  border-left: 3px solid var(--border);
+  padding-left: 1em;
+  color: var(--muted-foreground);
+  margin: 1em 0;
+}
+.fizz-prose hr { border: none; border-top: 1px solid var(--border); margin: 1.5em 0; }
+.fizz-prose :not(pre) > code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 0.1em 0.35em;
+}
+.fizz-prose pre {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.84rem;
+  line-height: 1.6;
+  overflow-x: auto;
+  padding: 0.9rem 1rem;
+  background: var(--code-bg);
+}
+.fizz-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+  margin: 1em 0;
+}
+.fizz-prose th, .fizz-prose td {
+  border: 1px solid var(--border);
+  padding: 0.45em 0.7em;
+  text-align: left;
+}
+.fizz-prose th { background: var(--surface); font-weight: 600; }
+.fizz-prose .katex-display { overflow-x: auto; overflow-y: hidden; padding: 0.25em 0; }
+
+/* highlight.js theme mapped to tokens */
+.hljs { color: var(--foreground); background: transparent; }
+.hljs-comment, .hljs-quote { color: #6a737d; font-style: italic; }
+.hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-type { color: #cf222e; }
+.hljs-string, .hljs-regexp, .hljs-addition { color: #0a7f3f; }
+.hljs-number, .hljs-symbol, .hljs-bullet { color: #0550ae; }
+.hljs-title, .hljs-section, .hljs-function .hljs-title { color: #8250df; }
+.hljs-attr, .hljs-attribute, .hljs-variable, .hljs-template-variable { color: #953800; }
+.hljs-built_in, .hljs-name, .hljs-tag { color: #116329; }
+.hljs-meta { color: #57606a; }
+.hljs-deletion { color: #82071e; }
+.dark .hljs-comment, .dark .hljs-quote { color: #7d8590; }
+.dark .hljs-keyword, .dark .hljs-selector-tag, .dark .hljs-literal, .dark .hljs-type { color: #ff7b72; }
+.dark .hljs-string, .dark .hljs-regexp, .dark .hljs-addition { color: #a5d6ff; }
+.dark .hljs-number, .dark .hljs-symbol, .dark .hljs-bullet { color: #79c0ff; }
+.dark .hljs-title, .dark .hljs-section, .dark .hljs-function .hljs-title { color: #d2a8ff; }
+.dark .hljs-attr, .dark .hljs-attribute, .dark .hljs-variable, .dark .hljs-template-variable { color: #ffa657; }
+.dark .hljs-built_in, .dark .hljs-name, .dark .hljs-tag { color: #7ee787; }
+.dark .hljs-meta { color: #8b949e; }
+
+/* xterm container */
+.xterm { padding: 6px 8px; height: 100%; }
+.xterm-viewport { scrollbar-width: thin; }
