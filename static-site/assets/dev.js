@@ -8,11 +8,7 @@
   const uid = () => crypto.randomUUID();
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const COLORS = ["#8fd3f4", "#c9a7f0", "#a8e0a0", "#f7c58b", "#f4a3b5", "#9ee6dc"];
-  const MODELS = [
-    { id: "claude-opus-5-5", name: "Fizz Code 1.0", note: "Best for building and complex tasks" },
-    { id: "claude-sonnet-5-5", name: "Fizz Code Swift", note: "Fast and capable" },
-    { id: "claude-haiku-5-5", name: "Fizz Lite", note: "Quickest for simple questions" },
-  ];
+  const MODELS = window.FIZZ.MODELS.map((m) => ({ id: m.id, name: m.dev, note: m.note }));
 
   function toast(msg) {
     const t = $("#toast");
@@ -31,73 +27,13 @@
     del(k) { try { localStorage.removeItem(k); } catch {} },
   };
 
-  // ---------- auth (PBKDF2-SHA256, 210k iterations) ----------
-  const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
-  async function hashPassword(password, saltB64) {
-    const salt = saltB64 ? Uint8Array.from(atob(saltB64), (c) => c.charCodeAt(0)) : crypto.getRandomValues(new Uint8Array(16));
-    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
-    const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations: 210000 }, key, 256);
-    return { salt: b64(salt), hash: b64(bits) };
-  }
-  const users = () => store.get("fizz.users", {});
-  const validEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
-
-  let user = null; // {id, name, email}
-  let data = null; // per-user data
-  const dataKey = () => `fizz.data.${user.id}`;
-  const save = () => store.set(dataKey(), data);
-
-  function loadUser(u) {
-    user = { id: u.id, name: u.name, email: u.email };
-    data = store.get(dataKey(), null) || { settings: { apiKey: "", instructions: "", model: MODELS[0].id }, projects: [] };
-    if (!data.projects.length) {
-      data.projects.push(newProjectObj("My first project"));
-      save();
-    }
-    state.projectId = data.projects[0].id;
-    state.chatId = null;
-    showApp();
-  }
-
-  async function signUp(form) {
-    const f = new FormData(form);
-    const name = String(f.get("name")).trim();
-    const email = String(f.get("email")).trim().toLowerCase();
-    const pw = String(f.get("password"));
-    if (!name) return "Enter your name.";
-    if (!validEmail(email)) return "Enter a valid email address.";
-    if (pw.length < 8 || !/[a-zA-Z]/.test(pw) || !/\d/.test(pw)) return "Password must be at least 8 characters with letters and numbers.";
-    if (pw !== f.get("confirm")) return "Passwords don't match.";
-    if (!f.get("terms")) return "Please accept the terms of use.";
-    const all = users();
-    if (all[email]) return "An account with this email already exists. Sign in instead.";
-    const { salt, hash } = await hashPassword(pw);
-    all[email] = { id: uid(), name, email, salt, hash, created: Date.now() };
-    store.set("fizz.users", all);
-    store.set("fizz.session", { email });
-    loadUser(all[email]);
-    toast(`Welcome, ${name}!`);
-    return null;
-  }
-
-  async function signIn(form) {
-    const f = new FormData(form);
-    const email = String(f.get("email")).trim().toLowerCase();
-    const pw = String(f.get("password"));
-    const u = users()[email];
-    const { hash } = await hashPassword(pw, u ? u.salt : undefined);
-    if (!u || hash !== u.hash) return "Email or password is incorrect.";
-    store.set("fizz.session", { email });
-    loadUser(u);
-    return null;
-  }
-
-  function signOut() {
-    store.del("fizz.session");
-    user = data = null;
-    $("#app").classList.add("hidden");
-    $("#auth").classList.remove("hidden");
-  }
+  // ---------- account (shared with FIZZ via core.js) ----------
+  const F = window.FIZZ;
+  let user;
+  try { user = F.auth.require(); } catch { return; }
+  const data = F.loadData(user);
+  const save = () => F.saveData(user, data);
+  function signOut() { F.auth.signOut(); }
 
   // ---------- state ----------
   const state = { projectId: null, chatId: null, view: "chat", file: null, attachments: [], streaming: null, filter: "" };
@@ -257,50 +193,20 @@
     state.streaming = controller;
     setSending(true);
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        signal: controller.signal,
-        headers: {
-          "content-type": "application/json",
-          "x-api-key": key,
-          "anthropic-version": "2023-06-01",
-          "anthropic-dangerous-direct-browser-access": "true",
-        },
-        body: JSON.stringify({ model: data.settings.model || MODELS[0].id, max_tokens: 32000, stream: true, system: systemPrompt(p), messages: toApiMessages({ messages: c.messages.slice(0, -1) }) }),
-      });
-      if (!res.ok) {
-        let msg = `Request failed (${res.status}).`;
-        try { msg = (await res.json()).error?.message || msg; } catch {}
-        if (res.status === 401) msg = "Your API key was rejected. Check it in Settings.";
-        throw new Error(msg);
-      }
-      const reader = res.body.getReader();
-      const dec = new TextDecoder();
-      let buf = "";
-      let stop = null;
       let last = 0;
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += dec.decode(value, { stream: true });
-        let i;
-        while ((i = buf.indexOf("\n\n")) !== -1) {
-          const raw = buf.slice(0, i);
-          buf = buf.slice(i + 2);
-          const line = raw.split("\n").find((l) => l.startsWith("data:"));
-          if (!line) continue;
-          let ev;
-          try { ev = JSON.parse(line.slice(5)); } catch { continue; }
-          if (ev.type === "content_block_delta" && ev.delta?.type === "text_delta") reply.content += ev.delta.text;
-          if (ev.type === "message_delta") stop = ev.delta?.stop_reason;
-          if (ev.type === "error") throw new Error(ev.error?.message || "The AI service returned an error.");
-        }
-        if (Date.now() - last > 60) { last = Date.now(); renderMessages(); }
-      }
-      if (stop === "refusal" && !reply.content) reply.error = "Fizz Code declined this request.";
-      if (stop === "max_tokens") reply.content += "\n\n_(Response reached the length limit.)_";
+      const r = await F.streamChat({
+        apiKey: key,
+        model: data.settings.model || MODELS[0].id,
+        system: systemPrompt(p),
+        messages: toApiMessages({ messages: c.messages.slice(0, -1) }),
+        signal: controller.signal,
+        onText: (_d, full) => { reply.content = full; if (Date.now() - last > 60) { last = Date.now(); renderMessages(); } },
+      });
+      reply.content = r.text;
+      if (r.stop === "refusal" && !r.text) reply.error = "Fizz Code declined this request.";
+      if (r.stop === "max_tokens") reply.content += "\n\n_(Response reached the length limit.)_";
     } catch (e) {
-      if (e.name !== "AbortError") reply.error = e.message === "Failed to fetch" ? "Couldn't reach the AI service. Check your connection." : e.message;
+      if (e.name !== "AbortError") reply.error = e.message;
     } finally {
       reply.pending = false;
       state.streaming = null;
@@ -454,9 +360,7 @@
       const name = f.name.value.trim();
       if (name) {
         user.name = name;
-        const all = users();
-        all[user.email].name = name;
-        store.set("fizz.users", all);
+        F.auth.rename(name);
       }
       save();
       renderAll();
@@ -466,35 +370,6 @@
 
   // ---------- events ----------
   function bind() {
-    $$(".tab").forEach((t) =>
-      t.addEventListener("click", () => {
-        $$(".tab").forEach((x) => x.classList.toggle("active", x === t));
-        $("#signin-form").classList.toggle("hidden", t.dataset.tab !== "signin");
-        $("#signup-form").classList.toggle("hidden", t.dataset.tab !== "signup");
-      }),
-    );
-    for (const [id, fn] of [["#signin-form", signIn], ["#signup-form", signUp]]) {
-      $(id).addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const btn = $("button[type=submit]", e.target);
-        btn.disabled = true;
-        const err = await fn(e.target);
-        btn.disabled = false;
-        $(".form-error", e.target).textContent = err || "";
-        if (!err) e.target.reset();
-      });
-    }
-    $("#forgot-btn").addEventListener("click", async () => {
-      const email = (await ask("Reset account", "Accounts are stored only in this browser, so there's no email reset. You can remove the account for this email and create it again — its projects will be deleted.", ""))?.toLowerCase();
-      if (!email) return;
-      const all = users();
-      if (!all[email]) return toast("No account with that email in this browser.");
-      store.del(`fizz.data.${all[email].id}`);
-      delete all[email];
-      store.set("fizz.users", all);
-      toast("Account removed. You can create it again.");
-    });
-
     $("#project-list").addEventListener("click", (e) => {
       const b = e.target.closest("[data-project]");
       if (!b) return;
@@ -541,6 +416,7 @@
       const a = e.target.closest("[data-action]")?.dataset.action;
       const p = project();
       if (a === "settings") openSettings();
+      if (a === "chat") location.href = "chat.html";
       if (a === "signout") signOut();
       if (a === "download") downloadZip();
       if (a === "rename" && p) {
@@ -638,11 +514,7 @@
     $("#delete-account").addEventListener("click", async () => {
       $("#dlg-settings").close();
       if (!(await ask("Delete account?", "Your account, projects and chats will be permanently deleted from this browser.", null))) return;
-      const all = users();
-      delete all[user.email];
-      store.set("fizz.users", all);
-      store.del(dataKey());
-      signOut();
+      F.auth.deleteAccount();
     });
     document.addEventListener("keydown", (e) => { if (e.key === "Escape" && state.streaming) state.streaming.abort(); });
   }
@@ -653,17 +525,10 @@
     ta.style.height = Math.min(ta.scrollHeight, 220) + "px";
   }
 
-  function showApp() {
-    $("#auth").classList.add("hidden");
-    $("#app").classList.remove("hidden");
-    setView("chat");
-    renderAll();
-  }
-
   // ---------- boot ----------
+  if (!data.projects.length) { data.projects.push(newProjectObj("My first project")); save(); }
+  state.projectId = data.projects[0].id;
   bind();
-  const session = store.get("fizz.session", null);
-  const u = session && users()[session.email];
-  if (u) loadUser(u);
-  else $("#auth").classList.remove("hidden");
+  setView("chat");
+  renderAll();
 })();

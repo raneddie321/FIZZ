@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Contact support · FIZZ</title>
+<meta name="description" content="Contact the RANEDDIE support team." />
+<link rel="icon" href="icon.svg" />
+<link rel="stylesheet" href="assets/site.css" />
+<script>try{var t=localStorage.getItem("fizz.theme");t=t?JSON.parse(t):"system";if(t==="dark"||(t!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}</script>
+<script src="assets/core.js" defer></script>
+<script src="assets/site.js" defer></script>
+</head>
+<body>
+<header data-site></header>
+<main id="main">
+
+<section class="section"><div class="grid-2" style="align-items:start">
+<div><p class="eyebrow">Support</p><h1 class="h2">How can we help?</h1><p class="lead">Send us a message and the RANEDDIE support team will get back to you by email.</p></div>
+<div><div id="contact-status" class="hidden"></div>
+<form id="contact-form" name="contact" method="POST" data-netlify="true" netlify-honeypot="company" class="form panel-box">
+  <input type="hidden" name="form-name" value="contact" />
+  <p class="hidden"><label>Leave empty <input name="company" /></label></p>
+  <div class="grid-2" style="gap:16px">
+    <label class="field"><span>Name</span><input class="input" name="name" required maxlength="80" autocomplete="name" /></label>
+    <label class="field"><span>Email</span><input class="input" name="email" type="email" required maxlength="254" autocomplete="email" /></label>
+  </div>
+  <label class="field"><span>Topic</span><select class="select" name="topic"><option>General question</option><option>Account & RANEDDIE ID</option><option>Billing</option><option>Technical problem</option><option>Report abuse</option></select></label>
+  <label class="field"><span>Subject</span><input class="input" name="subject" required maxlength="140" /></label>
+  <label class="field"><span>Message</span><textarea class="textarea" name="message" required minlength="10" maxlength="5000" rows="6"></textarea></label>
+  <div><button class="btn" type="submit">Send message</button></div>
+</form></div></div></section>
+
+</main>
+<footer data-site></footer>
+</body>
+</html>

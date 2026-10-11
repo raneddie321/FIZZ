@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>FIZZ</title>
+<link rel="icon" href="icon.svg" />
+<link rel="stylesheet" href="assets/site.css" />
+<script>try{var t=localStorage.getItem("fizz.theme");t=t?JSON.parse(t):"system";if(t==="dark"||(t!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}</script>
+<script src="vendor/marked.min.js"></script>
+<script src="vendor/purify.min.js"></script>
+<script src="assets/core.js"></script>
+<script src="assets/site.js"></script>
+</head>
+<body>
+<div class="chat-app" id="chat-app">
+  <div class="scrim hidden" id="scrim"></div>
+  <aside class="chat-side" aria-label="Conversations">
+    <div class="head">
+      <a href="index.html" class="wordmark" style="text-decoration:none"><span data-mark></span>FIZZ</a>
+      <button class="icon-btn" id="new-chat" title="New chat (Ctrl+Shift+O)" aria-label="New chat"><span data-icon="pen"></span></button>
+    </div>
+    <nav class="switcher" aria-label="Switch product"><a class="on" href="chat.html">FIZZ</a><a class="devlink" href="dev.html">FIZZ DEV</a></nav>
+    <label class="side-search"><span data-icon="search"></span><input id="search" placeholder="Search chats" aria-label="Search conversations" /></label>
+    <div class="conv-list" id="conv-list"></div>
+    <div class="side-foot">
+      <button class="side-btn" id="toggle-archived"><span data-icon="history"></span><span>Archived chats</span></button>
+      <button class="me" id="me-btn" aria-haspopup="menu"><span class="avatar" id="me-avatar"></span><span style="min-width:0"><b id="me-name"></b><small>Free plan</small></span></button>
+    </div>
+  </aside>
+  <main class="chat-main" id="main">
+    <div class="chat-top">
+      <button class="icon-btn" id="open-side" aria-label="Open conversations"><span data-icon="menu"></span></button>
+      <span class="title">FIZZ</span>
+      <button class="icon-btn" id="new-chat-m" aria-label="New chat"><span data-icon="pen"></span></button>
+    </div>
+    <div class="scroll" id="scroll"><div class="thread" id="thread"></div></div>
+    <div class="composer-area">
+      <div class="composer-inner">
+        <div id="key-notice"></div>
+        <form class="composer" id="composer">
+          <div class="chips" id="pending"></div>
+          <textarea id="input" rows="1" placeholder="Message FIZZ" aria-label="Message"></textarea>
+          <div class="row">
+            <button type="button" class="icon-btn" id="attach" title="Attach files" aria-label="Attach files"><span data-icon="clip"></span></button>
+            <input type="file" id="file" multiple hidden accept="image/png,image/jpeg,image/gif,image/webp,.txt,.md,.csv,.json,.xml,.html,.css,.js,.ts,.tsx,.jsx,.py,.java,.c,.cpp,.go,.rs,.rb,.php,.sh,.yaml,.yml,.sql,.log" />
+            <button type="button" class="model-btn" id="model-btn" aria-haspopup="menu"></button>
+            <button type="submit" class="send" id="send" aria-label="Send"><svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+          </div>
+        </form>
+        <p class="disclaimer">FIZZ can make mistakes. Check important information.</p>
+      </div>
+    </div>
+  </main>
+</div>
+
+<dialog class="dlg" id="settings">
+  <form method="dialog" class="dlg-body" id="settings-form">
+    <h2>Settings</h2>
+    <div class="dlg-tabs" role="tablist"><button type="button" data-tab="general" class="on">General</button><button type="button" data-tab="ai">AI</button><button type="button" data-tab="account">Account</button></div>
+    <div data-pane="general" class="form">
+      <label class="field"><span>Name</span><input class="input" name="name" maxlength="80" /></label>
+      <label class="field"><span>Theme</span><select class="select" name="theme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
+    </div>
+    <div data-pane="ai" class="form hidden">
+      <label class="field"><span>Anthropic API key</span><input class="input" name="apiKey" type="password" autocomplete="off" placeholder="sk-ant-…" /><small>Required for FIZZ to answer. Stored only in this browser and sent only to api.anthropic.com. Create one at console.anthropic.com.</small></label>
+      <label class="field"><span>Default model</span><select class="select" name="model"></select></label>
+      <label class="field"><span>Response style</span><select class="select" name="style"><option value="balanced">Balanced</option><option value="concise">Concise</option><option value="detailed">Detailed</option></select></label>
+      <label class="field"><span>Custom instructions</span><textarea class="textarea" name="instructions" maxlength="2000" rows="3" placeholder="Anything FIZZ should know about you or how to respond"></textarea></label>
+    </div>
+    <div data-pane="account" class="form hidden">
+      <p style="margin:0;font-size:14px;color:var(--muted)" id="acct-email"></p>
+      <label class="field"><span>Current password</span><input class="input" name="pwCurrent" type="password" autocomplete="current-password" /></label>
+      <label class="field"><span>New password</span><input class="input" name="pwNext" type="password" autocomplete="new-password" /><small>Leave empty to keep your current password.</small></label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn btn-outline btn-sm" id="export">Export my data</button><button type="button" class="btn btn-danger btn-sm" id="delete-account">Delete account</button></div>
+    </div>
+    <p class="err" id="settings-err" style="color:var(--danger);margin:0;font-size:14px"></p>
+    <div class="dlg-actions"><button class="btn btn-outline" value="cancel" formnovalidate>Cancel</button><button class="btn" value="save" id="settings-save">Save</button></div>
+  </form>
+</dialog>
+
+<dialog class="dlg" id="confirm">
+  <form method="dialog" class="dlg-body"><h2 id="confirm-title"></h2><p class="desc" id="confirm-text"></p>
+  <div class="dlg-actions"><button class="btn btn-outline" value="cancel">Cancel</button><button class="btn btn-danger" value="ok" id="confirm-ok">Delete</button></div></form>
+</dialog>
+<script src="assets/chat.js"></script>
+</body>
+</html>
