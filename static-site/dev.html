@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="vendor/codemirror/codemirror.css" />
 <link rel="stylesheet" href="vendor/xterm/xterm.css" />
 <link rel="stylesheet" href="assets/dev.css" />
-<script>try{var t=localStorage.getItem("fizz.theme");t=t?JSON.parse(t):"system";if(t==="dark"||(t!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}</script>
+<script>document.documentElement.dataset.app=/\/dev(\.html)?$/.test(location.pathname)?"dev":"chat";try{var t=localStorage.getItem("fizz.theme");t=t?JSON.parse(t):"system";if(t==="dark"||(t!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}</script>
 <script src="vendor/marked.min.js"></script>
 <script src="vendor/purify.min.js"></script>
 <script src="vendor/jszip.min.js"></script>
@@ -32,18 +32,64 @@
 <script src="assets/settings.js"></script>
 <script src="assets/terminal.js"></script>
 </head>
-<body>
+<body class="apps">
+<div class="chat-app" id="chat-app">
+  <div class="scrim hidden" id="scrim"></div>
+  <aside class="chat-side" aria-label="Conversations">
+    <div class="head">
+      <a href="index.html" class="logo" aria-label="FIZZ home"><img src="assets/logo-fizz.png" alt="fizz" /></a>
+      <button class="icon-btn" id="new-chat" title="New chat (Ctrl+Shift+O)" aria-label="New chat"><span data-icon="pen"></span></button>
+    </div>
+    <nav class="switcher" aria-label="Switch product" title="Switch instantly — Ctrl+."><a data-switch="chat" href="chat.html"><img src="assets/logo-fizz.png" alt="" />FIZZ</a><a data-switch="dev" href="dev.html"><img src="assets/logo-fizz-dev.png" alt="" />FIZZ DEV</a></nav>
+    <label class="side-search"><span data-icon="search"></span><input id="search" placeholder="Search chats" aria-label="Search conversations" /></label>
+    <div class="conv-list" id="conv-list"></div>
+    <div class="side-foot">
+      <button class="side-btn" id="toggle-archived"><span data-icon="history"></span><span>Archived chats</span></button>
+      <button class="me" id="me-btn" aria-haspopup="menu"><span class="avatar" id="me-avatar"></span><span style="min-width:0"><b id="me-name"></b><small>Free plan</small></span></button>
+    </div>
+  </aside>
+  <main class="chat-main" id="main">
+    <div class="chat-top">
+      <button class="icon-btn" id="open-side" aria-label="Open conversations"><span data-icon="menu"></span></button>
+      <span class="title">FIZZ</span>
+      <button class="icon-btn" id="new-chat-m" aria-label="New chat"><span data-icon="pen"></span></button>
+    </div>
+    <div class="scroll" id="scroll"><div class="thread" id="thread"></div></div>
+    <div class="composer-area">
+      <div class="composer-inner">
+        <div id="key-notice"></div>
+        <form class="composer" id="composer">
+          <div class="chips" id="pending"></div>
+          <textarea id="input" rows="1" placeholder="Message FIZZ" aria-label="Message"></textarea>
+          <div class="row">
+            <button type="button" class="icon-btn" id="attach" title="Attach files" aria-label="Attach files"><span data-icon="clip"></span></button>
+            <input type="file" id="file" multiple hidden accept="image/png,image/jpeg,image/gif,image/webp,.txt,.md,.csv,.json,.xml,.html,.css,.js,.ts,.tsx,.jsx,.py,.java,.c,.cpp,.go,.rs,.rb,.php,.sh,.yaml,.yml,.sql,.log" />
+            <button type="button" class="model-btn" id="model-btn" aria-haspopup="menu"></button>
+            <button type="submit" class="send" id="send" aria-label="Send"><svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+          </div>
+        </form>
+        <p class="disclaimer">FIZZ can make mistakes. Check important information.</p>
+      </div>
+    </div>
+  </main>
+
+<dialog class="dlg" id="confirm">
+  <form method="dialog" class="dlg-body"><h2 id="confirm-title"></h2><p class="desc" id="confirm-text"></p>
+  <div class="dlg-actions"><button class="btn btn-outline" value="cancel">Cancel</button><button class="btn btn-danger" value="ok" id="confirm-ok">Delete</button></div></form>
+</dialog>
+</div>
+
 <div class="dev-app" id="dev-app" data-view="chat">
   <div class="scrim hidden" id="scrim"></div>
 
   <!-- Sidebar (same structure as FIZZ) -->
   <aside class="chat-side" aria-label="Projects">
     <div class="head">
-      <a href="index.html" class="wordmark" style="text-decoration:none"><span data-mark="dev"></span>FIZZ<span class="dev-tag">DEV</span></a>
+      <a href="index.html" class="logo" aria-label="FIZZ DEV home"><img src="assets/logo-fizz-dev.png" alt="fizz dev" /></a>
       <button class="icon-btn" id="new-chat" title="New chat" aria-label="New chat"><span data-icon="pen"></span></button>
     </div>
-    <div style="padding:0 12px 10px"><button class="btn btn-block" id="new-project"><span aria-hidden="true">+</span> New project</button></div>
-    <nav class="switcher" aria-label="Switch product"><a href="chat.html">FIZZ</a><a class="on" href="dev.html">FIZZ DEV</a></nav>
+    <nav class="switcher" aria-label="Switch product" title="Switch instantly — Ctrl+."><a data-switch="chat" href="chat.html"><img src="assets/logo-fizz.png" alt="" />FIZZ</a><a data-switch="dev" href="dev.html"><img src="assets/logo-fizz-dev.png" alt="" />FIZZ DEV</a></nav>
+    <div class="side-label"><span>Projects</span><button class="icon-btn sm" id="new-project" title="New project" aria-label="New project">+</button></div>
     <label class="side-search"><span data-icon="search"></span><input id="search" placeholder="Search projects" aria-label="Search projects and chats" /></label>
     <div class="conv-list" id="project-list"></div>
     <div class="side-foot">
@@ -82,7 +128,7 @@
             <button type="submit" class="send" id="send" aria-label="Send"><svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
           </div>
         </form>
-        <p class="disclaimer">Fizz Code can make mistakes. Review changes before you ship. Type <kbd>/</kbd> for commands.</p>
+        <p class="disclaimer">Review changes before you ship. Type / for commands.</p>
       </div>
     </div>
   </main>
@@ -134,10 +180,12 @@
     <button data-goto="terminal"><span data-icon="terminal"></span>Terminal</button>
     <button data-goto="browser"><span data-icon="globe"></span>Browser</button>
   </nav>
-</div>
 
 <dialog class="dlg" id="prompt-dlg"><form method="dialog" class="dlg-body" id="prompt-form"></form></dialog>
 <dialog class="dlg" id="quick-open"><div class="dlg-body"><input class="input mono" id="qo-input" placeholder="Go to file…" aria-label="Go to file" /><div class="qo-list" id="qo-list"></div></div></dialog>
+</div>
+
+<script src="assets/chat.js"></script>
 <script src="assets/dev.js"></script>
 </body>
 </html>

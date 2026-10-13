@@ -247,4 +247,11 @@ page("signin.html", "Sign in · FIZZ", "Sign in with your RANEDDIE ID.", f"""
 page("404.html", "Page not found · FIZZ", "Page not found.", """
 <section class="section center"><p class="eyebrow">404</p><h1 class="h2">This page doesn't exist</h1><p class="lead">The link may be broken or the page may have moved.</p><div class="cta-row"><a class="btn" href="index.html">Go home</a></div></section>
 """)
+# FIZZ and FIZZ DEV are one page (scripts/app-shell.html) so switching between them never reloads.
+# chat.html and dev.html are the same document; the path only picks which app shows first.
+import pathlib as _pl
+_shell = (_pl.Path(__file__).parent / "app-shell.html").read_text()
+_out = _pl.Path(__file__).parent.parent / "static-site"
+(_out / "chat.html").write_text(_shell)
+(_out / "dev.html").write_text(_shell.replace("<title>FIZZ</title>", "<title>FIZZ DEV</title>", 1))
 print("pages written")

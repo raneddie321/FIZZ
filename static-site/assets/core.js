@@ -116,8 +116,11 @@
   };
 
   // ---------- per-user data ----------
+  // One shared object per user, so FIZZ and FIZZ DEV running on the same page never overwrite each other.
+  const dataCache = {};
   function loadData(user) {
-    const d = store.get(`fizz.data.${user.id}`, null) || {};
+    if (dataCache[user.id]) return dataCache[user.id];
+    const d = (dataCache[user.id] = store.get(`fizz.data.${user.id}`, null) || {});
     d.settings = Object.assign({ provider: "fizz", apiKey: "", openrouterKey: "", openrouterModel: "z-ai/glm-4.6", instructions: "", model: "claude-opus-5-5", style: "balanced" }, d.settings || {});
     d.conversations ||= [];
     d.projects ||= [];
@@ -342,6 +345,45 @@
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   }
 
-  window.FIZZ = { serverStatus, aiStream, providerLabel, openrouterConnect, openrouterFinish, toOpenAI, store, esc, uid, theme, auth, loadData, saveData, MODELS, streamChat, readAttachment, toApiContent, markdown, toast, download, validEmail };
+  // ---------- in-page switch between FIZZ and FIZZ DEV (no reload) ----------
+  const APP_PAGES = { chat: "chat.html", dev: "dev.html" };
+  const appHooks = { chat: [], dev: [] };
+  const app = {
+    current: () => document.documentElement.dataset.app || "chat",
+    onShow(name, fn) { appHooks[name].push(fn); },
+    switch(name, payload, { push = true } = {}) {
+      if (!APP_PAGES[name]) return;
+      const root = document.documentElement;
+      const same = app.current() === name;
+      if (push && !same) {
+        const hash = name === "chat" ? store.get("fizz.chat.last", "") : "";
+        history.pushState({ app: name }, "", APP_PAGES[name] + (hash ? `#${hash}` : ""));
+      }
+      const apply = () => {
+        root.dataset.app = name;
+        document.querySelectorAll("[data-switch]").forEach((a) => a.classList.toggle("on", a.dataset.switch === name));
+        appHooks[name].forEach((fn) => { try { fn(payload); } catch (e) { console.error(e); } });
+      };
+      if (same) return apply();
+      const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (document.startViewTransition && !reduce) document.startViewTransition(apply);
+      else apply();
+    },
+  };
+  if (document.documentElement.dataset.app) {
+    document.addEventListener("click", (e) => {
+      const a = e.target.closest("a[data-switch]");
+      if (!a || e.ctrlKey || e.metaKey || e.shiftKey || e.button) return;
+      e.preventDefault();
+      app.switch(a.dataset.switch);
+    });
+    document.addEventListener("DOMContentLoaded", () => document.querySelectorAll("[data-switch]").forEach((a) => a.classList.toggle("on", a.dataset.switch === app.current())));
+    window.addEventListener("popstate", () => app.switch(/\/dev(\.html)?$/.test(location.pathname) ? "dev" : "chat", null, { push: false }));
+    window.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === ".") { e.preventDefault(); app.switch(app.current() === "dev" ? "chat" : "dev"); }
+    });
+  }
+
+  window.FIZZ = { app, serverStatus, aiStream, providerLabel, openrouterConnect, openrouterFinish, toOpenAI, store, esc, uid, theme, auth, loadData, saveData, MODELS, streamChat, readAttachment, toApiContent, markdown, toast, download, validEmail };
   theme.init();
 })();

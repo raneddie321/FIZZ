@@ -1,7 +1,7 @@
 :root {
   --bg: #ffffff; --fg: #0b1220; --surface: #f7f8fa; --surface-2: #f1f3f6; --card: #ffffff; --popover: #ffffff;
-  --muted: #5b6474; --border: #e4e7ec; --input: #d5dae2; --primary: #1f5eea; --primary-hover: #1a50c8; --primary-fg: #fff;
-  --primary-soft: #eaf1fe; --accent: #eef1f6; --dev: #0b8fa8; --dev-soft: #e5f6f9; --success: #15803d; --success-soft: #e8f6ed;
+  --muted: #5b6474; --border: #e4e7ec; --input: #d5dae2; --primary: #e8620f; --primary-hover: #cc540a; --primary-fg: #fff;
+  --primary-soft: #fff1e7; --accent: #f1f2f4; --dev: #0896c4; --dev-soft: #e3f6fd; --success: #15803d; --success-soft: #e8f6ed;
   --warning: #b45309; --warning-soft: #fdf3e3; --danger: #dc2626; --danger-soft: #fdecec; --code: #f6f8fa;
   --shadow: 0 24px 60px -24px rgba(15, 23, 42, .25); --radius: 10px;
   --font: "Inter", "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -10,8 +10,8 @@
 }
 .dark {
   --bg: #0b0e14; --fg: #e6e9ef; --surface: #10141b; --surface-2: #151a23; --card: #11151d; --popover: #141922;
-  --muted: #8d96a8; --border: #232a36; --input: #2c3443; --primary: #4d8bff; --primary-hover: #6b9fff; --primary-fg: #06101f;
-  --primary-soft: #14223d; --accent: #1a202b; --dev: #2bc4dc; --dev-soft: #0f2a31; --success: #3fbf6f; --success-soft: #11291b;
+  --muted: #8d96a8; --border: #232a36; --input: #2c3443; --primary: #ff8a3d; --primary-hover: #ffa063; --primary-fg: #1d0d02;
+  --primary-soft: #2e1c10; --accent: #1a1e26; --dev: #1ccaff; --dev-soft: #0c2733; --success: #3fbf6f; --success-soft: #11291b;
   --warning: #f0a647; --warning-soft: #2d2212; --danger: #f26464; --danger-soft: #301617; --code: #0f131a;
   --shadow: 0 24px 60px -24px rgba(0, 0, 0, .7);
   color-scheme: dark;
@@ -46,7 +46,8 @@ svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-widt
 .badge-primary { background: var(--primary-soft); color: var(--primary); }
 
 /* brand */
-.mark { width: 26px; height: 26px; flex: none; }
+.mark { width: 26px; height: 26px; flex: none; border-radius: 7px; }
+.wordmark .logo-img { height: 26px; width: auto; display: block; }
 .wordmark { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; font-weight: 650; font-size: 17px; letter-spacing: -.01em; }
 .wordmark .dev-tag { font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: .08em; padding: 2px 6px; border-radius: 5px; background: var(--dev-soft); color: var(--dev); }
 
@@ -188,10 +189,29 @@ table.compare thead th { background: var(--surface); border-top: 0; }
 .chat-app { display: flex; height: 100dvh; overflow: hidden; }
 .chat-side { width: 272px; flex: none; display: flex; flex-direction: column; background: var(--surface); border-right: 1px solid var(--border); }
 .chat-side .head { height: 56px; display: flex; align-items: center; justify-content: space-between; padding: 0 10px 0 14px; }
-.switcher { display: flex; margin: 0 12px 10px; padding: 2px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); font-size: 13px; }
-.switcher a { flex: 1; text-align: center; padding: 5px; border-radius: 7px; text-decoration: none; color: var(--muted); font-weight: 500; }
-.switcher a.on { background: var(--bg); color: var(--fg); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
-.switcher a.devlink:hover { color: var(--dev); }
+.chat-side .logo { display: flex; align-items: center; padding: 4px; margin-left: -4px; border-radius: 8px; }
+.chat-side .logo img { height: 24px; width: auto; display: block; }
+#dev-app .chat-side .logo img { height: 30px; }
+.switcher { position: relative; display: flex; align-items: center; margin: 0 12px 12px; padding: 3px; border-radius: 10px; background: var(--accent); font-size: 13px; }
+.switcher a { position: relative; z-index: 1; flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 6px 4px; border-radius: 7px; text-decoration: none; color: var(--muted); font-weight: 550; transition: color .15s; }
+.switcher a img { height: 11px; width: auto; opacity: .55; filter: grayscale(1); transition: opacity .15s, filter .15s; display: none; }
+.switcher a:hover { color: var(--fg); }
+.switcher a.on { color: var(--fg); }
+.switcher a.on img { opacity: 1; filter: none; }
+.switcher::before { content: ""; position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / 2); border-radius: 7px; background: var(--bg); box-shadow: 0 1px 2px rgba(0,0,0,.1), 0 0 0 1px var(--border); transition: transform .25s cubic-bezier(.3,.7,.2,1); }
+html[data-app="dev"] .switcher::before { transform: translateX(100%); }
+.switcher kbd { width: 26px; text-align: center; font: 10.5px var(--mono); color: var(--muted); border: 0; background: none; }
+.side-label { display: flex; align-items: center; justify-content: space-between; margin: 2px 12px 4px 14px; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+
+/* FIZZ and FIZZ DEV live on one page; only the active one is shown */
+html[data-app="chat"] #dev-app, html[data-app="dev"] #chat-app { display: none !important; }
+html[data-app="dev"] { --primary: var(--dev); --primary-hover: #0782ab; --primary-soft: var(--dev-soft); --primary-fg: #fff; }
+html.dark[data-app="dev"] { --primary-hover: #5ad8ff; --primary-fg: #02141c; }
+html[data-app] .switcher a.on { color: var(--primary); }
+::view-transition-old(root) { animation: fizz-out .16s ease both; }
+::view-transition-new(root) { animation: fizz-in .22s cubic-bezier(.2,.7,.2,1) both; }
+@keyframes fizz-out { to { opacity: 0; } }
+@keyframes fizz-in { from { opacity: 0; transform: translateY(6px) scale(.995); } }
 .side-search { position: relative; margin: 0 12px 8px; }
 .side-search svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); }
 .side-search input { width: 100%; height: 36px; padding: 0 10px 0 32px; border: 1px solid var(--border); border-radius: 9px; background: var(--bg); font-size: 14px; }
@@ -335,3 +355,4 @@ dialog.dlg::backdrop { background: rgba(0,0,0,.45); }
 .conn-body b { display: block; font-size: 14px; }
 .conn-body small { display: block; color: var(--muted); font-size: 12.5px; }
 .conn-body .conn-state { color: var(--fg); margin-top: 3px; }
+@media (hover: none) { .m-actions { opacity: 1; } }

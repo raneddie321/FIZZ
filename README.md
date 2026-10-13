@@ -53,6 +53,13 @@ Never put secrets in code or in chat. Set them only in Netlify.
 - If any credential was ever shared in chat or email, **rotate it** in the provider's dashboard.
 - The included FIZZ AI enforces a per-visitor daily quota (Netlify Blobs) to protect your OpenRouter budget.
 
+## One app, instant switching
+
+FIZZ and FIZZ DEV are a single page (`scripts/app-shell.html`, written out as `chat.html` and `dev.html`).
+The FIZZ / FIZZ DEV switch in the sidebar — or **Ctrl+.** — swaps between them instantly in the same tab,
+with no reload: chats keep streaming, the editor and terminal keep their state, and Back/Forward work.
+Any FIZZ answer that contains code has **Build in FIZZ DEV**, which hands the answer over as an attachment.
+
 ## FIZZ DEV features
 
 - Agent chat with Build / Ask modes, step timeline (`Created index.html +24 −0`), expandable diffs,

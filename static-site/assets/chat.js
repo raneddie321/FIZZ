@@ -7,7 +7,10 @@
   try { user = F.auth.require(); } catch { return; }
   const data = F.loadData(user);
   const save = () => F.saveData(user, data);
-  const $ = (s) => document.querySelector(s);
+  const root = document.getElementById("chat-app");
+  const $ = (s) => root.querySelector(s);
+  const active = () => F.app.current() === "chat";
+  const setTitle = (t) => { if (active()) document.title = t; };
 
   const state = { id: location.hash.slice(1) || null, archived: false, query: "", pending: [], controller: null, streamingId: null, renaming: null };
   const conv = () => data.conversations.find((c) => c.id === state.id);
@@ -70,7 +73,7 @@
     if (m.error) body = `<div class="notice ${m.noKey ? "warn" : ""}"><span>${esc(m.error)}</span>${m.noKey ? `<button class="btn btn-sm" data-open-settings="ai">Open AI settings</button>` : isLast ? `<button class="btn btn-outline btn-sm" data-regen>Retry</button>` : ""}</div>`;
     else if (!m.content) body = `<span class="dots" aria-label="FIZZ is writing"><i></i><i></i><i></i></span>`;
     else body = `<div class="md">${F.markdown(m.content)}</div>`;
-    const actions = m.pending ? "" : `<div class="m-actions">${m.content ? `<button data-copy="${i}">Copy</button>` : ""}${isLast && !m.error ? `<button data-regen>Regenerate</button>` : ""}<span>${t} · ${modelName(m.model)}</span>${m.stopped ? "<span>· Stopped</span>" : ""}</div>`;
+    const actions = m.pending ? "" : `<div class="m-actions">${m.content ? `<button data-copy="${i}">Copy</button>` : ""}${isLast && !m.error ? `<button data-regen>Regenerate</button>` : ""}${m.content && /```/.test(m.content) && !m.pending ? `<button data-build="${i}" title="Open this in FIZZ DEV">Build in FIZZ DEV</button>` : ""}<span>${t} · ${modelName(m.model)}</span>${m.stopped ? "<span>· Stopped</span>" : ""}</div>`;
     return `<div class="m-ai">${F.MARK(false)}<div class="content">${body}${actions}</div></div>`;
   }
 
@@ -81,10 +84,10 @@
       const first = user.name.split(" ")[0];
       th.innerHTML = `<div class="welcome"><div><h1>How can I help, ${esc(first)}?</h1><p>Ask a question, share a file, or start with an idea.</p></div>
         <div class="suggestions">${SUGGESTIONS.map(([ic, t, p], i) => `<button class="suggestion" data-suggest="${i}">${icon(ic)}<span><b>${t}</b><span>${esc(p)}</span></span></button>`).join("")}</div></div>`;
-      document.title = "FIZZ";
+      setTitle("FIZZ");
       return;
     }
-    document.title = `${c.title} · FIZZ`;
+    setTitle(`${c.title} · FIZZ`);
     const sc = $("#scroll");
     const atBottom = sc.scrollHeight - sc.scrollTop - sc.clientHeight < 120;
     th.innerHTML = c.messages.map((m, i) => msgHtml(m, i, i === c.messages.length - 1)).join("");
@@ -115,7 +118,7 @@
     });
   }
 
-  const renderAll = () => { renderSide(); renderThread(); renderComposer(); };
+  const renderAll = () => { F.store.set("fizz.chat.last", state.id || ""); renderSide(); renderThread(); renderComposer(); };
 
   // ---------- AI ----------
   function systemPrompt() {
@@ -205,7 +208,7 @@
     return new Promise((resolve) => { m.onclick = (e) => { const b = e.target.closest("[data-k]"); if (b) { closeMenu(); resolve(b.dataset.k); } }; });
   }
   document.addEventListener("click", (e) => { if (openMenu && !openMenu.contains(e.target) && !e.target.closest("[aria-haspopup],[data-menu]")) closeMenu(); });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeMenu(); if (state.controller) state.controller.abort(); } });
+  document.addEventListener("keydown", (e) => { if (active() && e.key === "Escape") { closeMenu(); if (state.controller) state.controller.abort(); } });
 
   function confirmDlg(title, text, ok = "Delete") {
     const d = $("#confirm");
@@ -225,7 +228,7 @@
   // ---------- events ----------
   function grow() { const t = $("#input"); t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 260) + "px"; }
   function newChat() { state.id = null; history.replaceState(null, "", location.pathname); closeDrawer(); renderAll(); $("#input").focus(); }
-  const closeDrawer = () => { $("#chat-app").classList.remove("drawer"); $("#scrim").classList.add("hidden"); };
+  const closeDrawer = () => { root.classList.remove("drawer"); $("#scrim").classList.add("hidden"); };
 
   $("#composer").addEventListener("submit", (e) => { e.preventDefault(); send(); });
   $("#input").addEventListener("input", grow);
@@ -252,9 +255,9 @@
     else if (k) { data.settings.model = k; save(); renderComposer(); }
   });
   $("#me-btn").addEventListener("click", async (e) => {
-    const k = await menu(e.currentTarget, [{ label: user.email }, { k: "settings", html: "Settings" }, { k: "dev", html: "Open FIZZ DEV" }, { k: "help", html: "Help & support" }, "-", { k: "signout", html: "Sign out" }]);
+    const k = await menu(e.currentTarget, [{ label: user.email }, { k: "settings", html: "Settings" }, { k: "dev", html: "Switch to FIZZ DEV <small>Ctrl+.</small>" }, { k: "help", html: "Help & support" }, "-", { k: "signout", html: "Sign out" }]);
     if (k === "settings") openSettings();
-    if (k === "dev") location.href = "dev.html";
+    if (k === "dev") F.app.switch("dev");
     if (k === "help") location.href = "contact.html";
     if (k === "signout") F.auth.signOut();
   });
@@ -295,6 +298,13 @@
       $("#input").focus();
     }
     if (t.dataset.copy !== undefined) { navigator.clipboard.writeText(c.messages[+t.dataset.copy].content); F.toast("Copied"); }
+    if (t.dataset.build !== undefined) {
+      const ask = c.messages.slice(0, +t.dataset.build).reverse().find((m) => m.role === "user")?.content || "";
+      F.app.switch("dev", {
+        prompt: ask ? `Build this as a project: ${ask.slice(0, 300)}` : "Build this as a project.",
+        attachments: [{ type: "text", name: "answer-from-fizz.md", text: c.messages[+t.dataset.build].content.slice(0, 60000) }],
+      });
+    }
     if (t.hasAttribute("data-regen") && !state.controller) { c.messages.pop(); save(); generate(); }
     if (t.dataset.openSettings) openSettings(t.dataset.openSettings);
     if (t.dataset.edit !== undefined && !state.controller) {
@@ -314,21 +324,28 @@
       generate();
     }
   });
-  document.addEventListener("click", (e) => { const b = e.target.closest("[data-open-settings]"); if (b && !b.closest("#thread")) openSettings(b.dataset.openSettings); });
+  root.addEventListener("click", (e) => { const b = e.target.closest("[data-open-settings]"); if (b && !b.closest("#thread")) openSettings(b.dataset.openSettings); });
 
   $("#search").addEventListener("input", (e) => { state.query = e.target.value; renderSide(); });
   $("#toggle-archived").addEventListener("click", () => { state.archived = !state.archived; renderSide(); });
   $("#new-chat").addEventListener("click", newChat);
   $("#new-chat-m").addEventListener("click", newChat);
-  $("#open-side").addEventListener("click", () => { $("#chat-app").classList.add("drawer"); $("#scrim").classList.remove("hidden"); });
+  $("#open-side").addEventListener("click", () => { root.classList.add("drawer"); $("#scrim").classList.remove("hidden"); });
   $("#scrim").addEventListener("click", closeDrawer);
-  window.addEventListener("hashchange", () => { state.id = location.hash.slice(1) || null; if (state.id && !conv()) state.id = null; state.pending = []; renderAll(); });
+  window.addEventListener("hashchange", () => { if (!active()) return; state.id = location.hash.slice(1) || null; if (state.id && !conv()) state.id = null; state.pending = []; renderAll(); });
   window.addEventListener("keydown", (e) => {
+    if (!active()) return;
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "o") { e.preventDefault(); newChat(); }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); $("#search").focus(); }
   });
 
   if (state.id && !conv()) state.id = null;
+  F.app.onShow("chat", () => {
+    const id = location.hash.slice(1) || null;
+    if (id !== state.id) { state.id = data.conversations.some((x) => x.id === id) ? id : null; }
+    renderAll();
+    if (matchMedia("(hover: hover)").matches) $("#input").focus();
+  });
   renderAll();
-  $("#input").focus();
+  if (active()) $("#input").focus();
 })();

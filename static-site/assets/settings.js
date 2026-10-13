@@ -56,7 +56,7 @@
       <p class="err" data-err style="color:var(--danger);margin:0;font-size:14px"></p>
       <div class="dlg-actions"><button class="btn btn-outline" value="cancel" formnovalidate>Cancel</button><button class="btn" value="save" data-save>Save</button></div>
     </form>`;
-    (document.querySelector(".dev-app") || document.body).appendChild(d);
+    document.body.appendChild(d);
     return d;
   }
 
@@ -177,14 +177,20 @@
   }
 
   /** Call on page load: finishes an OpenRouter sign-in redirect if present. */
-  async function handleRedirects(ctx) {
+  // FIZZ and FIZZ DEV share one page, so the redirect is processed once and every app is told.
+  let redirectRun = null;
+  function handleRedirects(ctx) {
+    redirectRun ||= processRedirects(ctx);
+    redirectRun.then((key) => { if (key) ctx.onSaved?.(); });
+  }
+  async function processRedirects(ctx) {
+    let key = null;
     try {
-      const key = await F.openrouterFinish();
+      key = await F.openrouterFinish();
       if (key) {
         Object.assign(ctx.data.settings, { provider: "openrouter", openrouterKey: key });
         ctx.save();
         F.toast("OpenRouter connected");
-        ctx.onSaved?.();
       }
     } catch (e) {
       F.toast(e.message);
@@ -198,6 +204,7 @@
       F.toast(ok ? `${ok[0].toUpperCase() + ok.slice(1)} connected` : `Couldn't connect ${bad}. Please try again.`);
       F.serverStatus(true);
     }
+    return key;
   }
 
   F.settings = { open, handleRedirects };

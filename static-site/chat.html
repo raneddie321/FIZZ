@@ -6,23 +6,41 @@
 <title>FIZZ</title>
 <link rel="icon" href="icon.svg" />
 <link rel="stylesheet" href="assets/site.css" />
-<script>try{var t=localStorage.getItem("fizz.theme");t=t?JSON.parse(t):"system";if(t==="dark"||(t!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}</script>
+<link rel="stylesheet" href="vendor/codemirror/codemirror.css" />
+<link rel="stylesheet" href="vendor/xterm/xterm.css" />
+<link rel="stylesheet" href="assets/dev.css" />
+<script>document.documentElement.dataset.app=/\/dev(\.html)?$/.test(location.pathname)?"dev":"chat";try{var t=localStorage.getItem("fizz.theme");t=t?JSON.parse(t):"system";if(t==="dark"||(t!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}</script>
 <script src="vendor/marked.min.js"></script>
 <script src="vendor/purify.min.js"></script>
+<script src="vendor/jszip.min.js"></script>
+<script src="vendor/codemirror/codemirror.js"></script>
+<script src="vendor/codemirror/mode/xml.js"></script>
+<script src="vendor/codemirror/mode/javascript.js"></script>
+<script src="vendor/codemirror/mode/css.js"></script>
+<script src="vendor/codemirror/mode/htmlmixed.js"></script>
+<script src="vendor/codemirror/mode/markdown.js"></script>
+<script src="vendor/codemirror/mode/python.js"></script>
+<script src="vendor/codemirror/addon/closebrackets.js"></script>
+<script src="vendor/codemirror/addon/matchbrackets.js"></script>
+<script src="vendor/codemirror/addon/searchcursor.js"></script>
+<script src="vendor/codemirror/addon/active-line.js"></script>
+<script src="vendor/xterm/xterm.js"></script>
+<script src="vendor/xterm/addon-fit.js"></script>
 <script src="assets/core.js"></script>
 <script src="assets/site.js"></script>
 <script src="assets/connections.js"></script>
 <script src="assets/settings.js"></script>
+<script src="assets/terminal.js"></script>
 </head>
-<body>
+<body class="apps">
 <div class="chat-app" id="chat-app">
   <div class="scrim hidden" id="scrim"></div>
   <aside class="chat-side" aria-label="Conversations">
     <div class="head">
-      <a href="index.html" class="wordmark" style="text-decoration:none"><span data-mark></span>FIZZ</a>
+      <a href="index.html" class="logo" aria-label="FIZZ home"><img src="assets/logo-fizz.png" alt="fizz" /></a>
       <button class="icon-btn" id="new-chat" title="New chat (Ctrl+Shift+O)" aria-label="New chat"><span data-icon="pen"></span></button>
     </div>
-    <nav class="switcher" aria-label="Switch product"><a class="on" href="chat.html">FIZZ</a><a class="devlink" href="dev.html">FIZZ DEV</a></nav>
+    <nav class="switcher" aria-label="Switch product" title="Switch instantly — Ctrl+."><a data-switch="chat" href="chat.html"><img src="assets/logo-fizz.png" alt="" />FIZZ</a><a data-switch="dev" href="dev.html"><img src="assets/logo-fizz-dev.png" alt="" />FIZZ DEV</a></nav>
     <label class="side-search"><span data-icon="search"></span><input id="search" placeholder="Search chats" aria-label="Search conversations" /></label>
     <div class="conv-list" id="conv-list"></div>
     <div class="side-foot">
@@ -54,12 +72,120 @@
       </div>
     </div>
   </main>
-</div>
 
 <dialog class="dlg" id="confirm">
   <form method="dialog" class="dlg-body"><h2 id="confirm-title"></h2><p class="desc" id="confirm-text"></p>
   <div class="dlg-actions"><button class="btn btn-outline" value="cancel">Cancel</button><button class="btn btn-danger" value="ok" id="confirm-ok">Delete</button></div></form>
 </dialog>
+</div>
+
+<div class="dev-app" id="dev-app" data-view="chat">
+  <div class="scrim hidden" id="scrim"></div>
+
+  <!-- Sidebar (same structure as FIZZ) -->
+  <aside class="chat-side" aria-label="Projects">
+    <div class="head">
+      <a href="index.html" class="logo" aria-label="FIZZ DEV home"><img src="assets/logo-fizz-dev.png" alt="fizz dev" /></a>
+      <button class="icon-btn" id="new-chat" title="New chat" aria-label="New chat"><span data-icon="pen"></span></button>
+    </div>
+    <nav class="switcher" aria-label="Switch product" title="Switch instantly — Ctrl+."><a data-switch="chat" href="chat.html"><img src="assets/logo-fizz.png" alt="" />FIZZ</a><a data-switch="dev" href="dev.html"><img src="assets/logo-fizz-dev.png" alt="" />FIZZ DEV</a></nav>
+    <div class="side-label"><span>Projects</span><button class="icon-btn sm" id="new-project" title="New project" aria-label="New project">+</button></div>
+    <label class="side-search"><span data-icon="search"></span><input id="search" placeholder="Search projects" aria-label="Search projects and chats" /></label>
+    <div class="conv-list" id="project-list"></div>
+    <div class="side-foot">
+      <button class="me" id="me-btn" aria-haspopup="menu"><span class="avatar" id="me-avatar"></span><span style="min-width:0"><b id="me-name"></b><small id="me-sub">FIZZ DEV</small></span></button>
+    </div>
+  </aside>
+
+  <!-- Center: agent chat -->
+  <main class="dev-main" id="main">
+    <header class="dev-top">
+      <button class="icon-btn only-narrow" id="open-side" aria-label="Open projects"><span data-icon="menu"></span></button>
+      <button class="proj-title" id="proj-title" title="Rename project"></button>
+      <div class="top-actions">
+        <button class="btn btn-ghost btn-sm" id="gh-btn" aria-haspopup="menu" title="GitHub"><svg viewBox="0 0 24 24" class="i"><path fill="currentColor" stroke="none" d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.46-1.16-1.11-1.47-1.11-1.47-.9-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02a9.6 9.6 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2z"/></svg><span class="hide-xs">GitHub</span></button>
+        <button class="btn btn-sm" id="deploy-btn" title="Deploy to Vercel"><svg viewBox="0 0 24 24" class="i"><path fill="currentColor" stroke="none" d="M12 4l9 16H3z"/></svg><span class="hide-xs">Deploy</span></button>
+        <button class="icon-btn" id="more-btn" aria-haspopup="menu" aria-label="More actions">⋯</button>
+        <button class="icon-btn only-wide" id="panel-btn" aria-label="Toggle panel" title="Toggle panel"><svg viewBox="0 0 24 24" class="i"><path d="M3 4h18v16H3zM14 4v16"/></svg></button>
+        <button class="icon-btn only-mid" id="panel-btn-mid" aria-label="Open panel"><svg viewBox="0 0 24 24" class="i"><path d="M3 4h18v16H3zM14 4v16"/></svg></button>
+      </div>
+    </header>
+    <div class="scroll" id="scroll"><div class="thread dev-thread" id="thread"></div></div>
+    <div class="composer-area">
+      <div class="composer-inner">
+        <div id="notice"></div>
+        <div class="slash hidden" id="slash" role="listbox"></div>
+        <form class="composer" id="composer">
+          <div class="chips hidden" id="pending"></div>
+          <textarea id="input" rows="1" aria-label="Message" spellcheck="false"></textarea>
+          <div class="row">
+            <button type="button" class="icon-btn" id="attach" aria-haspopup="menu" aria-label="Attach"><span data-icon="clip"></span></button>
+            <input type="file" id="file" multiple hidden />
+            <div class="mode" role="radiogroup" aria-label="Mode">
+              <button type="button" role="radio" data-mode="build">Build</button><button type="button" role="radio" data-mode="ask">Ask</button>
+            </div>
+            <button type="button" class="model-btn" id="model-btn"></button>
+            <button type="submit" class="send" id="send" aria-label="Send"><svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+          </div>
+        </form>
+        <p class="disclaimer">Review changes before you ship. Type / for commands.</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- Right panel -->
+  <div class="resizer" id="resizer" role="separator" aria-orientation="vertical" aria-label="Resize panel" tabindex="0"></div>
+  <section class="panel" id="panel" aria-label="Workspace">
+    <div class="panel-tabs" role="tablist">
+      <button role="tab" data-tab="code">Code</button><button role="tab" data-tab="terminal">Terminal</button><button role="tab" data-tab="browser">Browser</button>
+      <span class="spacer"></span>
+      <button class="icon-btn" id="panel-close" aria-label="Close panel">✕</button>
+    </div>
+
+    <div class="pane pane-code" data-pane="code">
+      <div class="tree-wrap">
+        <div class="tree-head"><span>Files</span><span><button class="icon-btn sm" id="new-file" title="New file" aria-label="New file">+</button></span></div>
+        <div class="tree" id="tree" role="tree"></div>
+      </div>
+      <div class="editor-wrap">
+        <div class="file-tabs" id="file-tabs"></div>
+        <div class="editor-bar" id="editor-bar"></div>
+        <div class="editor-host" id="editor-host"></div>
+        <div class="diff-host hidden" id="diff-host"></div>
+        <div class="editor-empty" id="editor-empty"><p>Select a file, or ask Fizz Code to build something.</p></div>
+      </div>
+    </div>
+
+    <div class="pane pane-terminal" data-pane="terminal"><div class="term-host" id="term-host"></div></div>
+
+    <div class="pane pane-browser" data-pane="browser">
+      <div class="browser-bar">
+        <button class="icon-btn sm" id="br-refresh" aria-label="Refresh preview">↻</button>
+        <input class="input url" id="br-url" aria-label="Preview path" spellcheck="false" />
+        <div class="seg" id="br-devices"><button data-w="100%" class="on">Desktop</button><button data-w="820px">Tablet</button><button data-w="390px">Phone</button></div>
+        <button class="icon-btn sm" id="br-open" aria-label="Open in new tab" title="Open in new tab">↗</button>
+      </div>
+      <div class="browser-stage"><iframe id="preview" title="Live preview" sandbox="allow-scripts allow-forms allow-modals allow-popups"></iframe></div>
+      <div class="console" id="console">
+        <button class="console-head" id="console-toggle"><span>Console</span><span class="badge" id="console-count">0</span><span class="spacer"></span><span class="link" id="console-clear" role="button">Clear</span></button>
+        <div class="console-body" id="console-body"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Phone tab bar -->
+  <nav class="tabbar" aria-label="Views">
+    <button data-goto="chat"><span data-icon="chat"></span>Chat</button>
+    <button data-goto="code"><span data-icon="code"></span>Code</button>
+    <button data-goto="terminal"><span data-icon="terminal"></span>Terminal</button>
+    <button data-goto="browser"><span data-icon="globe"></span>Browser</button>
+  </nav>
+
+<dialog class="dlg" id="prompt-dlg"><form method="dialog" class="dlg-body" id="prompt-form"></form></dialog>
+<dialog class="dlg" id="quick-open"><div class="dlg-body"><input class="input mono" id="qo-input" placeholder="Go to file…" aria-label="Go to file" /><div class="qo-list" id="qo-list"></div></div></dialog>
+</div>
+
 <script src="assets/chat.js"></script>
+<script src="assets/dev.js"></script>
 </body>
 </html>

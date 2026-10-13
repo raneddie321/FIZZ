@@ -7,9 +7,10 @@
   try { user = F.auth.require(); } catch { return; }
   const data = F.loadData(user);
   const save = () => F.saveData(user, data);
-  const $ = (s, r = document) => r.querySelector(s);
-  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
-  const app = $("#dev-app");
+  const app = document.getElementById("dev-app");
+  const $ = (s, r = app) => r.querySelector(s);
+  const $$ = (s, r = app) => [...r.querySelectorAll(s)];
+  const active = () => F.app.current() === "dev";
 
   const COLORS = ["#0b8fa8", "#7c5cff", "#16a34a", "#e8590c", "#d6336c", "#1f5eea", "#c99400"];
   const newProject = (name) => ({ id: F.uid(), name, color: COLORS[data.projects.length % COLORS.length], created: Date.now(), files: {}, chats: [], history: [], git: null, deploy: null });
@@ -134,7 +135,7 @@
     $("#proj-title").innerHTML = `${esc(p.name)}<small>${n} file${n === 1 ? "" : "s"}${p.git ? ` · ${esc(p.git.owner)}/${esc(p.git.repo)}` : ""}</small>`;
     const live = p.deploy?.url && p.deploy.state === "READY";
     $("#deploy-btn").title = live ? `Live at ${p.deploy.url}` : "Deploy to Vercel";
-    document.title = `${p.name} · FIZZ DEV`;
+    if (active()) document.title = `${p.name} · FIZZ DEV`;
   }
 
   // ---------- thread ----------
@@ -176,8 +177,8 @@
     const th = $("#thread");
     if (!c || !c.messages.length) {
       const empty = !Object.keys(project().files).length;
-      th.innerHTML = `<div class="dev-welcome"><div><h1>${empty ? "What do you want to build?" : `Continue ${esc(project().name)}`}</h1><p>${empty ? "Describe it and Fizz Code writes the files. You'll see the code and a live preview on the right." : "Ask for a change, a fix or a new feature."}</p></div>
-        <div class="starter">${STARTERS.map(([t, p], i) => `<button data-starter="${i}"><b>${t}</b><span>&gt; ${esc(p)}</span></button>`).join("")}</div>
+      th.innerHTML = `<div class="dev-welcome"><div><h1>${empty ? "What do you want to build?" : `Continue ${esc(project().name)}`}</h1><p>${empty ? "Describe it and Fizz Code writes the files. You'll see the code and a live preview side by side." : "Ask for a change, a fix or a new feature."}</p></div>
+        <div class="starter">${STARTERS.map(([t, p], i) => `<button data-starter="${i}"><b>${t}</b><span>${esc(p)}</span></button>`).join("")}</div>
         <div class="connect-row"><button class="btn btn-outline btn-sm" data-act="gh-import">Import from GitHub</button><button class="btn btn-outline btn-sm" data-act="gdoc-import">Import a Google Doc</button><button class="btn btn-outline btn-sm" data-act="settings-conn">Connections</button></div></div>`;
       return;
     }
@@ -202,7 +203,7 @@
   }
 
   function renderComposer() {
-    $("#input").placeholder = state.mode === "ask" ? "> Ask about your code…" : "> Describe what to build…";
+    $("#input").placeholder = state.mode === "ask" ? "Ask about your code…" : "Describe what you want to build…";
     $$(".mode button").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.mode === state.mode)));
     $("#model-btn").innerHTML = `${esc(F.providerLabel(data.settings, "dev"))} <svg class="i" viewBox="0 0 24 24" style="width:14px"><path d="M6 9l6 6 6-6"/></svg>`;
     $("#pending").innerHTML = state.pending.map((a, i) => `<span class="chip">${esc(a.name)}<button type="button" data-rm="${i}" aria-label="Remove ${esc(a.name)}">✕</button></span>`).join("");
@@ -887,10 +888,10 @@
   $("#open-side").addEventListener("click", () => { app.classList.add("drawer"); $("#scrim").classList.remove("hidden"); });
   $("#scrim").addEventListener("click", () => { closeDrawer(); app.classList.remove("panel-open"); });
   $("#me-btn").addEventListener("click", async (e) => {
-    const k = await menu(e.currentTarget, [{ label: user.email }, { k: "settings", html: "Settings" }, { k: "conn", html: "Connections" }, { k: "chat", html: "Open FIZZ chat" }, { k: "help", html: "Help & support" }, "-", { k: "signout", html: "Sign out" }]);
+    const k = await menu(e.currentTarget, [{ label: user.email }, { k: "settings", html: "Settings" }, { k: "conn", html: "Connections" }, { k: "chat", html: "Switch to FIZZ <small>Ctrl+.</small>" }, { k: "help", html: "Help & support" }, "-", { k: "signout", html: "Sign out" }]);
     if (k === "settings") openSettings();
     if (k === "conn") openSettings("connections");
-    if (k === "chat") location.href = "chat.html";
+    if (k === "chat") F.app.switch("chat");
     if (k === "help") location.href = "contact.html";
     if (k === "signout") F.auth.signOut();
   });
@@ -1034,6 +1035,7 @@
   }
 
   window.addEventListener("keydown", (e) => {
+    if (!active()) return;
     const mod = e.ctrlKey || e.metaKey;
     if (e.key === "Escape") { closeMenu(); if (state.controller) state.controller.abort(); }
     if (mod && e.key.toLowerCase() === "k") { e.preventDefault(); if (isNarrow()) $("#open-side").click(); $("#search").focus(); }
@@ -1049,4 +1051,19 @@
   showTab(isPhone() ? ui.tab : ui.tab);
   if (isPhone()) setView("chat");
   if (isNarrow()) app.classList.remove("panel-open");
+
+  // Shown again after switching from FIZZ: refresh layout-dependent widgets and accept a hand-off prompt.
+  F.app.onShow("dev", (payload) => {
+    renderHeader();
+    setTimeout(() => { cm?.refresh(); term?.fit(); }, 30);
+    if (payload?.prompt) {
+      newChat();
+      state.pending = payload.attachments || [];
+      renderComposer();
+      $("#input").value = payload.prompt;
+      grow();
+      F.toast("Brought over from FIZZ — review and press Enter");
+    }
+    if (matchMedia("(hover: hover)").matches) $("#input").focus();
+  });
 })();

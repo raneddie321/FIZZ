@@ -35,8 +35,8 @@
     test: "M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3",
   };
   const icon = (name, cls = "i") => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICON_PATHS[name] || ""}"/></svg>`;
-  const MARK = (dev) => `<svg class="mark" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="6.5" fill="${dev ? "var(--dev)" : "var(--primary)"}"/><circle cx="8.4" cy="15.6" r="3.6" fill="#fff"/><circle cx="14.9" cy="9.6" r="2.5" fill="#fff" fill-opacity=".9"/><circle cx="18.6" cy="5.3" r="1.45" fill="#fff" fill-opacity=".8"/></svg>`;
-  const WORDMARK = (dev) => `<span class="wordmark">${MARK(dev)}FIZZ${dev ? '<span class="dev-tag">DEV</span>' : ""}</span>`;
+  const MARK = (dev) => `<img class="mark" src="assets/mark-fizz${dev ? "-dev" : ""}.png" alt="" aria-hidden="true" />`;
+  const WORDMARK = (dev) => `<span class="wordmark"><img class="logo-img" src="assets/logo-fizz${dev ? "-dev" : ""}.png" alt="${dev ? "fizz dev" : "fizz"}" /></span>`;
 
   const NAV = [
     ["fizz.html", "FIZZ"],
