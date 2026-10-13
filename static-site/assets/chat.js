@@ -11,7 +11,7 @@
 
   const state = { id: location.hash.slice(1) || null, archived: false, query: "", pending: [], controller: null, streamingId: null, renaming: null };
   const conv = () => data.conversations.find((c) => c.id === state.id);
-  const modelName = (id) => (MODELS.find((m) => m.id === id) || MODELS[0]).chat;
+  const modelName = (id) => (MODELS.find((m) => m.id === id)?.chat ?? id ?? "FIZZ");
 
   const SUGGESTIONS = [
     ["pen", "Help me write", "Help me write a friendly email to my team announcing a project kickoff next Monday."],
@@ -67,7 +67,7 @@
         <div class="m-actions"><span>${t}</span><button data-copy="${i}">Copy</button>${state.streamingId ? "" : `<button data-edit="${i}">Edit</button>`}</div></div>`;
     }
     let body;
-    if (m.error) body = `<div class="notice ${m.noKey ? "warn" : ""}"><span>${esc(m.error)}</span>${m.noKey ? `<button class="btn btn-sm" data-open-settings="ai">Add API key</button>` : isLast ? `<button class="btn btn-outline btn-sm" data-regen>Retry</button>` : ""}</div>`;
+    if (m.error) body = `<div class="notice ${m.noKey ? "warn" : ""}"><span>${esc(m.error)}</span>${m.noKey ? `<button class="btn btn-sm" data-open-settings="ai">Open AI settings</button>` : isLast ? `<button class="btn btn-outline btn-sm" data-regen>Retry</button>` : ""}</div>`;
     else if (!m.content) body = `<span class="dots" aria-label="FIZZ is writing"><i></i><i></i><i></i></span>`;
     else body = `<div class="md">${F.markdown(m.content)}</div>`;
     const actions = m.pending ? "" : `<div class="m-actions">${m.content ? `<button data-copy="${i}">Copy</button>` : ""}${isLast && !m.error ? `<button data-regen>Regenerate</button>` : ""}<span>${t} · ${modelName(m.model)}</span>${m.stopped ? "<span>· Stopped</span>" : ""}</div>`;
@@ -100,13 +100,19 @@
   }
 
   function renderComposer() {
-    $("#model-btn").innerHTML = `${esc(modelName(data.settings.model))} <svg class="i" viewBox="0 0 24 24" style="width:14px"><path d="M6 9l6 6 6-6"/></svg>`;
+    $("#model-btn").innerHTML = `${esc(F.providerLabel(data.settings, "chat"))} <svg class="i" viewBox="0 0 24 24" style="width:14px"><path d="M6 9l6 6 6-6"/></svg>`;
     $("#pending").innerHTML = state.pending.map((a, i) => `<span class="chip">${icon(a.type === "image" ? "image" : "file")}${esc(a.name)}<button type="button" data-rm="${i}" aria-label="Remove ${esc(a.name)}">✕</button></span>`).join("");
     $("#pending").classList.toggle("hidden", !state.pending.length);
     const send = $("#send");
     send.innerHTML = state.controller ? '<svg class="i" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor"/></svg>' : '<svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg>';
     send.setAttribute("aria-label", state.controller ? "Stop generating" : "Send");
-    $("#key-notice").innerHTML = data.settings.apiKey ? "" : `<div class="notice warn"><span>Add your Anthropic API key to start chatting with FIZZ.</span><button type="button" class="btn btn-sm" data-open-settings="ai">Add API key</button></div>`;
+    const missing = (data.settings.provider === "openrouter" && !data.settings.openrouterKey) || (data.settings.provider === "anthropic" && !data.settings.apiKey);
+    F.serverStatus().then((st) => {
+      const noServer = data.settings.provider === "fizz" && !st.ai?.configured;
+      $("#key-notice").innerHTML = missing || noServer
+        ? `<div class="notice warn"><span>${noServer ? "FIZZ AI isn't available on this deployment yet. Connect your own OpenRouter account to start chatting." : "Add your key in Settings → AI to start chatting."}</span><button type="button" class="btn btn-sm" data-open-settings="ai">Open AI settings</button></div>`
+        : "";
+    });
   }
 
   const renderAll = () => { renderSide(); renderThread(); renderComposer(); };
@@ -127,22 +133,16 @@
 
   async function generate() {
     const c = conv();
-    const reply = { role: "assistant", content: "", pending: true, model: data.settings.model, at: Date.now() };
+    const reply = { role: "assistant", content: "", pending: true, model: F.providerLabel(data.settings, "chat"), at: Date.now() };
     c.messages.push(reply);
     c.updated = Date.now();
-    if (!data.settings.apiKey) {
-      Object.assign(reply, { pending: false, error: "FIZZ isn't connected yet. Add your Anthropic API key in Settings.", noKey: true });
-      save();
-      return renderAll();
-    }
     state.controller = new AbortController();
     state.streamingId = c.id;
     renderAll();
     let last = 0;
     try {
-      const history = c.messages.slice(0, -1).filter((m) => !m.error && (m.role === "user" || m.content)).map(F.toApiContent);
-      const r = await F.streamChat({
-        apiKey: data.settings.apiKey, model: reply.model, system: systemPrompt(), messages: history, signal: state.controller.signal,
+      const r = await F.aiStream(data.settings, {
+        system: systemPrompt(), messages: c.messages.slice(0, -1), signal: state.controller.signal,
         onText: (_d, full) => { reply.content = full; if (Date.now() - last > 50) { last = Date.now(); renderThread(); } },
       });
       reply.content = r.text;
@@ -150,7 +150,8 @@
       if (r.stop === "max_tokens") reply.content += "\n\n*The response reached its maximum length.*";
     } catch (e) {
       if (e.name === "AbortError") reply.stopped = true;
-      else reply.error = e.message;
+      else if (e.message === "NO_KEY") Object.assign(reply, { error: "Add your API key in Settings → AI, or switch to FIZZ AI.", noKey: true });
+      else Object.assign(reply, { error: e.message, noKey: e.status === 404 || e.status === 503 || e.status === 429 });
     } finally {
       reply.pending = false;
       state.controller = null;
@@ -217,48 +218,9 @@
   }
 
   // ---------- settings ----------
-  function openSettings(tab = "general") {
-    const f = $("#settings-form");
-    f.name.value = user.name;
-    f.theme.value = F.theme.get();
-    f.apiKey.value = data.settings.apiKey;
-    f.model.innerHTML = MODELS.map((m) => `<option value="${m.id}">${m.chat} — ${m.note}</option>`).join("");
-    f.model.value = data.settings.model;
-    f.style.value = data.settings.style;
-    f.instructions.value = data.settings.instructions;
-    f.pwCurrent.value = f.pwNext.value = "";
-    $("#acct-email").textContent = `Signed in as ${user.email}`;
-    $("#settings-err").textContent = "";
-    setTab(tab);
-    $("#settings").showModal();
-  }
-  function setTab(tab) {
-    document.querySelectorAll(".dlg-tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));
-    document.querySelectorAll("[data-pane]").forEach((p) => p.classList.toggle("hidden", p.dataset.pane !== tab));
-  }
-  $("#settings-form").addEventListener("submit", async (e) => {
-    if (e.submitter?.value !== "save") return;
-    e.preventDefault();
-    const f = e.target;
-    if (f.pwNext.value) {
-      const err = await F.auth.changePassword(f.pwCurrent.value, f.pwNext.value);
-      if (err) { $("#settings-err").textContent = err; setTab("account"); return; }
-    }
-    const name = f.name.value.trim();
-    if (name && name !== user.name) { F.auth.rename(name); user.name = name; }
-    F.theme.set(f.theme.value);
-    Object.assign(data.settings, { apiKey: f.apiKey.value.trim(), model: f.model.value, style: f.style.value, instructions: f.instructions.value.trim() });
-    save();
-    $("#settings").close();
-    renderAll();
-    F.toast(f.pwNext.value ? "Settings and password saved" : "Settings saved");
-  });
-  document.querySelector(".dlg-tabs").addEventListener("click", (e) => e.target.dataset.tab && setTab(e.target.dataset.tab));
-  $("#export").addEventListener("click", () => F.download("fizz-export.json", JSON.stringify({ exportedAt: new Date().toISOString(), user, conversations: data.conversations, projects: data.projects }, null, 2)));
-  $("#delete-account").addEventListener("click", async () => {
-    $("#settings").close();
-    if (await confirmDlg("Delete your account?", "Your RANEDDIE ID, chats and FIZZ DEV projects will be permanently deleted from this browser.", "Delete account")) F.auth.deleteAccount();
-  });
+  const settingsCtx = { user, data, save, onSaved: () => renderAll() };
+  const openSettings = (tab) => F.settings.open(settingsCtx, tab);
+  F.settings.handleRedirects(settingsCtx);
 
   // ---------- events ----------
   function grow() { const t = $("#input"); t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 260) + "px"; }
@@ -284,8 +246,10 @@
   $("#pending").addEventListener("click", (e) => { const i = e.target.dataset.rm; if (i !== undefined) { state.pending.splice(+i, 1); renderComposer(); } });
 
   $("#model-btn").addEventListener("click", async (e) => {
-    const k = await menu(e.currentTarget, [{ label: "Model" }, ...MODELS.map((m) => ({ k: m.id, html: `<span>${m.id === data.settings.model ? "✓ " : ""}${m.chat}<small>${m.note}</small></span>` }))]);
-    if (k) { data.settings.model = k; save(); renderComposer(); }
+    if (data.settings.provider !== "anthropic") return openSettings("ai");
+    const k = await menu(e.currentTarget, [{ label: "Model" }, ...MODELS.map((m) => ({ k: m.id, html: `<span>${m.id === data.settings.model ? "✓ " : ""}${m.chat}<small>${m.note}</small></span>` })), "-", { k: "settings", html: "AI settings…" }]);
+    if (k === "settings") openSettings("ai");
+    else if (k) { data.settings.model = k; save(); renderComposer(); }
   });
   $("#me-btn").addEventListener("click", async (e) => {
     const k = await menu(e.currentTarget, [{ label: user.email }, { k: "settings", html: "Settings" }, { k: "dev", html: "Open FIZZ DEV" }, { k: "help", html: "Help & support" }, "-", { k: "signout", html: "Sign out" }]);

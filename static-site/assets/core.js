@@ -118,7 +118,7 @@
   // ---------- per-user data ----------
   function loadData(user) {
     const d = store.get(`fizz.data.${user.id}`, null) || {};
-    d.settings = Object.assign({ apiKey: "", instructions: "", model: "claude-opus-5-5", style: "balanced" }, d.settings || {});
+    d.settings = Object.assign({ provider: "fizz", apiKey: "", openrouterKey: "", openrouterModel: "z-ai/glm-4.6", instructions: "", model: "claude-opus-5-5", style: "balanced" }, d.settings || {});
     d.conversations ||= [];
     d.projects ||= [];
     return d;
@@ -179,6 +179,116 @@
     return { text, stop };
   }
 
+  // ---------- server capabilities (Netlify Functions) ----------
+  let statusPromise = null;
+  function serverStatus(force) {
+    if (!statusPromise || force) {
+      statusPromise = fetch("/api/status", { credentials: "same-origin", cache: "no-store" })
+        .then((r) => (r.ok && (r.headers.get("content-type") || "").includes("json") ? r.json() : null))
+        .catch(() => null)
+        .then((s) => s || { server: false, ai: { configured: false }, connections: {}, google: { configured: false } });
+    }
+    return statusPromise;
+  }
+
+  // ---------- OpenAI-compatible streaming (FIZZ server proxy and OpenRouter) ----------
+  async function streamOpenAI(url, headers, payload, signal, onText) {
+    const res = await fetch(url, { method: "POST", signal, credentials: "same-origin", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify(payload) }).catch((e) => {
+      if (e.name === "AbortError") throw e;
+      throw new Error("Couldn't reach the AI service. Check your internet connection.");
+    });
+    if (!res.ok) {
+      let msg = `The AI service returned an error (${res.status}).`;
+      try { const j = await res.json(); msg = j.error?.message || msg; } catch {}
+      if (res.status === 404) msg = "FIZZ AI isn't available on this deployment. Connect OpenRouter or add an API key in Settings → AI.";
+      if (res.status === 401 && url.includes("openrouter")) msg = "OpenRouter rejected your key. Reconnect it in Settings → AI.";
+      const e = new Error(msg);
+      e.status = res.status;
+      throw e;
+    }
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "", text = "", stop = null;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let i;
+      while ((i = buf.indexOf("\n")) !== -1) {
+        const line = buf.slice(0, i).trim();
+        buf = buf.slice(i + 1);
+        if (!line.startsWith("data:")) continue;
+        const data = line.slice(5).trim();
+        if (data === "[DONE]") continue;
+        let ev;
+        try { ev = JSON.parse(data); } catch { continue; }
+        if (ev.error) throw new Error(ev.error.message || "The AI service returned an error.");
+        const ch = ev.choices?.[0];
+        const delta = ch?.delta?.content;
+        if (delta) { text += delta; onText?.(delta, text); }
+        if (ch?.finish_reason) stop = ch.finish_reason === "length" ? "max_tokens" : ch.finish_reason === "content_filter" ? "refusal" : "end_turn";
+      }
+    }
+    return { text, stop };
+  }
+
+  function toOpenAI(m) {
+    if (m.role === "assistant") return { role: "assistant", content: m.content };
+    const parts = [];
+    for (const a of m.attachments || []) {
+      if (a.type === "image") parts.push({ type: "image_url", image_url: { url: `data:${a.mime};base64,${a.data}` } });
+      else parts.push({ type: "text", text: `<attachment name="${a.name}">\n${a.text}\n</attachment>` });
+    }
+    parts.push({ type: "text", text: m.content || "(see attachments)" });
+    return { role: "user", content: parts };
+  }
+
+  /** Streams a reply using the provider chosen in Settings → AI. */
+  async function aiStream(settings, { system, messages, signal, onText, model }) {
+    const history = messages.filter((m) => !m.error && (m.role === "user" || m.content));
+    if (settings.provider === "anthropic") {
+      if (!settings.apiKey) throw new Error("NO_KEY");
+      return streamChat({ apiKey: settings.apiKey, model: model || settings.model, system, messages: history.map(toApiContent), signal, onText });
+    }
+    if (settings.provider === "openrouter") {
+      if (!settings.openrouterKey) throw new Error("NO_KEY");
+      return streamOpenAI("https://openrouter.ai/api/v1/chat/completions", { Authorization: `Bearer ${settings.openrouterKey}`, "X-Title": "FIZZ" }, { model: settings.openrouterModel || "z-ai/glm-4.6", stream: true, messages: [{ role: "system", content: system }, ...history.map(toOpenAI)] }, signal, onText);
+    }
+    return streamOpenAI("/api/ai/chat", {}, { system, messages: history.map(toOpenAI) }, signal, onText);
+  }
+
+  function providerLabel(settings, product = "chat") {
+    if (settings.provider === "openrouter") return settings.openrouterModel || "OpenRouter";
+    if (settings.provider === "anthropic") return (MODELS.find((m) => m.id === settings.model) || MODELS[0])[product];
+    return product === "dev" ? "Fizz Code 1.0" : "FIZZ 1.0";
+  }
+
+  // ---------- OpenRouter OAuth (PKCE, fully in the browser) ----------
+  const b64url = (bytes) => btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  async function openrouterConnect() {
+    const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
+    const challenge = b64url(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)));
+    sessionStorage.setItem("fizz.or.verifier", verifier);
+    sessionStorage.setItem("fizz.or.return", location.pathname.split("/").pop() || "chat.html");
+    const cb = new URL(location.pathname, location.origin);
+    cb.searchParams.set("openrouter", "callback");
+    location.href = `https://openrouter.ai/auth?callback_url=${encodeURIComponent(cb.toString())}&code_challenge=${challenge}&code_challenge_method=S256`;
+  }
+  /** Completes the OpenRouter redirect if this page load is the callback. Returns the new key or null. */
+  async function openrouterFinish() {
+    const u = new URL(location.href);
+    const code = u.searchParams.get("code");
+    if (u.searchParams.get("openrouter") !== "callback" || !code) return null;
+    const verifier = sessionStorage.getItem("fizz.or.verifier");
+    history.replaceState(null, "", u.pathname + u.hash);
+    sessionStorage.removeItem("fizz.or.verifier");
+    if (!verifier) throw new Error("The OpenRouter sign-in expired. Please try again.");
+    const res = await fetch("https://openrouter.ai/api/v1/auth/keys", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code, code_verifier: verifier, code_challenge_method: "S256" }) });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok || !j.key) throw new Error(j.error?.message || "OpenRouter didn't return a key.");
+    return j.key;
+  }
+
   // ---------- attachments ----------
   async function readAttachment(file) {
     if (file.size > 5 * 1024 * 1024) throw new Error(`"${file.name}" is larger than 5 MB.`);
@@ -232,6 +342,6 @@
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   }
 
-  window.FIZZ = { store, esc, uid, theme, auth, loadData, saveData, MODELS, streamChat, readAttachment, toApiContent, markdown, toast, download, validEmail };
+  window.FIZZ = { serverStatus, aiStream, providerLabel, openrouterConnect, openrouterFinish, toOpenAI, store, esc, uid, theme, auth, loadData, saveData, MODELS, streamChat, readAttachment, toApiContent, markdown, toast, download, validEmail };
   theme.init();
 })();

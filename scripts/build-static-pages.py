@@ -121,12 +121,15 @@ page("fizz-dev.html", "FIZZ DEV — AI development workspace", "Describe it. FIZ
 <div class="panel-box grid-2" style="margin-top:48px"><div><h3 style="margin-top:0">From idea to working project</h3><p style="color:var(--muted)">Ask for something like “a landing page for my bakery with a menu and contact form” or “a bubble-popping game”. Fizz Code writes complete files you can see, run and change.</p></div>
 <ol class="steps">{"".join(f"<li><span>{i+1}</span>{s}</li>" for i,s in enumerate(steps))}</ol></div>
 {features([
-  ("bot", "Fizz Code", "An AI coding assistant that writes complete, working files into your project.", ""),
-  ("folder", "Projects", "Keep each website, app or game in its own colored project with its chats and files.", ""),
-  ("code", "Code editor", "Edit any file with line numbers and autosave.", ""),
-  ("eye", "Live preview", "Run your project instantly at desktop, tablet and phone sizes, or open it in a new tab.", ""),
-  ("devices", "Built for every screen", "The workspace adapts to phones, tablets and large monitors.", ""),
-  ("terminal", "Download & deploy", "Export any project as a ZIP and publish it anywhere — including Netlify Drop.", ""),
+  ("bot", "Fizz Code agent", "Plans, then writes complete files. Every edit shows as a step with a diff you can expand.", ""),
+  ("code", "Code editor", "Syntax highlighting, tabs, autosave, version history and one-click revert.", ""),
+  ("terminal", "Terminal", "A shell over your project files. Run JavaScript with node in an isolated worker.", ""),
+  ("eye", "Browser preview", "Live preview with console, page navigation and desktop, tablet and phone sizes.", ""),
+  ("git", "GitHub", "Import repositories and push your project as a commit.", "Connect"),
+  ("terminal", "Vercel", "Deploy a project and get a live URL in one click.", "Connect"),
+  ("file", "Google Workspace", "Import Google Docs, attach Drive files and export summaries to Docs.", "Connect"),
+  ("devices", "Built for every screen", "Three panels on desktop, drawers on tablets and a tab bar on phones.", ""),
+  ("keyboard", "Keyboard first", "Slash commands, Ctrl+P to open files, Ctrl+` for the terminal.", ""),
 ])}</section>
 """)
 

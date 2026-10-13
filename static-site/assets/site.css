@@ -316,3 +316,22 @@ dialog.dlg::backdrop { background: rgba(0,0,0,.45); }
   .auth-card { padding: 28px 22px; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* settings: providers & connections */
+.settings-dlg { width: min(600px, calc(100vw - 24px)); }
+.mono { font-family: var(--mono); }
+.muted-sm { color: var(--muted); font-size: 13px; margin: 0; }
+.row-inline { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.provider-list { display: grid; gap: 8px; }
+.provider { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; cursor: pointer; }
+.provider:has(input:checked) { border-color: var(--primary); background: var(--primary-soft); }
+.provider input { margin-top: 3px; accent-color: var(--primary); }
+.provider b { display: block; font-size: 14px; font-weight: 600; }
+.provider small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+.conn-list { display: grid; gap: 8px; }
+.conn { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; }
+.conn > .i { width: 22px; height: 22px; flex: none; }
+.conn-body { flex: 1; min-width: 0; }
+.conn-body b { display: block; font-size: 14px; }
+.conn-body small { display: block; color: var(--muted); font-size: 12.5px; }
+.conn-body .conn-state { color: var(--fg); margin-top: 3px; }

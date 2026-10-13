@@ -1,0 +1,21 @@
+# FIZZ static site + Netlify Functions (deploy by importing this repo into Netlify).
+[build]
+  publish = "static-site"
+  command = "echo 'Static site — no build step'"
+  functions = "netlify/functions"
+  edge_functions = "netlify/edge-functions"
+
+[build.environment]
+  # This repo also contains a Next.js app; it is not used by the Netlify static deploy.
+  NETLIFY_NEXT_PLUGIN_SKIP = "true"
+  NODE_VERSION = "22"
+
+[functions]
+  node_bundler = "esbuild"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    X-Frame-Options = "SAMEORIGIN"
