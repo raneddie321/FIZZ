@@ -5,7 +5,7 @@
 // Google AI Studio (Gemini) is used through its OpenAI-compatible endpoint, so streaming works the same way.
 export function aiBackend(env) {
   if (env("OPENROUTER_API_KEY")) return { name: "openrouter", key: env("OPENROUTER_API_KEY"), url: "https://openrouter.ai/api/v1/chat/completions", model: env("FIZZ_DEFAULT_MODEL") || "z-ai/glm-4.6" };
-  if (env("GEMINI_API_KEY")) return { name: "gemini", key: env("GEMINI_API_KEY"), url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", model: env("FIZZ_DEFAULT_MODEL") || "gemini-2.5-flash" };
+  if (env("GEMINI_API_KEY")) return { name: "gemini", key: env("GEMINI_API_KEY"), url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", model: env("FIZZ_DEFAULT_MODEL") || "gemini-3.8-flash" };
   return null;
 }
 
