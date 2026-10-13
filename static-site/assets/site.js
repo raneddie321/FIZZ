@@ -54,7 +54,7 @@
     const nav = NAV.map(([h, l]) => `<a href="${h}" ${page === h ? 'aria-current="page"' : ""}>${l}</a>`).join("");
     const actions = me.rid
       ? `<span class="hdr-user hide-sm" title="${esc(me.email)}"><span class="avatar">${esc(initials(me.name))}</span>${esc(me.name)}</span><button type="button" class="btn btn-ghost btn-sm hide-sm" data-rid-signout>Sign out</button><a class="btn btn-sm" href="chat.html">Open FIZZ</a>`
-      : `<a class="btn btn-ghost btn-sm hide-sm rid-signin-btn" href="${esc(auth.url())}"><img src="assets/raneddie-logo.png" alt="" />Sign in with RanEddie ID</a><a class="btn btn-sm" href="chat.html">Open FIZZ</a>`;
+      : `<a class="btn btn-ghost btn-sm hide-sm rid-signin-btn" href="${esc(auth.url())}"><img src="assets/raneddie-logo.png" alt="" />Sign in with RanEddie ID</a><a class="btn btn-sm" href="signin.html?mode=signup&amp;redirect_url=%2Fchat.html">Get started</a>`;
     return `<div class="inner"><a href="index.html" aria-label="FIZZ home" style="text-decoration:none">${WORDMARK(false)}</a>
       <nav class="site-nav" aria-label="Main">${nav}</nav>
       <div class="header-actions">${actions}<button class="icon-btn mobile-toggle" aria-label="Menu" aria-expanded="false">${icon("menu")}</button></div></div>

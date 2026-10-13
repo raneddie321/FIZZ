@@ -41,7 +41,7 @@ page("index.html", "FIZZ — AI by RANEDDIE", "FIZZ is RANEDDIE's AI assistant. 
   <span class="pill-note"><span data-icon="spark" style="color:var(--primary)"></span> From RANEDDIE</span>
   <h1 class="h1">Think it through with FIZZ.<br />Build it with FIZZ DEV.</h1>
   <p class="lead">A friendly AI assistant for everyday questions and writing, and a development workspace that plans, codes, designs and previews software with you. One RanEddie ID for both.</p>
-  <div class="cta-row"><a class="btn btn-lg" href="chat.html">Start using FIZZ <span data-icon="arrow"></span></a><a class="btn btn-lg btn-outline" href="product.html">See how it works</a></div>
+  <div class="cta-row"><a class="btn btn-lg" href="signin.html?mode=signup&amp;redirect_url=%2Fchat.html">Get started free <span data-icon="arrow"></span></a><a class="btn btn-lg btn-outline" href="product.html">See how it works</a></div>
   <div class="preview" aria-hidden="true"><div class="bar"><i></i><i></i><i></i></div><div class="body">
     <div class="col"><div class="sk" style="width:70%"></div><div class="sk" style="width:55%;margin-left:12px"></div><div class="sk" style="width:80%;margin-left:12px"></div><div class="sk" style="width:60%"></div><div class="sk" style="width:45%;margin-left:12px"></div></div>
     <div class="col"><div class="sk p" style="height:34px;width:75%;margin-left:auto;border-radius:12px;opacity:.6"></div><div class="sk" style="width:92%"></div><div class="sk" style="width:80%"></div><div class="sk" style="width:66%"></div><div class="sk-box"><div class="sk d" style="width:35%"></div><div class="sk" style="width:75%"></div></div></div>
@@ -78,7 +78,7 @@ page("index.html", "FIZZ — AI by RANEDDIE", "FIZZ is RANEDDIE's AI assistant. 
     <li><span data-icon="devices" style="color:var(--primary)"></span><div><b>Works everywhere</b><p>Designed for phones, tablets and desktops, in light and dark themes.</p></div></li>
   </ul></div>
 </section>
-<section class="section" style="padding-bottom:40px"><div class="cta-box"><span data-mark></span><h2 class="h2" style="margin:0">Start with a question. Finish with a product.</h2><p style="color:var(--muted);margin:0">Use FIZZ and FIZZ DEV right away — no account needed. Sign in with your RanEddie ID to keep your settings everywhere.</p><div class="cta-row" style="margin:0"><a class="btn btn-lg" href="chat.html">Open FIZZ</a><a class="btn btn-lg btn-outline" href="signin.html?mode=signup">Create a RanEddie ID</a></div></div></section>
+<section class="section" style="padding-bottom:40px"><div class="cta-box"><span data-mark></span><h2 class="h2" style="margin:0">Start with a question. Finish with a product.</h2><p style="color:var(--muted);margin:0">Create a free RanEddie ID — one account for FIZZ, FIZZ DEV and every RANEDDIE product.</p><div class="cta-row" style="margin:0"><a class="btn btn-lg" href="signin.html?mode=signup&amp;redirect_url=%2Fchat.html">Create a RanEddie ID</a><a class="btn btn-lg btn-outline" href="signin.html?redirect_url=%2Fchat.html">Sign in</a></div></div></section>
 """)
 
 # ---------------- product overview ----------------
@@ -141,7 +141,7 @@ plans = [("Free", "Try FIZZ and FIZZ DEV.", "Free", False, ["FIZZ chat", "FIZZ D
          ("Team", "Shared workspace for teams.", None, False, ["Everything in Pro", "Team seats", "Centralized billing"])]
 def plan_html(n, d, price, featured, items):
     price_html = '<div class="price">Free</div>' if price else '<div class="price soon">Pricing to be announced</div>'
-    btn = '<a class="btn btn-block" href="chat.html">Get started</a>' if price else '<a class="btn btn-outline btn-block" href="contact.html">Join the waitlist</a>'
+    btn = '<a class="btn btn-block" href="signin.html?mode=signup&amp;redirect_url=%2Fchat.html">Get started</a>' if price else '<a class="btn btn-outline btn-block" href="contact.html">Join the waitlist</a>'
     return f'<div class="plan{" featured" if featured else ""}"><h3>{n}{" <span class=\"badge badge-primary\">Popular</span>" if featured else ""}</h3><p class="desc">{d}</p>{price_html}{btn}<ul>{"".join(f"<li>{i}</li>" for i in items)}</ul></div>'
 page("pricing.html", "Pricing · FIZZ", "FIZZ plans.", f"""
 <section class="section center" style="padding-bottom:0"><p class="eyebrow">Pricing</p><h1 class="h2">Plans for every stage</h1><p class="lead">Start free. Paid plans with higher limits and team features are coming soon.</p></section>
@@ -151,8 +151,8 @@ page("pricing.html", "Pricing · FIZZ", "FIZZ plans.", f"""
 
 # ---------------- FAQ ----------------
 faq = [("What is the difference between FIZZ and FIZZ DEV?", "FIZZ is a general AI assistant for conversation, writing, analysis and research. FIZZ DEV is a workspace where Fizz Code writes, edits and previews software projects with you."),
-       ("What is a RanEddie ID?", "RanEddie ID is one account for every RanEddie product, including FIZZ and the RanEddie games. It's optional in FIZZ: sign in to see your name in the app and keep your settings (theme, model, mode) on every device. Your chats and projects stay in your browser."),
-       ("Do I need an account?", "No. FIZZ and FIZZ DEV work without signing in. Everything you create is saved in this browser."),
+       ("What is a RanEddie ID?", "RanEddie ID is one account for every RanEddie product, including FIZZ and the RanEddie games. You need one to use FIZZ and FIZZ DEV. Your settings (theme, model, mode) are saved to it and follow you to every device; your chats and projects stay in your browser."),
+       ("Do I need an account?", "Yes. FIZZ is a RANEDDIE product, so you sign in with a free RanEddie ID. If you already have one from a RANEDDIE game, use the same account."),
        ("Where are my account and projects stored?", "In this version, your account, chats and projects are stored securely in your browser on this device. Use Settings → Export my data to keep a copy."),
        ("Why do I need to add an API key?", "FIZZ connects to an AI model provider (Anthropic). Add your API key in Settings to start chatting. It's stored only in your browser and sent only to the provider."),
        ("Can I use FIZZ on my phone or tablet?", "Yes. FIZZ and FIZZ DEV are designed for phones, tablets and desktops."),
@@ -190,13 +190,13 @@ def legal(name, title, sections):
 {"".join(f"<h2>{h}</h2><p>{t}</p>" for h,t in sections)}</article>""")
 legal("terms.html", "Terms of Service", [
   ("1. Agreement", "These terms govern your use of FIZZ, FIZZ DEV and related services provided by RANEDDIE."),
-  ("2. Accounts", "You can use FIZZ without an account. A RanEddie ID is optional; if you create one, you are responsible for activity on your account and for keeping your password and API keys secure."),
+  ("2. Accounts", "You need a RanEddie ID to use FIZZ. You are responsible for activity on your account and for keeping your password and API keys secure."),
   ("3. Acceptable use", "Don't use FIZZ to break the law, harm others, or abuse AI systems or third-party services."),
   ("4. AI output", "AI-generated content can be inaccurate. Review it before relying on it."),
   ("5. Your content", "You keep ownership of the projects and content you create with FIZZ DEV."),
   ("6. Changes", "RANEDDIE may update these terms. Placeholder for termination, liability and governing law.")])
 legal("privacy.html", "Privacy Policy", [
-  ("1. Information stored", "Your chats, projects, API keys and settings are stored in your browser's local storage on your device. Signing in is optional."),
+  ("1. Information stored", "Your chats, projects, API keys and settings are stored in your browser's local storage on your device. You sign in with a RanEddie ID."),
   ("RanEddie ID", "If you sign in with RanEddie ID, your account (email, username, date of birth and country you gave at sign-up) is managed by RANEDDIE through Clerk, our authentication provider. FIZZ saves only a few small settings to your account — theme, response style, AI model and FIZZ DEV mode — so they follow you to other devices. Your chats, projects and API keys are never sent to your account."),
   ("2. AI requests", "When you send a message, its content and any attachments are sent directly from your browser to the AI provider (Anthropic) using your API key."),
   ("3. Support messages", "Messages sent through the contact form are delivered to RANEDDIE's support team."),
@@ -228,7 +228,6 @@ RID_HEAD = """<!doctype html>
 <main class="rid-main">
   <a class="rid-brand" href="index.html" aria-label="RanEddie ID home"><img src="assets/raneddie-logo.png" alt="" width="56" height="44" /><span>RanEddie <span class="rid-gradient-text">ID</span></span></a>
   <div class="rid-card" id="rid-card"><noscript><p>Turn on JavaScript to sign in with RanEddie ID.</p></noscript></div>
-  <p class="rid-guest"><a href="chat.html">Continue to FIZZ without an account</a></p>
   <footer class="rid-footer"><span>© RanEddie</span><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><span>🔒 Secured by Clerk</span></footer>
 </main>
 </body>

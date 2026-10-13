@@ -142,7 +142,7 @@
     const foot = root.querySelector(".side-foot");
     root.querySelector(".rid-invite")?.remove();
     const hiddenAt = F.store.get(INVITE_KEY, 0);
-    if (!user.rid && foot && Date.now() - hiddenAt > 14 * 86400000) {
+    if (!user.rid && !user.guest && foot && Date.now() - hiddenAt > 14 * 86400000) {
       foot.insertAdjacentHTML("beforebegin", `<div class="rid-invite"><button type="button" class="x" data-rid-hide aria-label="Hide">✕</button>
         <p><b>Keep your settings everywhere</b>Sign in with your RanEddie ID — one account for FIZZ and RanEddie games. Your chats and projects stay in this browser.</p>
         <a class="btn btn-sm rid-signin-btn" href="${F.esc(F.auth.url())}"><img src="assets/raneddie-logo.png" alt="" />Sign in with RanEddie ID</a></div>`);

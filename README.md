@@ -63,12 +63,13 @@ Never put secrets in code or in chat. Set them only in Netlify.
 - If any credential was ever shared in chat or email, **rotate it** in the provider's dashboard.
 - The included FIZZ AI enforces a per-visitor daily quota (Netlify Blobs) to protect your OpenRouter budget.
 
-## RanEddie ID (optional sign-in)
+## RanEddie ID (required sign-in)
 
 FIZZ uses the same Clerk instance as RanEddie ID, so it's the same account as every RanEddie product.
 `signin.html` has the RanEddie ID forms (sign in with a new-device email code, sign up with email
 verification and a minimum age of 13, forgot password), built on clerk-js pinned in
-`assets/raneddie-id.js`. Signing in is optional: guests use FIZZ as before. When signed in, only a few
+`assets/raneddie-id.js`. FIZZ and FIZZ DEV require a RanEddie ID: visitors are sent to sign in and
+back (only a deployment without the Clerk keys lets guests in). Only a few
 small settings (≤ 500 bytes) are saved under `privateMetadata.fizz` through `/api/account`, which
 verifies the Clerk session token and merges only that key — other products' metadata (e.g. Snake
 Brawl) is never touched. Chats and projects stay in the browser and are linked to the account on first

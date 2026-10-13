@@ -23,9 +23,9 @@
   };
 
   // ---------- accounts ----------
-  // Signing in is optional. With RanEddie ID (Clerk, loaded by raneddie-id.js) the user's name shows in
-  // the app and small settings sync to the account. Chats and projects always stay in this browser.
-  // Guests use the "guest" data. Older FIZZ-only accounts from this browser keep working read-only.
+  // FIZZ needs a RanEddie ID (Clerk, loaded by raneddie-id.js), the account for every RANEDDIE product.
+  // Small settings sync to the account; chats and projects stay in this browser. Data from before
+  // RanEddie ID (the guest's, or an older FIZZ-only account) is linked to the account on first sign-in.
   const users = () => store.get("fizz.users", {});
   const validEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e);
   const RID_USER = "fizz.rid.user";
@@ -74,7 +74,20 @@
       if (l) return { ...l, legacy: true, guest: false };
       return { id: "guest", name: "Guest", email: "", guest: true };
     },
-    require() { return this.current(); },
+    /**
+     * FIZZ and FIZZ DEV need a RanEddie ID: without one, go to the RanEddie ID page and come back here.
+     * Only when this deployment has no RanEddie ID configured (the page sets fizz.rid.off) do guests get in.
+     */
+    require() {
+      const u = this.current();
+      if (u.rid) return u;
+      let off = false;
+      try { off = sessionStorage.getItem("fizz.rid.off") === "1"; } catch {}
+      if (off) return u;
+      document.documentElement.style.visibility = "hidden";
+      location.replace(this.url("signin"));
+      throw new Error("redirecting to RanEddie ID");
+    },
     rename(name) {
       const me = legacyUser();
       if (!me) return;

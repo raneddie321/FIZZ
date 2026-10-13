@@ -179,7 +179,7 @@
   // ---------- sign in ----------
   function signInView() {
     const loading = S.busy;
-    if (S.step === "email") return `<form novalidate>${heading("Sign in", "Use your RanEddie ID to continue to FIZZ.")}${alertBox(S.error)}
+    if (S.step === "email") return `<form novalidate>${heading("Sign in", "FIZZ is a RANEDDIE product. Use your RanEddie ID to continue.")}${alertBox(S.error)}
       ${field({ label: "Email", name: "email", type: "email", value: S.email, error: S.fe.email, attrs: 'autocomplete="username" inputmode="email" placeholder="you@example.com" autofocus' })}
       <div class="mt6">${button("Next", { loading })}</div>
       <p class="rid-foot">New here? <a href="${withRedirect("signup")}" data-mode="signup">Create a RanEddie ID</a></p></form>`;
@@ -403,12 +403,14 @@
   F.rid.load().then((c) => {
     clerk = c;
     if (!clerk) {
+      // No RanEddie ID on this deployment: let people into FIZZ for this browser session instead of looping.
+      try { sessionStorage.setItem("fizz.rid.off", "1"); } catch {}
       card.innerHTML = `${heading("RanEddie ID isn't available here yet", "You can keep using FIZZ and FIZZ DEV without an account. Your chats and projects stay in this browser.")}<a class="rid-btn primary" href="${esc(target())}">Continue to FIZZ</a>`;
       return;
     }
+    try { sessionStorage.removeItem("fizz.rid.off"); } catch {}
     if (clerk.user) {
       F.auth.setRid(F.rid.profile(clerk.user));
-      document.querySelector(".rid-guest")?.classList.add("hidden");
       const p = F.rid.profile(clerk.user);
       card.innerHTML = `${heading("You're signed in", `Signed in as <b>${esc(p.email || p.name)}</b>.`)}<a class="rid-btn primary" href="${esc(target())}">Continue</a><button type="button" class="rid-link" id="rid-switch">Use another account</button>`;
       card.querySelector("#rid-switch").onclick = async () => { await clerk.signOut(); F.auth.setRid(null); render(); };
