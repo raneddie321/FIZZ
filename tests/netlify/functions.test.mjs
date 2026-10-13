@@ -97,6 +97,8 @@ assert.equal(new URL(r.headers.get("location")).searchParams.get("redirect_uri")
 r = await vOauth.GET(new Request(`${O}/api/oauth/vercel/start`));
 assert.equal(r.status, 302);
 assert.ok(new URL(r.headers.get("location")).searchParams.get("code_challenge"));
+r = await vOauth.GET(new Request(`${O}/api/oauth/[provider]/[action].mjs?provider=github&action=start`));
+assert.equal(r.status, 302, "rewritten Vercel URL uses query params");
 r = await vOauth.GET(new Request(`${O}/api/oauth/nope/start`));
 assert.equal(r.status, 404);
 r = await vGithub.GET(new Request(`${O}/api/github/repos`));

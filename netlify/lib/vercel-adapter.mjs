@@ -2,9 +2,10 @@
 // path parameters that Netlify passes in `context.params` are read from the URL here.
 export function route(handler, names) {
   const run = (req) => {
-    const parts = new URL(req.url).pathname.split("/").filter(Boolean);
-    const values = parts.slice(-names.length);
-    const params = Object.fromEntries(names.map((n, i) => [n, decodeURIComponent(values[i] || "")]));
+    // vercel.json rewrites /api/github/repos to /api/github/[action].mjs?action=repos; fall back to the path.
+    const url = new URL(req.url);
+    const values = url.pathname.split("/").filter(Boolean).slice(-names.length);
+    const params = Object.fromEntries(names.map((n, i) => [n, url.searchParams.get(n) ?? decodeURIComponent(values[i] || "")]));
     return handler(req, { params, ip: clientIp(req) });
   };
   return { GET: run, POST: run, PUT: run, DELETE: run };

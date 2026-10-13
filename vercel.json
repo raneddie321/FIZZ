@@ -1,20 +1,68 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": null,
-  "installCommand": "echo 'No install needed: static site + dependency-free functions'",
-  "buildCommand": "echo 'Static site, no build step'",
-  "outputDirectory": "static-site",
-  "functions": {
-    "api/**/*.mjs": { "maxDuration": 300 }
-  },
-  "headers": [
+  "builds": [
     {
-      "source": "/(.*)",
-      "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
-        { "key": "X-Frame-Options", "value": "SAMEORIGIN" }
-      ]
+      "src": "static-site/**",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "api/**/*.mjs",
+      "use": "@vercel/node",
+      "config": {
+        "maxDuration": 60
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "headers": {
+        "X-Content-Type-Options": "nosniff",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "X-Frame-Options": "SAMEORIGIN"
+      },
+      "continue": true
+    },
+    {
+      "src": "/api/oauth/([^/]+)/([^/]+)",
+      "dest": "/api/oauth/[provider]/[action].mjs?provider=$1&action=$2"
+    },
+    {
+      "src": "/api/github/([^/]+)",
+      "dest": "/api/github/[action].mjs?action=$1"
+    },
+    {
+      "src": "/api/vercel/([^/]+)",
+      "dest": "/api/vercel/[action].mjs?action=$1"
+    },
+    {
+      "src": "/api/status",
+      "dest": "/api/status.mjs"
+    },
+    {
+      "src": "/api/ai/chat",
+      "dest": "/api/ai/chat.mjs"
+    },
+    {
+      "src": "/api/(.*)",
+      "status": 404,
+      "dest": "/static-site/404.html"
+    },
+    {
+      "src": "/",
+      "dest": "/static-site/index.html"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/static-site/$1"
+    },
+    {
+      "handle": "error"
+    },
+    {
+      "src": "/(.*)",
+      "status": 404,
+      "dest": "/static-site/404.html"
     }
   ]
 }

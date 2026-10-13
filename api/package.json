@@ -1,0 +1,1 @@
+{ "name": "fizz-api", "private": true, "type": "module", "description": "Vercel functions for FIZZ; dependency-free (only node built-ins and fetch)." }
