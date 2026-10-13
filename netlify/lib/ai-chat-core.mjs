@@ -70,7 +70,10 @@ export async function handleChat(req, { env, ip, bump }) {
   if (!upstream.ok) {
     const detail = await upstream.text().catch(() => "");
     console.error(backend.name, upstream.status, detail.slice(0, 500));
-    const msg = upstream.status === 429 ? "FIZZ is very busy right now. Please try again in a moment." : upstream.status === 402 ? "FIZZ AI is temporarily unavailable." : "The AI service returned an error. Please try again.";
+    // Include the provider's short reason (e.g. "API key not valid", unknown model); it never contains the key.
+    let reason = "";
+    try { const d = JSON.parse(detail); reason = String((Array.isArray(d) ? d[0] : d)?.error?.message || "").slice(0, 200); } catch {}
+    const msg = upstream.status === 429 ? "FIZZ is very busy right now. Please try again in a moment." : upstream.status === 402 ? "FIZZ AI is temporarily unavailable." : `The AI service returned an error${reason ? `: ${reason}` : ""}. Please try again.`;
     return err(upstream.status === 429 ? 429 : 502, msg, "upstream");
   }
   return new Response(upstream.body, { headers });
