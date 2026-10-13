@@ -134,6 +134,14 @@ globalThis.fetch = async (url, init) => { gemini = { url: String(url), auth: ini
 r = await vAi.POST(new Request(`${O}/api/ai/chat`, { method: "POST", headers: { origin: O, cookie: "fizz_uid=qrstuvwxyz12345678", "x-forwarded-for": "5.6.7.8" }, body: JSON.stringify({ messages: [{ role: "user", content: "hi" }] }) }));
 assert.equal(r.status, 200);
 assert.deepEqual(gemini, { url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", auth: "Bearer AIza-fake", model: "gemini-3.8-flash" });
+// busy model: retried, then falls back to FIZZ_FALLBACK_MODELS
+process.env.FIZZ_FALLBACK_MODELS = "backup-model";
+const tried = [];
+globalThis.fetch = async (url, init) => { const m = JSON.parse(init.body).model; tried.push(m); return m === "backup-model" ? new Response("data: [DONE]\n\n") : new Response('{"error":{"message":"high demand"}}', { status: 503 }); };
+r = await vAi.POST(new Request(`${O}/api/ai/chat`, { method: "POST", headers: { origin: O, cookie: "fizz_uid=qrstuvwxyz12345678", "x-forwarded-for": "5.6.7.8" }, body: JSON.stringify({ messages: [{ role: "user", content: "hi" }] }) }));
+assert.equal(r.status, 200);
+assert.deepEqual(tried, ["gemini-3.8-flash", "gemini-3.8-flash", "backup-model"]);
+delete process.env.FIZZ_FALLBACK_MODELS;
 globalThis.fetch = realFetch;
 j = await (await vStatus.GET(new Request(`${O}/api/status`))).json();
 assert.equal(j.ai.configured, true);

@@ -36,6 +36,7 @@ Never put secrets in code or in chat. Set them only in Netlify.
 | `OPENROUTER_API_KEY` | Included FIZZ AI | openrouter.ai → Keys |
 | `GEMINI_API_KEY` | Included FIZZ AI (alternative) | aistudio.google.com → Get API key. Used when `OPENROUTER_API_KEY` isn't set; default model `gemini-3.8-flash` |
 | `FIZZ_DEFAULT_MODEL` | optional | OpenRouter model ID, default `z-ai/glm-4.6` (check openrouter.ai/models) |
+| `FIZZ_FALLBACK_MODELS` | optional | Comma-separated backup models tried when the main one is busy |
 | `FIZZ_DAILY_LIMIT` | optional | Free messages per visitor per day, default `50` |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | GitHub | github.com → Settings → Developer settings → **OAuth Apps** |
 | `VERCEL_CLIENT_ID`, `VERCEL_CLIENT_SECRET` | Vercel | vercel.com → Team settings → **Sign in with Vercel / Apps** |

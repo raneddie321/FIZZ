@@ -55,17 +55,23 @@ export async function handleChat(req, { env, ip, bump }) {
   const allowed = (env("FIZZ_MODELS") || "").split(",").map((s) => s.trim()).filter(Boolean);
   const model = allowed.includes(body.model) ? body.model : backend.model;
 
-  const upstream = await fetch(backend.url, {
+  // Busy models (429/500/503) are retried once, then each model in FIZZ_FALLBACK_MODELS is tried in order.
+  const call = (m) => fetch(backend.url, {
     method: "POST",
     headers: { Authorization: `Bearer ${backend.key}`, "Content-Type": "application/json", ...(backend.name === "openrouter" ? { "HTTP-Referer": new URL(req.url).origin, "X-Title": "FIZZ" } : {}) },
     body: JSON.stringify({
-      model,
+      model: m,
       stream: true,
       max_tokens: Math.min(Number(env("FIZZ_MAX_TOKENS") || 16000), 32000),
       messages: [{ role: "system", content: String(body.system || "").slice(0, 200_000) }, ...body.messages],
     }),
     signal: req.signal,
   }).catch(() => null);
+  const busy = (r) => r && [429, 500, 503].includes(r.status);
+  const fallbacks = (env("FIZZ_FALLBACK_MODELS") || "").split(",").map((x) => x.trim()).filter((x) => x && x !== model);
+  let upstream = await call(model);
+  if (busy(upstream)) { await new Promise((ok) => setTimeout(ok, 1200)); upstream = await call(model); }
+  for (const m of fallbacks) { if (!busy(upstream)) break; upstream = await call(m); }
   if (!upstream) return err(502, "Couldn't reach the AI service. Please try again.", "upstream");
   if (!upstream.ok) {
     const detail = await upstream.text().catch(() => "");
