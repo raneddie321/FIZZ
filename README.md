@@ -41,6 +41,8 @@ Never put secrets in code or in chat. Set them only in Netlify.
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | GitHub | github.com → Settings → Developer settings → **OAuth Apps** |
 | `VERCEL_CLIENT_ID`, `VERCEL_CLIENT_SECRET` | Vercel | vercel.com → Team settings → **Sign in with Vercel / Apps** |
 | `GOOGLE_CLIENT_ID` | Google Workspace | console.cloud.google.com → APIs & Services → **Credentials → OAuth client (Web)** |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | RanEddie ID sign-in (optional for users) | Same value as the RanEddie ID project (Clerk → API keys). Public by design. |
+| `CLERK_SECRET_KEY` | Saving FIZZ settings to the RanEddie ID | Same value as the RanEddie ID project. Secret. |
 
 ### Provider settings (replace `YOUR-SITE` with your Netlify or Vercel domain, e.g. `fizzbrowser.vercel.app`)
 
@@ -60,6 +62,17 @@ Never put secrets in code or in chat. Set them only in Netlify.
   page JavaScript can never read them. All POST endpoints reject cross-site requests.
 - If any credential was ever shared in chat or email, **rotate it** in the provider's dashboard.
 - The included FIZZ AI enforces a per-visitor daily quota (Netlify Blobs) to protect your OpenRouter budget.
+
+## RanEddie ID (optional sign-in)
+
+FIZZ uses the same Clerk instance as RanEddie ID, so it's the same account as every RanEddie product.
+`signin.html` has the RanEddie ID forms (sign in with a new-device email code, sign up with email
+verification and a minimum age of 13, forgot password), built on clerk-js pinned in
+`assets/raneddie-id.js`. Signing in is optional: guests use FIZZ as before. When signed in, only a few
+small settings (≤ 500 bytes) are saved under `privateMetadata.fizz` through `/api/account`, which
+verifies the Clerk session token and merges only that key — other products' metadata (e.g. Snake
+Brawl) is never touched. Chats and projects stay in the browser and are linked to the account on first
+sign-in. Larger cloud storage would need a separate store keyed by the Clerk user id, not metadata.
 
 ## One app, instant switching
 

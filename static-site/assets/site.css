@@ -356,3 +356,17 @@ dialog.dlg::backdrop { background: rgba(0,0,0,.45); }
 .conn-body small { display: block; color: var(--muted); font-size: 12.5px; }
 .conn-body .conn-state { color: var(--fg); margin-top: 3px; }
 @media (hover: none) { .m-actions { opacity: 1; } }
+
+/* RanEddie ID in FIZZ: header button, signed-in name, sidebar invite */
+.rid-signin-btn { display: inline-flex; align-items: center; gap: 8px; }
+.rid-signin-btn img { height: 16px; width: auto; }
+.hdr-user { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hdr-user .avatar { width: 26px; height: 26px; font-size: 11px; flex: none; }
+.rid-invite { margin: 0 10px 8px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); font-size: 13px; position: relative; }
+.rid-invite p { margin: 0 0 8px; color: var(--muted); line-height: 1.45; padding-right: 16px; }
+.rid-invite b { display: block; color: var(--fg); margin-bottom: 2px; }
+.rid-invite .btn { width: 100%; }
+.rid-invite .x { position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; border: 0; background: none; color: var(--muted); border-radius: 6px; font-size: 14px; }
+.rid-invite .x:hover { background: var(--accent); color: var(--fg); }
+.me small.rid-cta { color: var(--primary); font-weight: 600; }
+.avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }

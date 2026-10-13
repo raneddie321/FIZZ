@@ -47,12 +47,7 @@
       </div>
       <div data-pane="connections" class="form"><div class="conn-list" data-conn-list></div>
         <p class="muted-sm">Tokens for GitHub and Vercel are kept encrypted in a secure cookie that page scripts can't read. Google access lasts about an hour and stays in this tab only.</p></div>
-      <div data-pane="account" class="form">
-        <p class="muted-sm" data-acct></p>
-        <label class="field"><span>Current password</span><input class="input" name="pwCurrent" type="password" autocomplete="current-password" /></label>
-        <label class="field"><span>New password</span><input class="input" name="pwNext" type="password" autocomplete="new-password" /><small>Leave empty to keep your current password.</small></label>
-        <div class="row-inline"><button type="button" class="btn btn-outline btn-sm" data-export>Export my data</button><button type="button" class="btn btn-danger btn-sm" data-delete>Delete account</button></div>
-      </div>
+      <div data-pane="account" class="form"><div data-acct></div></div>
       <p class="err" data-err style="color:var(--danger);margin:0;font-size:14px"></p>
       <div class="dlg-actions"><button class="btn btn-outline" value="cancel" formnovalidate>Cancel</button><button class="btn" value="save" data-save>Save</button></div>
     </form>`;
@@ -74,6 +69,19 @@
       if (s.connected && s.scopes?.length) state += ` <span class="mono muted-sm">(${esc(s.scopes.join(", "))})</span>`;
     }
     return `<div class="conn">${c.icon}<div class="conn-body"><b>${c.name}</b><small>${c.desc}</small><small class="conn-state">${state}</small></div>${action}</div>`;
+  }
+
+  function accountPane(user) {
+    const esc = F.esc;
+    const signIn = `<a class="btn btn-sm rid-signin-btn" href="${esc(F.auth.url("signin"))}"><img src="assets/raneddie-logo.png" alt="" />Sign in with RanEddie ID</a>`;
+    const exp = `<button type="button" class="btn btn-outline btn-sm" data-export>Export my data</button>`;
+    if (user.rid) return `<div class="conn"><span class="avatar">${esc(user.name.slice(0, 1).toUpperCase())}</span><div class="conn-body"><b>${esc(user.name)}</b><small>${esc(user.email)}</small><small class="conn-state">Signed in with RanEddie ID</small></div></div>
+      <p class="muted-sm">Your theme, response style, model and FIZZ DEV mode are saved to your RanEddie ID. Chats, projects and API keys stay in this browser.</p>
+      <div class="row-inline">${exp}<button type="button" class="btn btn-outline btn-sm" data-signout>Sign out</button></div>`;
+    if (user.legacy) return `<p class="muted-sm">You're using an older FIZZ account saved only in this browser (${esc(user.email)}). Sign in with RanEddie ID to keep your settings on every device — your chats and projects stay here.</p>
+      <div class="row-inline">${signIn}${exp}<button type="button" class="btn btn-outline btn-sm" data-signout>Sign out</button></div>`;
+    return `<p class="muted-sm">You're using FIZZ without an account. Everything is saved in this browser. Sign in with your RanEddie ID — one account for FIZZ and RanEddie games — to keep your settings on every device.</p>
+      <div class="row-inline">${signIn}<a class="btn btn-outline btn-sm" href="${esc(F.auth.url("signup"))}">Create a RanEddie ID</a>${exp}</div>`;
   }
 
   async function renderConnections(d) {
@@ -100,8 +108,8 @@
     f.apiKey.value = s.apiKey;
     f.model.innerHTML = F.MODELS.map((m) => `<option value="${m.id}">${m.chat} — ${m.note}</option>`).join("");
     f.model.value = s.model;
-    f.pwCurrent.value = f.pwNext.value = "";
-    d.querySelector("[data-acct]").textContent = `Signed in as ${ctx.user.email}`;
+    f.name.closest("label").classList.toggle("hidden", !ctx.user.legacy);
+    d.querySelector("[data-acct]").innerHTML = accountPane(ctx.user);
     d.querySelector("[data-err]").textContent = "";
     d.querySelector("[data-or-state]").textContent = s.openrouterKey ? "Key saved" : "";
     const sub = () => {
@@ -144,20 +152,13 @@
         try { await F.conn.disconnect(t.dataset.disconnect); F.toast("Disconnected"); renderConnections(d); } catch (err) { F.toast(err.message); }
       }
       if (t.hasAttribute("data-export")) F.download("fizz-export.json", JSON.stringify({ exportedAt: new Date().toISOString(), user: ctx.user, conversations: ctx.data.conversations, projects: ctx.data.projects }, null, 2));
-      if (t.hasAttribute("data-delete")) {
-        d.close();
-        if (confirm("Delete your account? Your RANEDDIE ID, chats and FIZZ DEV projects will be permanently deleted from this browser.")) F.auth.deleteAccount();
-      }
+      if (t.hasAttribute("data-signout")) { d.close(); F.auth.signOut(); }
     };
     f.onsubmit = async (e) => {
       if (e.submitter?.value !== "save") return;
       e.preventDefault();
-      if (f.pwNext.value) {
-        const err = await F.auth.changePassword(f.pwCurrent.value, f.pwNext.value);
-        if (err) { d.querySelector("[data-err]").textContent = err; setTab("account"); return; }
-      }
       const name = f.name.value.trim();
-      if (name && name !== ctx.user.name) { F.auth.rename(name); ctx.user.name = name; }
+      if (ctx.user.legacy && name && name !== ctx.user.name) { F.auth.rename(name); ctx.user.name = name; }
       F.theme.set(f.theme.value);
       Object.assign(s, {
         provider: f.querySelector("[name=provider]:checked")?.value || "fizz",
@@ -170,7 +171,7 @@
       });
       ctx.save();
       d.close();
-      F.toast(f.pwNext.value ? "Settings and password saved" : "Settings saved");
+      F.toast(ctx.user.rid ? "Settings saved to your RanEddie ID" : "Settings saved");
       ctx.onSaved?.();
     };
     d.showModal();

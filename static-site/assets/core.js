@@ -1,4 +1,4 @@
-/* FIZZ core: storage, RANEDDIE ID accounts (stored in this browser), theme, AI client. */
+/* FIZZ core: storage, accounts (guest or RanEddie ID), theme, AI client. */
 (function () {
   "use strict";
 
@@ -23,95 +23,74 @@
   };
 
   // ---------- accounts ----------
-  const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
-  async function hashPassword(password, saltB64) {
-    const salt = saltB64 ? Uint8Array.from(atob(saltB64), (c) => c.charCodeAt(0)) : crypto.getRandomValues(new Uint8Array(16));
-    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
-    const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations: 210000 }, key, 256);
-    return { salt: b64(salt), hash: b64(bits) };
-  }
+  // Signing in is optional. With RanEddie ID (Clerk, loaded by raneddie-id.js) the user's name shows in
+  // the app and small settings sync to the account. Chats and projects always stay in this browser.
+  // Guests use the "guest" data. Older FIZZ-only accounts from this browser keep working read-only.
   const users = () => store.get("fizz.users", {});
   const validEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e);
-  const strongPassword = (p) => p.length >= 8 && /[a-zA-Z]/.test(p) && /\d/.test(p);
+  const RID_USER = "fizz.rid.user";
+  const RID_LINKS = "fizz.rid.links";
+
+  function legacyUser() {
+    const s = store.get("fizz.session", null);
+    if (!s) return null;
+    if (s.expires && s.expires < Date.now()) { store.del("fizz.session"); return null; }
+    const u = users()[s.email];
+    return u ? { id: u.id, name: u.name, email: u.email, created: u.created } : null;
+  }
+
+  /**
+   * Which browser data a RanEddie ID uses. Decided once per device, the first time that account
+   * signs in here, so nothing already in this browser is lost:
+   * an older FIZZ account with the same email, else the signed-in older account, else the guest's
+   * chats and projects (moved to the account, so signing out leaves a clean guest), else a new store.
+   */
+  function dataKeyFor(rid) {
+    const links = store.get(RID_LINKS, {});
+    if (links[rid.id]) return links[rid.id];
+    const sameEmail = rid.email && users()[rid.email.toLowerCase()];
+    let key = sameEmail?.id || legacyUser()?.id;
+    if (!key) {
+      key = `rid_${rid.id}`;
+      const guest = localStorage.getItem("fizz.data.guest");
+      if (guest && !localStorage.getItem(`fizz.data.${key}`)) {
+        try { localStorage.setItem(`fizz.data.${key}`, guest); localStorage.removeItem("fizz.data.guest"); } catch {}
+      }
+    }
+    links[rid.id] = key;
+    store.set(RID_LINKS, links);
+    return key;
+  }
 
   const auth = {
+    /** The RanEddie ID last seen in this browser (kept up to date by raneddie-id.js). */
+    rid: () => store.get(RID_USER, null),
+    setRid(u) { if (u) store.set(RID_USER, u); else store.del(RID_USER); },
+    /** Always returns a user: the RanEddie ID, an older local account, or a guest. */
     current() {
-      const s = store.get("fizz.session", null);
-      if (!s) return null;
-      if (s.expires && s.expires < Date.now()) { store.del("fizz.session"); return null; }
-      const u = users()[s.email];
-      return u ? { id: u.id, name: u.name, email: u.email, created: u.created } : null;
+      const r = this.rid();
+      if (r) return { id: dataKeyFor(r), name: r.name, email: r.email, rid: r, guest: false };
+      const l = legacyUser();
+      if (l) return { ...l, legacy: true, guest: false };
+      return { id: "guest", name: "Guest", email: "", guest: true };
     },
-    startSession(email, remember) {
-      store.set("fizz.session", { email, expires: Date.now() + (remember ? 30 : 1) * 86400000 });
-    },
-    async signUp({ name, email, password, confirm, terms }) {
-      name = String(name || "").trim();
-      email = String(email || "").trim().toLowerCase();
-      if (!name) return { field: "name", error: "Enter your name." };
-      if (!validEmail(email)) return { field: "email", error: "Enter a valid email address." };
-      if (!strongPassword(password)) return { field: "password", error: "Use at least 8 characters with letters and numbers." };
-      if (password !== confirm) return { field: "confirm", error: "The passwords don't match." };
-      if (!terms) return { field: "terms", error: "Please accept the Terms of Service." };
-      const all = users();
-      if (all[email]) return { field: "email", error: "An account with this email already exists. Sign in instead." };
-      const { salt, hash } = await hashPassword(password);
-      all[email] = { id: uid(), name, email, salt, hash, created: Date.now() };
-      store.set("fizz.users", all);
-      this.startSession(email, true);
-      return { ok: true };
-    },
-    async signIn({ email, password, remember }) {
-      email = String(email || "").trim().toLowerCase();
-      const u = users()[email];
-      const { hash } = await hashPassword(String(password || ""), u ? u.salt : undefined);
-      if (!u || hash !== u.hash) return { error: "That email and password combination is incorrect." };
-      this.startSession(email, remember !== false);
-      return { ok: true };
-    },
-    async changePassword(current, next) {
-      const me = this.current();
-      const all = users();
-      const u = all[me.email];
-      if ((await hashPassword(current, u.salt)).hash !== u.hash) return "Your current password is incorrect.";
-      if (!strongPassword(next)) return "Use at least 8 characters with letters and numbers.";
-      Object.assign(u, await hashPassword(next));
-      store.set("fizz.users", all);
-      return null;
-    },
+    require() { return this.current(); },
     rename(name) {
-      const me = this.current();
+      const me = legacyUser();
+      if (!me) return;
       const all = users();
       all[me.email].name = name;
       store.set("fizz.users", all);
     },
-    signOut() { store.del("fizz.session"); location.href = "index.html"; },
-    deleteAccount() {
-      const me = this.current();
-      const all = users();
-      delete all[me.email];
-      store.set("fizz.users", all);
-      store.del(`fizz.data.${me.id}`);
+    async signOut() {
+      if (this.rid() && window.FIZZ.rid) return window.FIZZ.rid.signOut();
       store.del("fizz.session");
-      location.href = "index.html";
+      location.reload();
     },
-    resetLocal(email) {
-      email = String(email || "").trim().toLowerCase();
-      const all = users();
-      if (!all[email]) return false;
-      store.del(`fizz.data.${all[email].id}`);
-      delete all[email];
-      store.set("fizz.users", all);
-      return true;
-    },
-    /** Redirects to sign-in when there is no session. */
-    require() {
-      const u = this.current();
-      if (!u) {
-        location.replace(`signin.html?next=${encodeURIComponent(location.pathname.split("/").pop() || "chat.html")}`);
-        throw new Error("redirecting");
-      }
-      return u;
+    /** Link to the RanEddie ID page that returns here afterwards. mode: "signin" | "signup" | "forgot". */
+    url(mode = "signin") {
+      const back = location.pathname + location.search + location.hash;
+      return `signin.html?mode=${mode}&redirect_url=${encodeURIComponent(back)}`;
     },
   };
 

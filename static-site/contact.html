@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="assets/site.css" />
 <script>try{var t=localStorage.getItem("fizz.theme");t=t?JSON.parse(t):"system";if(t==="dark"||(t!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}</script>
 <script src="assets/core.js" defer></script>
+<script src="assets/raneddie-id.js" defer></script>
 <script src="assets/site.js" defer></script>
 </head>
 <body>
@@ -25,7 +26,7 @@
     <label class="field"><span>Name</span><input class="input" name="name" required maxlength="80" autocomplete="name" /></label>
     <label class="field"><span>Email</span><input class="input" name="email" type="email" required maxlength="254" autocomplete="email" /></label>
   </div>
-  <label class="field"><span>Topic</span><select class="select" name="topic"><option>General question</option><option>Account & RANEDDIE ID</option><option>Billing</option><option>Technical problem</option><option>Report abuse</option></select></label>
+  <label class="field"><span>Topic</span><select class="select" name="topic"><option>General question</option><option>Account & RanEddie ID</option><option>Billing</option><option>Technical problem</option><option>Report abuse</option></select></label>
   <label class="field"><span>Subject</span><input class="input" name="subject" required maxlength="140" /></label>
   <label class="field"><span>Message</span><textarea class="textarea" name="message" required minlength="10" maxlength="5000" rows="6"></textarea></label>
   <div><button class="btn" type="submit">Send message</button></div>

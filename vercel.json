@@ -40,6 +40,10 @@
       "dest": "/api/status.mjs"
     },
     {
+      "src": "/api/account",
+      "dest": "/api/account.mjs"
+    },
+    {
       "src": "/api/ai/chat",
       "dest": "/api/ai/chat.mjs"
     },

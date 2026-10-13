@@ -57,8 +57,7 @@
       box.querySelector("[data-rename]")?.focus();
     }
     $("#toggle-archived span:last-child").textContent = state.archived ? "Back to chats" : "Archived chats";
-    $("#me-name").textContent = user.name;
-    $("#me-avatar").textContent = user.name.split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase();
+    F.rid.renderMe(root, user);
   }
 
   // ---------- messages ----------
@@ -82,7 +81,7 @@
     const th = $("#thread");
     if (!c || !c.messages.length) {
       const first = user.name.split(" ")[0];
-      th.innerHTML = `<div class="welcome"><div><h1>How can I help, ${esc(first)}?</h1><p>Ask a question, share a file, or start with an idea.</p></div>
+      th.innerHTML = `<div class="welcome"><div><h1>How can I help${user.guest ? "" : `, ${esc(first)}`}?</h1><p>Ask a question, share a file, or start with an idea.</p></div>
         <div class="suggestions">${SUGGESTIONS.map(([ic, t, p], i) => `<button class="suggestion" data-suggest="${i}">${icon(ic)}<span><b>${t}</b><span>${esc(p)}</span></span></button>`).join("")}</div></div>`;
       setTitle("FIZZ");
       return;
@@ -255,11 +254,11 @@
     else if (k) { data.settings.model = k; save(); renderComposer(); }
   });
   $("#me-btn").addEventListener("click", async (e) => {
-    const k = await menu(e.currentTarget, [{ label: user.email }, { k: "settings", html: "Settings" }, { k: "dev", html: "Switch to FIZZ DEV <small>Ctrl+.</small>" }, { k: "help", html: "Help & support" }, "-", { k: "signout", html: "Sign out" }]);
+    const k = await menu(e.currentTarget, [...F.rid.menuHead(user), { k: "settings", html: "Settings" }, { k: "dev", html: "Switch to FIZZ DEV <small>Ctrl+.</small>" }, { k: "help", html: "Help & support" }, ...F.rid.menuTail(user)]);
+    F.rid.onMenu(k);
     if (k === "settings") openSettings();
     if (k === "dev") F.app.switch("dev");
     if (k === "help") location.href = "contact.html";
-    if (k === "signout") F.auth.signOut();
   });
 
   $("#conv-list").addEventListener("click", async (e) => {
@@ -340,6 +339,7 @@
   });
 
   if (state.id && !conv()) state.id = null;
+  window.addEventListener("fizz:settings", () => renderAll());
   F.app.onShow("chat", () => {
     const id = location.hash.slice(1) || null;
     if (id !== state.id) { state.id = data.conversations.some((x) => x.id === id) ? id : null; }

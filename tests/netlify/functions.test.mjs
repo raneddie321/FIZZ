@@ -147,4 +147,72 @@ j = await (await vStatus.GET(new Request(`${O}/api/status`))).json();
 assert.equal(j.ai.configured, true);
 assert.equal(j.ai.model, "gemini-3.8-flash");
 
+// ---------- RanEddie ID (Clerk): token verification and privateMetadata.fizz merge ----------
+{
+  const { generateKeyPairSync, sign } = await import("node:crypto");
+  const vAccount = await import("../../api/account.mjs");
+  const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+  const jwk = { ...publicKey.export({ format: "jwk" }), kid: "ins_test", alg: "RS256", use: "sig" };
+  const b64 = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
+  const jwt = (payload, kid = "ins_test", key = privateKey) => {
+    const h = b64({ alg: "RS256", kid, typ: "JWT" }), p = b64(payload);
+    return `${h}.${p}.${sign("RSA-SHA256", Buffer.from(`${h}.${p}`), key).toString("base64url")}`;
+  };
+  const now = Math.floor(Date.now() / 1000);
+  const good = jwt({ sub: "user_abc", azp: O, exp: now + 60, nbf: now - 5 });
+
+  r = await vAccount.GET(new Request(`${O}/api/account`, { headers: { authorization: `Bearer ${good}` } }));
+  assert.equal(r.status, 503, "not configured without CLERK_SECRET_KEY");
+  process.env.CLERK_SECRET_KEY = "sk_test_fake";
+  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = "pk_test_fake";
+  j = await (await vStatus.GET(new Request(`${O}/api/status`))).json();
+  assert.deepEqual(j.raneddieId, { publishableKey: "pk_test_fake", account: true });
+
+  // The user already has Snake Brawl data (about 6 KB) that must survive every FIZZ write.
+  let meta = { snakeBrawlSave: "x".repeat(6000), snakeBrawlSaveAt: 123, gameTokenVersion: 2 };
+  const calls = [];
+  globalThis.fetch = async (url, init = {}) => {
+    url = String(url);
+    calls.push(`${init.method || "GET"} ${url.replace("https://api.clerk.com/v1", "")}`);
+    assert.equal(init.headers.Authorization, "Bearer sk_test_fake");
+    if (url.endsWith("/jwks")) return Response.json({ keys: [jwk] });
+    if (url.endsWith("/users/user_abc/metadata")) {
+      const body = JSON.parse(init.body);
+      assert.deepEqual(Object.keys(body), ["private_metadata"]);
+      assert.deepEqual(Object.keys(body.private_metadata), ["fizz"], "only the fizz key is sent");
+      meta = { ...meta, ...body.private_metadata }; // Clerk merges
+      return Response.json({ id: "user_abc" });
+    }
+    if (url.endsWith("/users/user_abc")) return Response.json({ id: "user_abc", private_metadata: meta, public_metadata: { snakeBrawl: { level: 9 } } });
+    return new Response("{}", { status: 404 });
+  };
+  const call = (method, token, body, origin = O) => vAccount[method](new Request(`${O}/api/account`, { method, headers: { authorization: `Bearer ${token}`, origin, "content-type": "application/json" }, body: body && JSON.stringify(body) }));
+
+  r = await call("GET", good); assert.equal(r.status, 200); assert.deepEqual(await r.json(), { fizz: null });
+  r = await call("PUT", good, { fizz: { theme: "dark", model: "claude-opus-5-5", devMode: "ask", at: 1700000000000, apiKey: "sk-ant-secret", evil: "x" } });
+  assert.equal(r.status, 200);
+  assert.deepEqual((await r.json()).fizz, { theme: "dark", model: "claude-opus-5-5", devMode: "ask", at: 1700000000000 }, "unknown keys and API keys are dropped");
+  assert.equal(meta.snakeBrawlSave.length, 6000); assert.equal(meta.snakeBrawlSaveAt, 123); assert.equal(meta.gameTokenVersion, 2);
+  assert.ok(calls.indexOf("GET /users/user_abc") < calls.indexOf("PATCH /users/user_abc/metadata"), "reads before writing");
+  r = await call("GET", good); assert.deepEqual((await r.json()).fizz.theme, "dark");
+
+  // no room left: metadata would pass 8 KB
+  meta.snakeBrawlSave = "x".repeat(8150);
+  r = await call("PUT", good, { fizz: { theme: "light" } }); assert.equal(r.status, 507);
+  assert.equal(meta.fizz.theme, "dark", "nothing written when over the limit");
+  meta.snakeBrawlSave = "x".repeat(6000);
+
+  // rejected tokens
+  const other = generateKeyPairSync("rsa", { modulusLength: 2048 }).privateKey;
+  for (const [why, t] of [
+    ["expired", jwt({ sub: "user_abc", azp: O, exp: now - 60 })],
+    ["wrong site", jwt({ sub: "user_abc", azp: "https://evil.example", exp: now + 60 })],
+    ["bad signature", jwt({ sub: "user_abc", azp: O, exp: now + 60 }, "ins_test", other)],
+    ["unknown key", jwt({ sub: "user_abc", azp: O, exp: now + 60 }, "ins_other")],
+    ["garbage", "not.a.jwt"],
+  ]) { r = await call("GET", t); assert.equal(r.status, 401, why); }
+  r = await call("PUT", good, { fizz: { theme: "dark" } }, "https://evil.example"); assert.equal(r.status, 403, "cross-site write blocked");
+  globalThis.fetch = realFetch;
+}
+
 console.log("All Netlify and Vercel function tests passed");

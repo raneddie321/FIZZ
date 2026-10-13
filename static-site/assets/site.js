@@ -47,16 +47,18 @@
   ];
   const page = location.pathname.split("/").pop() || "index.html";
 
+  const initials = (name) => String(name || "?").split(/\s+/).map((x) => x[0]).slice(0, 2).join("").toUpperCase();
+
   function header() {
     const me = auth.current();
     const nav = NAV.map(([h, l]) => `<a href="${h}" ${page === h ? 'aria-current="page"' : ""}>${l}</a>`).join("");
-    const actions = me
-      ? `<a class="btn btn-sm" href="chat.html">Open FIZZ</a>`
-      : `<a class="btn btn-ghost btn-sm hide-sm" href="signin.html">Sign in</a><a class="btn btn-sm" href="signin.html#signup">Get started</a>`;
+    const actions = me.rid
+      ? `<span class="hdr-user hide-sm" title="${esc(me.email)}"><span class="avatar">${esc(initials(me.name))}</span>${esc(me.name)}</span><button type="button" class="btn btn-ghost btn-sm hide-sm" data-rid-signout>Sign out</button><a class="btn btn-sm" href="chat.html">Open FIZZ</a>`
+      : `<a class="btn btn-ghost btn-sm hide-sm rid-signin-btn" href="${esc(auth.url())}"><img src="assets/raneddie-logo.png" alt="" />Sign in with RanEddie ID</a><a class="btn btn-sm" href="chat.html">Open FIZZ</a>`;
     return `<div class="inner"><a href="index.html" aria-label="FIZZ home" style="text-decoration:none">${WORDMARK(false)}</a>
       <nav class="site-nav" aria-label="Main">${nav}</nav>
       <div class="header-actions">${actions}<button class="icon-btn mobile-toggle" aria-label="Menu" aria-expanded="false">${icon("menu")}</button></div></div>
-      <nav class="mobile-nav" aria-label="Mobile">${NAV.map(([h, l]) => `<a href="${h}">${l}</a>`).join("")}${me ? "" : '<a href="signin.html">Sign in</a>'}</nav>`;
+      <nav class="mobile-nav" aria-label="Mobile">${NAV.map(([h, l]) => `<a href="${h}">${l}</a>`).join("")}${me.rid ? `<a href="#" data-rid-signout>Sign out (${esc(me.name)})</a>` : `<a href="${esc(auth.url())}">Sign in with RanEddie ID</a>`}</nav>`;
   }
 
   function footer() {
@@ -76,11 +78,17 @@
     const h = document.querySelector("header[data-site]");
     if (h) {
       h.className = "site-header";
-      h.innerHTML = header();
-      h.querySelector(".mobile-toggle").addEventListener("click", (e) => {
-        const open = h.classList.toggle("open");
-        e.currentTarget.setAttribute("aria-expanded", open);
+      const draw = () => { h.innerHTML = header(); };
+      draw();
+      h.addEventListener("click", (e) => {
+        if (e.target.closest(".mobile-toggle")) {
+          const open = h.classList.toggle("open");
+          e.target.closest(".mobile-toggle").setAttribute("aria-expanded", open);
+        }
+        if (e.target.closest("[data-rid-signout]")) { e.preventDefault(); auth.signOut(); }
       });
+      // RanEddie ID finished loading and the user changed (e.g. signed in on another tab).
+      document.addEventListener("fizz:account", draw);
     }
     const f = document.querySelector("footer[data-site]");
     if (f) {
@@ -93,85 +101,7 @@
         f.querySelectorAll("[data-theme]").forEach((x) => x.setAttribute("aria-pressed", x === b));
       });
     }
-    initAuth();
     initContact();
-  }
-
-  // ---------- auth page ----------
-  function safeNext() {
-    const n = new URLSearchParams(location.search).get("next") || "chat.html";
-    return /^[a-z0-9-]+\.html(#.*)?$/i.test(n) ? n : "chat.html";
-  }
-  function initAuth() {
-    const root = document.getElementById("auth-root");
-    if (!root) return;
-    if (auth.current()) return location.replace(safeNext());
-    const views = { signin: root.querySelector("#v-signin"), signup: root.querySelector("#v-signup"), reset: root.querySelector("#v-reset") };
-    const show = (v) => {
-      Object.entries(views).forEach(([k, el]) => el.classList.toggle("hidden", k !== v));
-      document.title = { signin: "Sign in", signup: "Create your RANEDDIE ID", reset: "Reset your account" }[v] + " · FIZZ";
-      views[v].querySelector("input")?.focus();
-    };
-    const fromHash = () => show(["signup", "reset"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "signin");
-    window.addEventListener("hashchange", fromHash);
-    fromHash();
-
-    root.querySelectorAll(".pw-toggle").forEach((b) =>
-      b.addEventListener("click", () => {
-        const i = b.previousElementSibling;
-        i.type = i.type === "password" ? "text" : "password";
-        b.textContent = i.type === "password" ? "Show" : "Hide";
-      }),
-    );
-    const setErr = (form, field, msg) => {
-      form.querySelectorAll(".err").forEach((e) => (e.textContent = ""));
-      form.querySelectorAll("[aria-invalid]").forEach((e) => e.removeAttribute("aria-invalid"));
-      const slot = form.querySelector(`[data-err="${field}"]`) || form.querySelector('[data-err="form"]');
-      if (slot) slot.textContent = msg || "";
-      const input = form.querySelector(`[name="${field}"]`);
-      if (input && msg) { input.setAttribute("aria-invalid", "true"); input.focus(); }
-    };
-    const busy = (form, on, label) => {
-      const b = form.querySelector("button[type=submit]");
-      b.disabled = on;
-      b.textContent = on ? "Please wait…" : label;
-    };
-
-    root.addEventListener("input", (e) => {
-      const f = e.target.closest("form");
-      if (!f || !e.target.name) return;
-      e.target.removeAttribute("aria-invalid");
-      const slot = f.querySelector(`[data-err="${e.target.name}"]`);
-      if (slot) slot.textContent = "";
-    });
-    views.signin.querySelector("form").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const f = e.target;
-      busy(f, true, "Sign in");
-      const r = await auth.signIn({ email: f.email.value, password: f.password.value, remember: f.remember.checked });
-      busy(f, false, "Sign in");
-      if (r.error) return setErr(f, "form", r.error);
-      location.replace(safeNext());
-    });
-    views.signup.querySelector("form").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const f = e.target;
-      busy(f, true, "Create account");
-      const r = await auth.signUp({ name: f.name.value, email: f.email.value, password: f.password.value, confirm: f.confirm.value, terms: f.terms.checked });
-      busy(f, false, "Create account");
-      if (r.error) return setErr(f, r.field, r.error);
-      location.replace(safeNext());
-    });
-    views.reset.querySelector("form").addEventListener("submit", (e) => {
-      e.preventDefault();
-      const f = e.target;
-      if (!f.confirm.checked) return setErr(f, "form", "Tick the box to confirm.");
-      if (auth.resetLocal(f.email.value)) {
-        toast("Account removed from this browser. You can create it again.");
-        f.reset();
-        location.hash = "signup";
-      } else setErr(f, "email", "There's no account with that email in this browser.");
-    });
   }
 
   // ---------- contact form (Netlify Forms) ----------
@@ -179,7 +109,7 @@
     const form = document.getElementById("contact-form");
     if (!form) return;
     const me = auth.current();
-    if (me) { form.name.value = me.name; form.email.value = me.email; }
+    if (!me.guest) { form.name.value = me.name; form.email.value = me.email; }
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       const status = document.getElementById("contact-status");

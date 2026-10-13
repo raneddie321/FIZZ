@@ -165,8 +165,7 @@
             ${chats.length ? `<div class="proj-chats">${chats.map((c) => `<a href="#" data-project="${p.id}" data-chat="${c.id}" class="${c.id === state.chatId ? "on" : ""}">${esc(c.title)}</a>`).join("")}</div>` : ""}`;
         }).join("")
       : `<p class="empty-list">${q ? "No matches." : "No projects yet."}</p>`;
-    $("#me-name").textContent = user.name;
-    $("#me-avatar").textContent = user.name.split(/\s+/).map((s) => s[0]).slice(0, 2).join("").toUpperCase();
+    F.rid.renderMe(app, user);
   }
 
   function renderHeader() {
@@ -972,12 +971,12 @@
   $("#open-side").addEventListener("click", () => { app.classList.add("drawer"); $("#scrim").classList.remove("hidden"); });
   $("#scrim").addEventListener("click", () => { closeDrawer(); app.classList.remove("panel-open"); });
   $("#me-btn").addEventListener("click", async (e) => {
-    const k = await menu(e.currentTarget, [{ label: user.email }, { k: "settings", html: "Settings" }, { k: "conn", html: "Connections" }, { k: "chat", html: "Switch to FIZZ <small>Ctrl+.</small>" }, { k: "help", html: "Help & support" }, "-", { k: "signout", html: "Sign out" }]);
+    const k = await menu(e.currentTarget, [...F.rid.menuHead(user), { k: "settings", html: "Settings" }, { k: "conn", html: "Connections" }, { k: "chat", html: "Switch to FIZZ <small>Ctrl+.</small>" }, { k: "help", html: "Help & support" }, ...F.rid.menuTail(user)]);
+    F.rid.onMenu(k);
     if (k === "settings") openSettings();
     if (k === "conn") openSettings("connections");
     if (k === "chat") F.app.switch("chat");
     if (k === "help") location.href = "contact.html";
-    if (k === "signout") F.auth.signOut();
   });
   $("#gh-btn").addEventListener("click", async (e) => {
     const p = project();
@@ -1135,6 +1134,8 @@
   showTab(isPhone() ? ui.tab : ui.tab);
   if (isPhone()) setView("chat");
   if (isNarrow()) app.classList.remove("panel-open");
+
+  window.addEventListener("fizz:settings", () => { state.mode = data.settings.devMode || state.mode; renderAll(); });
 
   // Shown again after switching from FIZZ: refresh layout-dependent widgets and accept a hand-off prompt.
   F.app.onShow("dev", (payload) => {
