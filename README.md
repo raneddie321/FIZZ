@@ -20,6 +20,12 @@ FIZZ AI show **"Not available yet"**, because Drop can't run server functions.
    `netlify.toml` already sets the publish folder, functions and edge functions.
 2. Add the environment variables below (**Site configuration → Environment variables**), then redeploy.
 
+**3. Vercel (also enables everything).** Import the repo in Vercel. `vercel.json` already sets the
+output folder (`static-site`), skips the Next.js build and runs the same server code from `api/`.
+Add the environment variables below under **Settings → Environment Variables** and redeploy. For a
+reliable FIZZ AI daily quota, add **Storage → Upstash Redis** to the project (it sets
+`KV_REST_API_URL`/`KV_REST_API_TOKEN`); without it the quota is kept per server instance.
+
 ## FIZZ DEV setup — environment variables
 
 Never put secrets in code or in chat. Set them only in Netlify.
@@ -34,7 +40,7 @@ Never put secrets in code or in chat. Set them only in Netlify.
 | `VERCEL_CLIENT_ID`, `VERCEL_CLIENT_SECRET` | Vercel | vercel.com → Team settings → **Sign in with Vercel / Apps** |
 | `GOOGLE_CLIENT_ID` | Google Workspace | console.cloud.google.com → APIs & Services → **Credentials → OAuth client (Web)** |
 
-### Provider settings (replace `YOUR-SITE` with your Netlify URL)
+### Provider settings (replace `YOUR-SITE` with your Netlify or Vercel domain, e.g. `fizzbrowser.vercel.app`)
 
 - **GitHub OAuth App** — Homepage URL `https://YOUR-SITE`, Authorization callback URL
   `https://YOUR-SITE/api/oauth/github/callback`. Scopes requested: `repo read:user`.

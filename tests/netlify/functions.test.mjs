@@ -81,4 +81,46 @@ delete process.env.VERCEL_CLIENT_SECRET;
 r = await oauth(new Request(`${O}/api/oauth/vercel/start`), { params: { provider: "vercel", action: "start" } });
 assert.equal(r.status, 503);
 
-console.log("All Netlify function tests passed");
+// ---------- Vercel entry points (api/) run the same handlers ----------
+process.env.VERCEL_CLIENT_SECRET = "vc_fake_secret";
+const vStatus = await import("../../api/status.mjs");
+const vOauth = await import("../../api/oauth/[provider]/[action].mjs");
+const vGithub = await import("../../api/github/[action].mjs");
+const vAi = await import("../../api/ai/chat.mjs");
+r = await vStatus.GET(new Request(`${O}/api/status`, { headers: { cookie: `fizz_gh=${encodeURIComponent(ghCookie)}` } }));
+j = await r.json();
+assert.equal(j.server, true);
+assert.equal(j.connections.github.account, "@octo");
+r = await vOauth.GET(new Request(`${O}/api/oauth/github/start`));
+assert.equal(r.status, 302);
+assert.equal(new URL(r.headers.get("location")).searchParams.get("redirect_uri"), `${O}/api/oauth/github/callback`);
+r = await vOauth.GET(new Request(`${O}/api/oauth/vercel/start`));
+assert.equal(r.status, 302);
+assert.ok(new URL(r.headers.get("location")).searchParams.get("code_challenge"));
+r = await vOauth.GET(new Request(`${O}/api/oauth/nope/start`));
+assert.equal(r.status, 404);
+r = await vGithub.GET(new Request(`${O}/api/github/repos`));
+assert.equal(r.status, 401);
+
+// AI proxy on Vercel: not configured, then streams with an in-memory quota
+r = await vAi.POST(new Request(`${O}/api/ai/chat`, { method: "POST", headers: { origin: O }, body: JSON.stringify({ messages: [{ role: "user", content: "hi" }] }) }));
+assert.equal(r.status, 503);
+process.env.OPENROUTER_API_KEY = "sk-or-fake";
+process.env.FIZZ_DAILY_LIMIT = "2";
+const realFetch = globalThis.fetch;
+let upstreamAuth = null;
+globalThis.fetch = async (url, init) => {
+  assert.equal(String(url), "https://openrouter.ai/api/v1/chat/completions");
+  upstreamAuth = init.headers.Authorization;
+  return new Response("data: [DONE]\n\n", { headers: { "content-type": "text/event-stream" } });
+};
+const ask = () => vAi.POST(new Request(`${O}/api/ai/chat`, { method: "POST", headers: { origin: O, cookie: "fizz_uid=abcdefghijklmnop1234", "x-forwarded-for": "1.2.3.4" }, body: JSON.stringify({ messages: [{ role: "user", content: "hi" }] }) }));
+r = await ask(); assert.equal(r.status, 200); assert.equal(await r.text(), "data: [DONE]\n\n");
+assert.equal(upstreamAuth, "Bearer sk-or-fake");
+r = await ask(); assert.equal(r.status, 200);
+r = await ask(); assert.equal(r.status, 429, "daily quota enforced");
+r = await vAi.POST(new Request(`${O}/api/ai/chat`, { method: "POST", headers: { origin: "https://evil.example" }, body: "{}" }));
+assert.equal(r.status, 403);
+globalThis.fetch = realFetch;
+
+console.log("All Netlify and Vercel function tests passed");

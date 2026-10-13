@@ -1,0 +1,15 @@
+# Vercel serves static-site/ and the functions in api/ (which import netlify/lib and netlify/functions).
+src
+prisma
+public
+tests
+deploy
+scripts
+node_modules
+next.config.ts
+next-env.d.ts
+tsconfig.json
+tsconfig.tsbuildinfo
+vitest.config.ts
+postcss.config.mjs
+eslint.config.mjs
