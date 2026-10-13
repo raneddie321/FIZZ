@@ -86,10 +86,10 @@
   <aside class="chat-side" aria-label="Projects">
     <div class="head">
       <a href="index.html" class="logo" aria-label="FIZZ DEV home"><img src="assets/logo-fizz-dev.png" alt="fizz dev" /></a>
-      <button class="icon-btn" id="new-chat" title="New chat" aria-label="New chat"><span data-icon="pen"></span></button>
+      <button class="pill-btn" id="new-project" title="New project"><span aria-hidden="true">+</span> New project</button>
     </div>
     <nav class="switcher" aria-label="Switch product" title="Switch instantly — Ctrl+."><a data-switch="chat" href="chat.html"><img src="assets/logo-fizz.png" alt="" />FIZZ</a><a data-switch="dev" href="dev.html"><img src="assets/logo-fizz-dev.png" alt="" />FIZZ DEV</a></nav>
-    <div class="side-label"><span>Projects</span><button class="icon-btn sm" id="new-project" title="New project" aria-label="New project">+</button></div>
+    <div class="side-label"><span>Projects</span></div>
     <label class="side-search"><span data-icon="search"></span><input id="search" placeholder="Search projects" aria-label="Search projects and chats" /></label>
     <div class="conv-list" id="project-list"></div>
     <div class="side-foot">
@@ -103,9 +103,10 @@
       <button class="icon-btn only-narrow" id="open-side" aria-label="Open projects"><span data-icon="menu"></span></button>
       <button class="proj-title" id="proj-title" title="Rename project"></button>
       <div class="top-actions">
+        <button class="icon-btn ring" id="new-chat" title="New chat" aria-label="New chat"><span data-icon="pen"></span></button>
         <button class="btn btn-ghost btn-sm" id="gh-btn" aria-haspopup="menu" title="GitHub"><svg viewBox="0 0 24 24" class="i"><path fill="currentColor" stroke="none" d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.46-1.16-1.11-1.47-1.11-1.47-.9-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02a9.6 9.6 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2z"/></svg><span class="hide-xs">GitHub</span></button>
         <button class="btn btn-sm" id="deploy-btn" title="Deploy to Vercel"><svg viewBox="0 0 24 24" class="i"><path fill="currentColor" stroke="none" d="M12 4l9 16H3z"/></svg><span class="hide-xs">Deploy</span></button>
-        <button class="icon-btn" id="more-btn" aria-haspopup="menu" aria-label="More actions">⋯</button>
+        <button class="icon-btn ring" id="more-btn" aria-haspopup="menu" aria-label="More actions">⋯</button>
         <button class="icon-btn only-wide" id="panel-btn" aria-label="Toggle panel" title="Toggle panel"><svg viewBox="0 0 24 24" class="i"><path d="M3 4h18v16H3zM14 4v16"/></svg></button>
         <button class="icon-btn only-mid" id="panel-btn-mid" aria-label="Open panel"><svg viewBox="0 0 24 24" class="i"><path d="M3 4h18v16H3zM14 4v16"/></svg></button>
       </div>

@@ -83,8 +83,9 @@
     let cwd = "";
     let line = "", pos = 0, history = [], hIdx = -1, busy = null;
     const prompt = () => `${C.cyan}${api.projectName().replace(/\s+/g, "-").toLowerCase()}${C.reset}:${C.bold}/${cwd}${C.reset}$ `;
-    const w = (s) => term.write(s);
-    const wl = (s = "") => term.write(s + "\r\n");
+    let capture = null;
+    const w = (s) => { if (capture) capture.push(s); term.write(s); };
+    const wl = (s = "") => w(s + "\r\n");
 
     const abs = (p = "") => {
       const parts = (p.startsWith("/") ? [] : cwd.split("/").filter(Boolean));
@@ -292,6 +293,18 @@
       focus: () => term.focus(),
       fit: doFit,
       run: async (cmd) => { line = cmd; pos = cmd.length; redraw(); await submit(); },
+      // Runs a command visibly and returns what it printed (ANSI colors stripped) and whether it printed an error.
+      async capture(cmd) {
+        capture = [];
+        line = cmd; pos = cmd.length; redraw();
+        const out = capture;
+        try { await submit(); } finally { capture = null; }
+        const raw = out.join("");
+        const lines = raw.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "").replace(/\r/g, "").split("\n").slice(0, -1);
+        if (lines[0]?.trimEnd().endsWith(`$ ${cmd}`)) lines.shift();
+        const text = lines.join("\n").trim();
+        return { text: text.slice(0, 8000), failed: raw.includes(C.red) };
+      },
       reset() { cwd = ""; term.clear(); redraw(); },
     };
   }

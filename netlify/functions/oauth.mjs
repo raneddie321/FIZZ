@@ -43,7 +43,8 @@ export default async (req, context) => {
       headers.set("Location", back(origin, { connected: provider }));
     } catch (e) {
       console.error(`[oauth:${provider}]`, e);
-      headers.set("Location", back(origin, { connect_error: provider, reason: "exchange_failed" }));
+      // Pass the provider's own error text back (no secrets in it) so the page can show what went wrong.
+      headers.set("Location", back(origin, { connect_error: provider, reason: String(e.message || "exchange_failed").slice(0, 160) }));
     }
     return new Response(null, { status: 302, headers });
   }

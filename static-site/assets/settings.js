@@ -198,10 +198,11 @@
     const u = new URL(location.href);
     const ok = u.searchParams.get("connected");
     const bad = u.searchParams.get("connect_error");
+    const reason = u.searchParams.get("reason");
     if (ok || bad) {
       ["connected", "connect_error", "reason"].forEach((k) => u.searchParams.delete(k));
       history.replaceState(null, "", u.pathname + u.search + u.hash);
-      F.toast(ok ? `${ok[0].toUpperCase() + ok.slice(1)} connected` : `Couldn't connect ${bad}. Please try again.`);
+      F.toast(ok ? `${ok[0].toUpperCase() + ok.slice(1)} connected` : `Couldn't connect ${bad}${reason ? `: ${reason}` : ""}. Please try again.`);
       F.serverStatus(true);
     }
     return key;
