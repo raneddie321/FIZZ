@@ -34,6 +34,7 @@ Never put secrets in code or in chat. Set them only in Netlify.
 |---|---|---|
 | `FIZZ_SECRET` | All connections | Any random string of 32+ characters (e.g. `openssl rand -base64 48`). Encrypts the connection cookies. |
 | `OPENROUTER_API_KEY` | Included FIZZ AI | openrouter.ai → Keys |
+| `GEMINI_API_KEY` | Included FIZZ AI (alternative) | aistudio.google.com → Get API key. Used when `OPENROUTER_API_KEY` isn't set; default model `gemini-2.5-flash` |
 | `FIZZ_DEFAULT_MODEL` | optional | OpenRouter model ID, default `z-ai/glm-4.6` (check openrouter.ai/models) |
 | `FIZZ_DAILY_LIMIT` | optional | Free messages per visitor per day, default `50` |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | GitHub | github.com → Settings → Developer settings → **OAuth Apps** |

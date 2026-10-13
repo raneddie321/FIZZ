@@ -1,6 +1,14 @@
 // FIZZ AI proxy core, shared by the Netlify edge function and the Vercel function.
 // Streams completions from OpenRouter using the site owner's key, with a per-visitor daily quota.
 // Host-specific pieces are passed in: env lookup, client IP and a quota counter `bump(key, limit) -> boolean`.
+// Which AI service the site owner configured. OpenRouter wins if both keys are set.
+// Google AI Studio (Gemini) is used through its OpenAI-compatible endpoint, so streaming works the same way.
+export function aiBackend(env) {
+  if (env("OPENROUTER_API_KEY")) return { name: "openrouter", key: env("OPENROUTER_API_KEY"), url: "https://openrouter.ai/api/v1/chat/completions", model: env("FIZZ_DEFAULT_MODEL") || "z-ai/glm-4.6" };
+  if (env("GEMINI_API_KEY")) return { name: "gemini", key: env("GEMINI_API_KEY"), url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", model: env("FIZZ_DEFAULT_MODEL") || "gemini-2.5-flash" };
+  return null;
+}
+
 const err = (status, message, code) =>
   new Response(JSON.stringify({ error: { code, message } }), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
 
@@ -15,8 +23,8 @@ function cookie(req, name) {
 export async function handleChat(req, { env, ip, bump }) {
   if (req.method !== "POST") return err(405, "Use POST.", "method");
   if (req.headers.get("origin") !== new URL(req.url).origin) return err(403, "Not allowed.", "origin");
-  const apiKey = env("OPENROUTER_API_KEY");
-  if (!apiKey) return err(503, "FIZZ AI isn't configured on this server yet.", "not_configured");
+  const backend = aiBackend(env);
+  if (!backend) return err(503, "FIZZ AI isn't configured on this server yet.", "not_configured");
 
   let body;
   try {
@@ -45,12 +53,11 @@ export async function handleChat(req, { env, ip, bump }) {
   }
 
   const allowed = (env("FIZZ_MODELS") || "").split(",").map((s) => s.trim()).filter(Boolean);
-  const defaultModel = env("FIZZ_DEFAULT_MODEL") || "z-ai/glm-4.6";
-  const model = allowed.includes(body.model) ? body.model : defaultModel;
+  const model = allowed.includes(body.model) ? body.model : backend.model;
 
-  const upstream = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+  const upstream = await fetch(backend.url, {
     method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", "HTTP-Referer": new URL(req.url).origin, "X-Title": "FIZZ" },
+    headers: { Authorization: `Bearer ${backend.key}`, "Content-Type": "application/json", ...(backend.name === "openrouter" ? { "HTTP-Referer": new URL(req.url).origin, "X-Title": "FIZZ" } : {}) },
     body: JSON.stringify({
       model,
       stream: true,
@@ -62,7 +69,7 @@ export async function handleChat(req, { env, ip, bump }) {
   if (!upstream) return err(502, "Couldn't reach the AI service. Please try again.", "upstream");
   if (!upstream.ok) {
     const detail = await upstream.text().catch(() => "");
-    console.error("openrouter", upstream.status, detail.slice(0, 500));
+    console.error(backend.name, upstream.status, detail.slice(0, 500));
     const msg = upstream.status === 429 ? "FIZZ is very busy right now. Please try again in a moment." : upstream.status === 402 ? "FIZZ AI is temporarily unavailable." : "The AI service returned an error. Please try again.";
     return err(upstream.status === 429 ? 429 : 502, msg, "upstream");
   }

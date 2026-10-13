@@ -125,4 +125,18 @@ r = await vAi.POST(new Request(`${O}/api/ai/chat`, { method: "POST", headers: { 
 assert.equal(r.status, 403);
 globalThis.fetch = realFetch;
 
+// Google AI Studio key: used through Gemini's OpenAI-compatible endpoint when no OpenRouter key is set
+delete process.env.OPENROUTER_API_KEY;
+process.env.GEMINI_API_KEY = "AIza-fake";
+process.env.FIZZ_DAILY_LIMIT = "100";
+let gemini = null;
+globalThis.fetch = async (url, init) => { gemini = { url: String(url), auth: init.headers.Authorization, model: JSON.parse(init.body).model }; return new Response("data: [DONE]\n\n"); };
+r = await vAi.POST(new Request(`${O}/api/ai/chat`, { method: "POST", headers: { origin: O, cookie: "fizz_uid=qrstuvwxyz12345678", "x-forwarded-for": "5.6.7.8" }, body: JSON.stringify({ messages: [{ role: "user", content: "hi" }] }) }));
+assert.equal(r.status, 200);
+assert.deepEqual(gemini, { url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", auth: "Bearer AIza-fake", model: "gemini-2.5-flash" });
+globalThis.fetch = realFetch;
+j = await (await vStatus.GET(new Request(`${O}/api/status`))).json();
+assert.equal(j.ai.configured, true);
+assert.equal(j.ai.model, "gemini-2.5-flash");
+
 console.log("All Netlify and Vercel function tests passed");
