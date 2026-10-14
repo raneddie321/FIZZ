@@ -22,6 +22,12 @@ async function clerkApi(path, init = {}) {
   return data;
 }
 
+/** True when an email already belongs to a RanEddie ID (so sign-up can say so on its first step). */
+export async function emailTaken(email) {
+  const users = await clerkApi(`/users?email_address=${encodeURIComponent(email)}&limit=1`);
+  return Array.isArray(users) && users.length > 0;
+}
+
 let jwks = { at: 0, keys: [] };
 async function signingKey(kid) {
   const find = () => jwks.keys.find((k) => k.kid === kid);
