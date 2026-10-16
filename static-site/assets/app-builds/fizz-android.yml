@@ -1,0 +1,56 @@
+# Made by FIZZ DEV: builds this project as an Android app (APK to install, AAB for Google Play).
+# Runs when a commit message contains [fizz-android], or by hand: Actions → FIZZ Android app → Run workflow.
+# App name, id and version: .fizz/app.json. Signing: see .fizz/build/android-signing.sh.
+name: FIZZ Android app
+on:
+  push:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  android:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[fizz-android]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: android-actions/setup-android@v3
+      - name: Make the Android project
+        run: node .fizz/build/android.mjs
+      - name: Signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          PRIVATE_REPO: ${{ github.event.repository.private }}
+        run: bash .fizz/build/android-signing.sh
+      - name: Build the APK and AAB
+        working-directory: .fizz-build/android
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug assembleRelease bundleRelease $(cat ../signing-args 2>/dev/null || true)
+      - name: Collect the files
+        run: |
+          mkdir -p .fizz-out/app
+          A=.fizz-build/android/app/build/outputs
+          cp $A/apk/debug/*.apk $A/apk/release/*.apk $A/bundle/release/*.aab .fizz-out/app/ 2>/dev/null || true
+          ls -la .fizz-out/app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-app
+          path: .fizz-out/app/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-signing-key
+          path: .fizz-out/key/
+          if-no-files-found: ignore
+          retention-days: 7

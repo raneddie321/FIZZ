@@ -5,11 +5,16 @@
 
   async function api(path, opts = {}) {
     let res;
+    const headers = {};
+    if (opts.body) headers["Content-Type"] = "application/json";
+    // FIZZ's own tools (search, sandbox, sync) know who is calling from the RanEddie ID session.
+    if (opts.auth) { const t = await F.rid?.token?.(); if (t) headers.Authorization = `Bearer ${t}`; }
     try {
       res = await fetch(path, {
         method: opts.method || (opts.body ? "POST" : "GET"),
         credentials: "same-origin",
-        headers: opts.body ? { "Content-Type": "application/json" } : undefined,
+        headers,
+        signal: opts.signal,
         body: opts.body ? JSON.stringify(opts.body) : undefined,
       });
     } catch {
@@ -135,6 +140,24 @@
       create: (name, isPrivate, description) => api("/api/github/create", { body: { name, private: isPrivate, description } }),
       import: (owner, repo, branch) => api("/api/github/import", { body: { owner, repo, branch } }),
       push: (owner, repo, branch, message, files) => api("/api/github/push", { body: { owner, repo, branch, message, files } }),
+      runs: (owner, repo, workflow) => api(`/api/github/runs?${new URLSearchParams({ owner, repo, ...(workflow ? { workflow } : {}) })}`),
+      jobs: (owner, repo, runId) => api(`/api/github/jobs?${new URLSearchParams({ owner, repo, runId })}`),
+      log: (owner, repo, jobId) => api(`/api/github/log?${new URLSearchParams({ owner, repo, jobId })}`),
+      artifacts: (owner, repo, runId) => api(`/api/github/artifacts?${new URLSearchParams({ owner, repo, runId })}`),
+      artifactUrl: (owner, repo, id) => api(`/api/github/artifact?${new URLSearchParams({ owner, repo, id })}`),
+      dispatch: (owner, repo, branch, workflow, inputs) => api("/api/github/dispatch", { body: { owner, repo, branch, workflow, inputs } }),
+    },
+    web: {
+      search: (q, count = 8) => api(`/api/web/search?${new URLSearchParams({ q, count })}`, { auth: true }),
+      read: (url, max) => api(`/api/web/read?${new URLSearchParams({ url, ...(max ? { max } : {}) })}`, { auth: true }),
+      frame: (url) => api(`/api/web/frame?${new URLSearchParams({ url })}`, { auth: true }),
+    },
+    sandbox: (body, signal) => api("/api/sandbox", { body, auth: true, signal }),
+    sync: {
+      index: () => api("/api/sync", { auth: true }),
+      get: (id) => api(`/api/sync?id=${encodeURIComponent(id)}`, { auth: true }),
+      put: (item) => api("/api/sync", { method: "PUT", body: item, auth: true }),
+      remove: (id) => api(`/api/sync?id=${encodeURIComponent(id)}`, { method: "DELETE", auth: true }),
     },
     vercel: {
       deploy: (name, files, production) => api("/api/vercel/deploy", { body: { name, files, production } }),

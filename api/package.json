@@ -1,1 +1,9 @@
-{ "name": "fizz-api", "private": true, "type": "module", "description": "Vercel functions for FIZZ; dependency-free (only node built-ins and fetch)." }
+{
+  "name": "fizz-api",
+  "private": true,
+  "type": "module",
+  "description": "Vercel functions for FIZZ. Only the sandbox function uses a dependency (@vercel/sandbox).",
+  "dependencies": {
+    "@vercel/sandbox": "3.5.1"
+  }
+}

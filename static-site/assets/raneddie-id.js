@@ -160,7 +160,11 @@
     if (k === "signout") F.auth.signOut();
   }
 
-  F.rid = { load, reconcile, signOut, profile, version: CLERK_JS_VERSION, renderMe, menuHead, menuTail, onMenu };
+  /** The RanEddie ID session token for FIZZ's own API (null when signed out or RanEddie ID is off). */
+  async function token() {
+    try { const clerk = await load(); return (await clerk?.session?.getToken()) || null; } catch { return null; }
+  }
+  F.rid = { load, reconcile, signOut, profile, token, version: CLERK_JS_VERSION, renderMe, menuHead, menuTail, onMenu };
 
   // The sign-in page drives Clerk itself; everywhere else, check the session in the background.
   if (!document.getElementById("rid-card")) {

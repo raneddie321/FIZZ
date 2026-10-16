@@ -10,7 +10,7 @@ export const PROVIDERS = {
       const u = new URL("https://github.com/login/oauth/authorize");
       u.searchParams.set("client_id", env("GITHUB_CLIENT_ID"));
       u.searchParams.set("redirect_uri", `${origin}/api/oauth/github/callback`);
-      u.searchParams.set("scope", env("GITHUB_SCOPES") || "repo read:user");
+      u.searchParams.set("scope", env("GITHUB_SCOPES") || "repo workflow read:user");
       u.searchParams.set("state", state);
       u.searchParams.set("allow_signup", "true");
       return u.toString();

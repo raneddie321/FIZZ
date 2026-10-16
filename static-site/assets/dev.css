@@ -357,3 +357,25 @@
 .bin-stage iframe { width: 100%; height: 100%; min-height: 480px; border: 0; }
 .bin-stage[data-kind="file"] { display: none; }
 #dev-app #br-select.on { background: var(--primary-soft); color: var(--primary); }
+
+/* web search results, page reads and app builds in the thread */
+.web-results { list-style: none; margin: 0; padding: 6px 12px 10px; display: grid; gap: 10px; }
+.web-results li { display: grid; gap: 1px; }
+.web-results a { color: var(--primary); font-weight: 550; text-decoration: none; }
+.web-results a:hover { text-decoration: underline; }
+.web-results small { color: var(--success); font-size: 12px; }
+.web-results p { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
+.web-read { padding: 8px 12px 10px; display: grid; gap: 6px; }
+.web-read a { color: var(--primary); font-weight: 550; text-decoration: none; }
+.web-read pre { margin: 0; max-height: 220px; overflow: auto; white-space: pre-wrap; font: 12px/1.5 var(--mono); color: var(--muted); }
+.build-card { margin: 10px 0; padding: 12px 14px; max-width: 560px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); display: grid; gap: 10px; }
+.build-card.ok { border-color: color-mix(in srgb, var(--success) 45%, var(--border)); }
+.build-card.fail { border-color: color-mix(in srgb, var(--danger) 45%, var(--border)); }
+.build-top { display: flex; align-items: center; gap: 10px; }
+.build-ic { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: var(--surface-2); font-size: 18px; flex: none; }
+.build-txt { display: grid; min-width: 0; flex: 1; }
+.build-txt span { font-size: 12.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
+.build-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.build-actions:empty { display: none; }
+.build-actions small { opacity: .75; margin-left: 4px; }
+.build-card p { margin: 0; }

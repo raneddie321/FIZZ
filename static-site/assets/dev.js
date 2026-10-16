@@ -231,6 +231,8 @@
     parsed.files.forEach((f, idx) => fileRow(f.path, idx, { running: m.pending && !f.closed, content: f.content, kind: "file" }));
     parsed.edits.forEach((e, idx) => fileRow(e.path, `e${idx}`, { running: m.pending && !e.closed, content: e.hunks.map((h) => h.replace).join("\n…\n"), kind: "edit", failed: (m.editErrors || {})[e.path] }));
     const tools = replyTools(m, parsed).filter((t) => !["ask", "push", "attach", "memory"].includes(t.type));
+    // Live cards (app builds) stay visible under the message, outside the collapsed steps.
+    const toolCards = tools.map((t) => (t.result ? T()[t.type]?.card?.(t, m) || "" : "")).join("");
     tools.forEach((t, idx) => {
       const key = `${m.id}:t${idx}`;
       const waiting = t.status === "waiting";
@@ -241,7 +243,7 @@
       if (open) {
         if (waiting) body = `<div class="stage-bar"><span class="muted-sm">Fizz Code wants to do this.</span><button class="btn btn-sm" data-approve="${m.id}:${idx}">Allow</button><button class="btn btn-outline btn-sm" data-deny="${m.id}:${idx}">Don't allow</button></div>`;
         else if (t.result) body = (t.result.html || outputHtml(t.result.text)) + (t.result.images || []).map((src) => `<img class="tool-img" src="${esc(src)}" alt="" />`).join("");
-        else body = outputHtml(t.body);
+        else body = outputHtml(t.progress || t.body);
       }
       rows.push(`<div class="step"><button class="step-head" data-step="${key}" aria-expanded="${open}">${st}<span class="verb">${esc(def.icon || "")}</span><span class="path">${esc(toolLabel(t))}</span>${t.status === "failed" ? '<span class="delta del">failed</span>' : ""}</button>${open ? `<div class="step-body">${body}</div>` : ""}</div>`);
     });
@@ -279,7 +281,7 @@
       : "";
     const stageBar = staged.filter((x) => !x.decided).length > 1 ? `<div class="stage-bar all"><span>${staged.filter((x) => !x.decided).length} changes waiting for review</span><button class="btn btn-sm" data-accept-all="${m.id}">Accept all</button><button class="btn btn-outline btn-sm" data-reject-all="${m.id}">Reject all</button></div>` : "";
     const outs = [...new Set([...(m.outputs || []), ...replyTools(m, parsed).filter((t) => t.type === "attach" && t.result?.files).flatMap((t) => t.result.files)])];
-    const cards = outs.length ? `<div class="file-cards">${outs.map((f) => F.docs.card(project().files, f)).join("")}</div>` : "";
+    const cards = toolCards + (outs.length ? `<div class="file-cards">${outs.map((f) => F.docs.card(project().files, f)).join("")}</div>` : "");
     return { html: skills + planHtml + activity + stageBar, prose: parsed.prose, asks: parsed.tools.filter((t) => t.type === "ask"), cards };
   }
 
@@ -585,6 +587,12 @@
       showTab, refreshPreview, buildPreview,
       previewFrame: () => $("#preview"),
       toast: F.toast,
+      rerender: () => { renderThread(); renderTree(); },
+      githubPush: (message) => githubPush(message, { ask: false }),
+      send: (text) => sendText(text),
+      needConnection,
+      filesForUpload,
+      isBinary,
     };
   }
 
@@ -1135,7 +1143,8 @@
   /** Files for GitHub and Vercel: text as is, binary files as { base64 }. */
   const filesForUpload = async () => Object.fromEntries(await Promise.all(Object.entries(project().files).map(async ([k, v]) => [k, isBinary(v) ? { base64: await F.blobs.base64(v) } : v])));
 
-  async function githubPush(message = "Update from FIZZ DEV") {
+  /** Pushes the project. With { ask: false } (app builds) a linked repository is pushed without the commit dialog. Returns { sha, owner, repo, branch } or nothing. */
+  async function githubPush(message = "Update from FIZZ DEV", { ask = true } = {}) {
     const p = project();
     if (!Object.keys(p.files).length) return F.toast("This project has no files yet.");
     if (!(await needConnection("github", "GitHub"))) return;
@@ -1149,7 +1158,9 @@
         try { const r = await F.conn.github.create(v.name, v.private, `Created with FIZZ DEV`); target = { owner: r.repo.owner, repo: r.repo.name, branch: r.repo.defaultBranch || "main" }; } catch (e) { return F.toast(e.message); }
       } else target = { owner: repo.owner, repo: repo.name, branch: repo.defaultBranch || "main" };
     }
-    const v = await dialog({ title: `Push to ${target.owner}/${target.repo}`, desc: "Creates one commit with this project's files. Other files in the repository are kept.", fields: [{ name: "branch", label: "Branch", value: target.branch, mono: true, required: true }, { name: "message", label: "Commit message", value: message, required: true }], ok: "Push" });
+    const v = ask || !p.git
+      ? await dialog({ title: `Push to ${target.owner}/${target.repo}`, desc: "Creates one commit with this project's files. Other files in the repository are kept.", fields: [{ name: "branch", label: "Branch", value: target.branch, mono: true, required: true }, { name: "message", label: "Commit message", value: message, required: true }], ok: "Push" })
+      : { branch: target.branch, message };
     if (!v) return;
     F.toast("Pushing to GitHub…");
     try {
@@ -1158,7 +1169,12 @@
       save();
       renderHeader();
       F.toast(`Pushed ${r.files} files to ${target.owner}/${target.repo}`);
-    } catch (e) { F.toast(e.message); }
+      return { sha: r.sha, owner: target.owner, repo: target.repo, branch: v.branch };
+    } catch (e) {
+      if (e.code === "needs_workflow_scope" && (await dialog({ title: "Connect GitHub again", desc: e.message, ok: "Reconnect GitHub" }))) F.conn.connect("github");
+      else F.toast(e.message);
+      if (!ask) throw e;
+    }
   }
 
   async function githubImport() {
@@ -1731,6 +1747,8 @@
   if (isNarrow()) app.classList.remove("panel-open");
 
   window.addEventListener("fizz:settings", () => { state.mode = data.settings.devMode || state.mode; renderAll(); });
+  window.addEventListener("fizz:synced", () => { if (!project()) selectProject(data.projects[0].id); renderAll(); });
+  F.builds?.attach({ data, save, rerender: () => renderThread(), send: (text) => sendText(text) });
 
   // Shown again after switching from FIZZ: refresh layout-dependent widgets and accept a hand-off prompt.
   F.app.onShow("dev", (payload) => {

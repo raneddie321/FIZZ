@@ -1,0 +1,38 @@
+# Made by FIZZ DEV: builds this project as a desktop app for Windows, macOS and Linux (Electron).
+# Runs when a commit message contains [fizz-desktop], or by hand: Actions → FIZZ desktop app → Run workflow.
+# The macOS app isn't notarized: open it the first time with right-click → Open.
+name: FIZZ desktop app
+on:
+  push:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  desktop:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[fizz-desktop]')
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Make the desktop project
+        run: node .fizz/build/desktop.mjs
+      - name: Build the app
+        working-directory: .fizz-build
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: npx electron-builder --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ runner.os }}
+          path: |
+            .fizz-build/dist/*.exe
+            .fizz-build/dist/*.dmg
+            .fizz-build/dist/*.AppImage
+          if-no-files-found: error

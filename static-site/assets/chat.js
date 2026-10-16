@@ -340,6 +340,7 @@
 
   if (state.id && !conv()) state.id = null;
   window.addEventListener("fizz:settings", () => renderAll());
+  window.addEventListener("fizz:synced", () => renderAll());
   F.app.onShow("chat", () => {
     const id = location.hash.slice(1) || null;
     if (id !== state.id) { state.id = data.conversations.some((x) => x.id === id) ? id : null; }
