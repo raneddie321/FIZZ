@@ -190,12 +190,22 @@
   }
 
   // ---------- thread ----------
+  // Templates on the welcome screen: each fills in a prompt for Fizz Code.
   const STARTERS = [
-    ["Landing page", "Build a modern landing page for a coffee shop with a menu and contact form"],
-    ["Browser game", "Make a bubble-popping canvas game with a score and a 30-second timer"],
-    ["Dashboard", "Create an admin dashboard with stats cards, a bar chart and a table"],
-    ["Portfolio", "Build a minimal developer portfolio with projects and an about section"],
+    ["🌐", "Landing page", "Build a modern landing page for a coffee shop with a menu, opening hours and a contact form"],
+    ["🎮", "Browser game", "Make a bubble-popping canvas game with a score, sound effects and a 30-second timer"],
+    ["📊", "Dashboard", "Create an admin dashboard with stats cards, a bar chart and a sortable table"],
+    ["📱", "Android app", "Build a mobile-first habit tracker (touch-friendly, saves to localStorage, works offline), make app icons, then build it as an Android app (APK + AAB)"],
+    ["🖥", "Desktop app", "Build a Markdown notes app with a sidebar and a live preview, then build it as a desktop app for Windows, macOS and Linux"],
+    ["📄", "CV as PDF", "Design a modern one-page CV and export it as an A4 PDF. Ask me for my details first"],
+    ["📽", "Presentation", "Make a 6-slide PowerPoint presentation (.pptx) with a clean design. Ask me for the topic first"],
+    ["📈", "Excel budget", "Create an Excel workbook (.xlsx) for a monthly budget with categories, formulas and a summary sheet"],
+    ["🐍", "Python data", "Write a Python script that creates sample sales data, analyses it and saves a summary as CSV and a chart as PNG"],
+    ["🔎", "Research page", "Search the web for the most popular JavaScript frameworks right now and build a comparison page with sources"],
+    ["👤", "Portfolio", "Build a minimal developer portfolio with projects, an about section and dark mode"],
+    ["🧩", "Chrome extension", "Make a Chrome extension (Manifest V3) that shows a word count for the selected text, with a popup"],
   ];
+
 
   const T = () => F.agentTools.registry;
   const toolLabel = (t) => T()[t.type]?.label?.(t) || `${t.type} ${t.body || ""}`.trim();
@@ -292,7 +302,8 @@
     if (!c || !c.messages.length) {
       const empty = !Object.keys(project().files).length;
       th.innerHTML = `<div class="dev-welcome"><div><h1>${empty ? "What do you want to build?" : `Continue ${esc(project().name)}`}</h1><p>${empty ? "Describe it and Fizz Code writes the files. You'll see the code and a live preview side by side." : "Ask for a change, a fix or a new feature."}</p></div>
-        <div class="starter">${STARTERS.map(([t, p], i) => `<button data-starter="${i}"><b>${t}</b><span>${esc(p)}</span></button>`).join("")}</div>
+        <div class="starter${state.allTemplates ? " all" : ""}">${STARTERS.map(([ic, t, p], i) => `<button data-starter="${i}" title="${esc(p)}"><span class="st-ic">${ic}</span><b>${t}</b><span>${esc(p)}</span></button>`).join("")}</div>
+        ${state.allTemplates ? "" : `<button type="button" class="link" data-all-templates>More templates (${STARTERS.length - 6})</button>`}
         <div class="connect-row"><button class="btn btn-outline btn-sm" data-act="gh-import">Import from GitHub</button><button class="btn btn-outline btn-sm" data-act="gdoc-import">Import a Google Doc</button><button class="btn btn-outline btn-sm" data-act="settings-conn">Connections</button></div></div>`;
       return;
     }
@@ -611,7 +622,7 @@
     icon: "$", feedback: true,
     label: (t) => t.body.split("\n")[0].slice(0, 120),
     summary: (k) => `ran ${k} command${k === 1 ? "" : "s"}`,
-    prompt: "<fizz-run>command</fizz-run> runs one command in the project's terminal: ls, cat, tree, grep, head, tail, wc, mkdir, mv, cp, rm, echo > file, `node file.js` (JavaScript in an isolated worker; top-level await works) and `python file.py` (Python 3 in the browser). Scripts can make real documents: require('docx') (Word), require('xlsx') (Excel, SheetJS), require('pptxgenjs') (PowerPoint), require('jspdf') / require('pdf-lib') (PDF), and save them with fizz.writeFile('out/report.docx', data) (data: string, Uint8Array, ArrayBuffer or Blob; e.g. await docx.Packer.toBlob(doc), XLSX.write(wb, { type: 'array', bookType: 'xlsx' }), await pptx.write({ outputType: 'uint8array' }), pdf.output('arraybuffer')). Then show the file with <fizz-attach path='…'/>. No npm install or git here.",
+    prompt: "<fizz-run>command</fizz-run> runs one command in the project's terminal: ls, cat, tree, grep, head, tail, wc, mkdir, mv, cp, rm, echo > file, `node file.js` (JavaScript in an isolated worker; top-level await works) and `python file.py` (Python 3 in the browser). Scripts can make real documents: require('docx') (Word), require('xlsx') (Excel, SheetJS), require('pptxgenjs') (PowerPoint), require('jspdf') / require('pdf-lib') (PDF), and save them with fizz.writeFile('out/report.docx', data) (data: string, Uint8Array, ArrayBuffer or Blob; e.g. await docx.Packer.toBlob(doc), XLSX.write(wb, { type: 'array', bookType: 'xlsx' }), await pptx.write({ outputType: 'uint8array' }), pdf.output('arraybuffer')). Then show the file with <fizz-attach path='…'/>. No npm install or git here — use <fizz-sandbox> for those when it's listed.",
     needsApproval: () => data.settings.askBeforeRun === true,
     async run(t, ctx) {
       const term = ctx.term();
@@ -885,9 +896,9 @@
     if (v !== "chat") {
       $$(".panel-tabs [role=tab]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === v)));
       $$(".pane").forEach((p) => p.classList.toggle("on", p.dataset.pane === v));
-      if (v === "terminal" && !term) showTab("terminal");
+      if (v === "terminal") { ensureTerm(); setTimeout(() => term?.focus(), 30); }
       if (v === "code") { renderTree(); renderEditor(); setTimeout(() => cm?.refresh(), 30); }
-      if (v === "browser") refreshPreview();
+      if (v === "browser" && !F.web?.isWeb()) refreshPreview();
       if (v === "activity") renderActivity();
       if (v === "terminal") setTimeout(() => term?.fit(), 30);
     }
@@ -1439,7 +1450,8 @@
     const t = e.target.closest("button,[data-starter]");
     if (!t) return;
     const c = chat();
-    if (t.dataset.starter !== undefined) { $("#input").value = STARTERS[+t.dataset.starter][1]; grow(); $("#input").focus(); return; }
+    if (t.dataset.starter !== undefined) { $("#input").value = STARTERS[+t.dataset.starter][2]; grow(); $("#input").focus(); return; }
+    if (t.hasAttribute("data-all-templates")) { state.allTemplates = true; renderThread(); return; }
     if (t.dataset.step) { state.expanded.has(t.dataset.step) ? state.expanded.delete(t.dataset.step) : state.expanded.add(t.dataset.step); renderThread(); return; }
     if (t.dataset.copy !== undefined) { navigator.clipboard.writeText(c.messages[+t.dataset.copy].content); F.toast("Copied"); }
     if (t.dataset.revert) revertMessage(t.dataset.revert);
@@ -1603,10 +1615,14 @@
   $("#deploy-btn").addEventListener("click", deploy);
   $("#more-btn").addEventListener("click", async (e) => {
     const p = project();
-    const items = [{ k: "zip", html: "Download project (.zip)" }, { k: "html1", html: "Download as one HTML file" }, { k: "icons", html: "Make app icons from an image…" }, { k: "gdoc-in", html: "Import a Google Doc…" }, { k: "gdoc-out", html: "Export summary to Google Docs" }];
+    const items = [{ k: "zip", html: "Download project (.zip)" }, { k: "html1", html: "Download as one HTML file" }, { k: "icons", html: "Make app icons from an image…" }, "-", { k: "android", html: "Build Android app<small>APK + AAB</small>" }, { k: "desktop", html: "Build desktop app<small>Windows · macOS · Linux</small>" }, "-", { k: "gdoc-in", html: "Import a Google Doc…" }, { k: "gdoc-out", html: "Export summary to Google Docs" }];
     if (p.deploy?.url) items.push({ k: "live", html: `Open live site<small>${esc(p.deploy.url)}</small>` });
     items.push("-", { k: "rename", html: "Rename project" }, { k: "clear", html: "Clear this chat" }, { k: "delete", html: "Delete project", danger: true });
-    const k = await menu(e.currentTarget, items);
+    moreAction(await menu(e.currentTarget, items));
+  });
+  async function moreAction(k) {
+    const p = project();
+    if (k === "android" || k === "desktop") return sendText(k === "android" ? "Build this project as an Android app (APK to install and AAB for Google Play). Make it mobile-friendly and add app icons first if needed." : "Build this project as a desktop app for Windows, macOS and Linux.");
     if (k === "zip") exportZip();
     if (k === "html1") { const entry = buildPreview(state.previewPath).entry; if (!entry) return F.toast("There's no HTML page yet."); F.download(`${p.name.replace(/[^\w-]+/g, "-") || "site"}.html`, await F.docs.singleHtml(toolContext({ id: "menu" }), entry)); }
     if (k === "icons") {
@@ -1621,7 +1637,7 @@
     if (k === "rename") renameProject();
     if (k === "clear" && chat()) { chat().messages = []; save(); renderThread(); }
     if (k === "delete") deleteProject();
-  });
+  }
   $("#panel-btn").addEventListener("click", togglePanel);
   $("#panel-btn-mid").addEventListener("click", () => { app.classList.add("panel-open"); showTab(ui.tab); });
   $("#panel-close").addEventListener("click", () => (isNarrow() ? app.classList.remove("panel-open") : togglePanel()));
@@ -1748,11 +1764,94 @@
     $("#qo-list").onclick = (e) => { const b = e.target.closest("[data-f]"); if (b) { d.close(); openFile(b.dataset.f); } };
   }
 
+  // ---------- command palette (Ctrl+K) ----------
+  function commands(q) {
+    const list = [
+      { g: "Chat", label: "New chat", run: () => newChat() },
+      { g: "Chat", label: "New project", run: () => $("#new-project")?.click() },
+      { g: "Chat", label: "Plan mode", hint: "Plan before building", run: () => $('.mode [data-mode="plan"]')?.click() },
+      { g: "Chat", label: "Build mode", run: () => $('.mode [data-mode="build"]')?.click() },
+      { g: "Chat", label: "Ask mode", hint: "Questions, no file changes", run: () => $('.mode [data-mode="ask"]')?.click() },
+      { g: "Chat", label: "Summarise older messages", run: () => compactChat() },
+      { g: "Files", label: "Open a file…", hint: "Ctrl+P", run: () => quickOpen() },
+      { g: "Files", label: "Download project (.zip)", run: () => moreAction("zip") },
+      { g: "Files", label: "Download as one HTML file", run: () => moreAction("html1") },
+      { g: "Files", label: "Make app icons…", run: () => moreAction("icons") },
+      { g: "Files", label: "Project memory (FIZZ.md)…", run: () => openMemory() },
+      { g: "Ship", label: "Push to GitHub", run: () => githubPush() },
+      { g: "Ship", label: "Import from GitHub…", run: () => githubImport() },
+      { g: "Ship", label: "Deploy to Vercel", run: () => deploy() },
+      { g: "Ship", label: "Build Android app", hint: "APK + AAB", run: () => moreAction("android") },
+      { g: "Ship", label: "Build desktop app", hint: "exe · dmg · AppImage", run: () => moreAction("desktop") },
+      { g: "View", label: "Show code", run: () => showTab("code") },
+      { g: "View", label: "Show terminal", hint: "Ctrl+`", run: () => showTab("terminal") },
+      { g: "View", label: "Show preview", run: () => { showTab("browser"); F.web?.select("preview"); } },
+      { g: "View", label: "New browser tab", run: () => { showTab("browser"); F.web?.newTab(); } },
+      { g: "View", label: "Show activity", run: () => showTab("activity") },
+      { g: "View", label: "Switch to FIZZ", hint: "Ctrl+.", run: () => F.app.switch("chat") },
+      { g: "View", label: `Theme: ${document.documentElement.classList.contains("dark") ? "light" : "dark"}`, run: () => { F.theme.set(document.documentElement.classList.contains("dark") ? "light" : "dark"); } },
+      { g: "Settings", label: "Settings", run: () => openSettings() },
+      { g: "Settings", label: "Tools", hint: "Search, cloud browser, sandbox, sync", run: () => openSettings("tools") },
+      { g: "Settings", label: "Connections", run: () => openSettings("connections") },
+      { g: "Settings", label: "Skills…", run: () => manageSkills() },
+      { g: "Settings", label: `${data.settings.reviewChanges ? "Stop reviewing" : "Review"} changes before applying`, run: () => { data.settings.reviewChanges = !data.settings.reviewChanges; save(); F.toast(`Review changes: ${data.settings.reviewChanges ? "on" : "off"}`); } },
+      ...data.projects.filter((p) => p.id !== state.projectId).map((p) => ({ g: "Projects", label: p.name, hint: `${Object.keys(p.files).length} files`, run: () => selectProject(p.id) })),
+      ...STARTERS.map(([ic, t, pr]) => ({ g: "Templates", label: `${ic} ${t}`, run: () => { newChat(); $("#input").value = pr; grow(); $("#input").focus(); } })),
+    ];
+    const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+    const hits = words.length ? list.filter((c) => words.every((w) => `${c.g} ${c.label} ${c.hint || ""}`.toLowerCase().includes(w))) : list.filter((c) => c.g !== "Templates");
+    if (q.trim()) {
+      hits.push({ g: "Web", label: `Search the web for “${q.trim()}”`, run: () => { showTab("browser"); F.web?.newTab(q.trim()); } });
+      hits.push({ g: "Fizz Code", label: `Ask Fizz Code: “${q.trim()}”`, run: () => sendText(q.trim()) });
+    }
+    return hits.slice(0, 60);
+  }
+  function palette() {
+    const $ = (q) => document.querySelector(q);
+    let d = $("#palette");
+    if (!d) {
+      d = document.createElement("dialog");
+      d.id = "palette";
+      d.className = "dlg palette";
+      d.innerHTML = `<div class="pal-body"><input class="input" id="pal-q" placeholder="Type a command, a project, or something to search…" autocomplete="off" spellcheck="false" /><div class="pal-list" id="pal-list" role="listbox"></div><div class="pal-foot"><span>↑↓ to move</span><span>Enter to run</span><span>Esc to close</span></div></div>`;
+      document.body.appendChild(d);
+      d.addEventListener("click", (e) => { if (e.target === d) d.close(); });
+    }
+    const input = $("#pal-q");
+    let idx = 0, items = [];
+    const draw = () => {
+      items = commands(input.value);
+      idx = Math.min(idx, Math.max(0, items.length - 1));
+      let g = "";
+      $("#pal-list").innerHTML = items.length ? items.map((c, i) => { const head = c.g !== g ? `<div class="pal-g">${esc((g = c.g))}</div>` : ""; return `${head}<button type="button" data-i="${i}" class="${i === idx ? "on" : ""}" role="option" aria-selected="${i === idx}"><span>${esc(c.label)}</span>${c.hint ? `<small>${esc(c.hint)}</small>` : ""}</button>`; }).join("") : `<p class="muted-sm" style="padding:12px">Nothing found.</p>`;
+      $("#pal-list .on")?.scrollIntoView({ block: "nearest" });
+    };
+    const run = (i) => { const c = items[i]; if (!c) return; d.close(); setTimeout(() => c.run(), 0); };
+    input.value = "";
+    idx = 0;
+    draw();
+    d.showModal();
+    input.focus();
+    input.oninput = () => { idx = 0; draw(); };
+    input.onkeydown = (e) => {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); idx = Math.max(0, Math.min(items.length - 1, idx + (e.key === "ArrowDown" ? 1 : -1))); draw(); }
+      if (e.key === "Enter") { e.preventDefault(); run(idx); }
+    };
+    $("#pal-list").onclick = (e) => { const b = e.target.closest("[data-i]"); if (b) run(+b.dataset.i); };
+  }
+
+  // Capture phase, so Ctrl+K works even while the terminal or the editor has focus.
+  window.addEventListener("keydown", (e) => {
+    if (!active() || !(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "k" || e.altKey || e.shiftKey) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const pal = document.getElementById("palette");
+    if (pal?.open) pal.close(); else palette();
+  }, true);
   window.addEventListener("keydown", (e) => {
     if (!active()) return;
     const mod = e.ctrlKey || e.metaKey;
     if (e.key === "Escape") { closeMenu(); if (state.controller) state.controller.abort(); }
-    if (mod && e.key.toLowerCase() === "k") { e.preventDefault(); if (isNarrow()) $("#open-side").click(); $("#search").focus(); }
     if (mod && e.key.toLowerCase() === "p") { e.preventDefault(); quickOpen(); }
     if (mod && e.key === "`") { e.preventDefault(); ui.tab === "terminal" && app.dataset.panel !== "closed" && !isNarrow() ? togglePanel() : showTab("terminal"); }
   });

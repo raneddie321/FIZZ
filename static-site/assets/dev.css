@@ -408,3 +408,26 @@
 .br-handoff > div span { color: var(--muted); }
 .br-handoff .hb-ic { font-size: 20px; }
 .stage-bar.handoff { background: color-mix(in srgb, var(--warning) 12%, transparent); }
+
+/* template gallery */
+.starter { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); max-width: 680px; }
+.starter:not(.all) button:nth-child(n+7) { display: none; }
+.starter button { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 10px; align-items: center; transition: border-color .15s, background .15s, transform .15s; }
+.starter button:hover { border-color: color-mix(in srgb, var(--primary) 45%, var(--border)); transform: translateY(-1px); }
+.starter .st-ic { grid-row: span 2; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; background: var(--surface-2); font-size: 17px; color: inherit; white-space: normal; }
+.dev-welcome .link { font-size: 13px; }
+
+/* command palette */
+.palette { width: min(620px, calc(100vw - 32px)); padding: 0; margin-top: 12vh; border-radius: 16px; }
+.palette::backdrop { background: rgba(5, 8, 14, .45); backdrop-filter: blur(2px); }
+.pal-body { display: flex; flex-direction: column; max-height: 70vh; }
+.pal-body > .input { height: 52px; border: 0; border-bottom: 1px solid var(--border); border-radius: 16px 16px 0 0; font-size: 15.5px; padding: 0 18px; background: transparent; box-shadow: none; }
+.pal-list { overflow: auto; padding: 6px; }
+.pal-g { padding: 10px 10px 4px; font-size: 11.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.pal-list button { width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border: 0; background: none; border-radius: 9px; text-align: left; font-size: 14px; color: var(--fg); }
+.pal-list button span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pal-list button small { color: var(--muted); font-size: 12px; flex: none; }
+.pal-list button.on, .pal-list button:hover { background: var(--primary-soft); }
+.pal-list button.on span { color: var(--primary); }
+.pal-foot { display: flex; gap: 16px; padding: 8px 14px; border-top: 1px solid var(--border); font-size: 11.5px; color: var(--muted); }
+@media (max-width: 640px) { .pal-foot { display: none; } .palette { margin-top: 8vh; } }

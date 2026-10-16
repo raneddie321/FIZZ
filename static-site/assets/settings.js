@@ -1,4 +1,4 @@
-/* Shared Settings dialog for FIZZ and FIZZ DEV: General, AI, Connections, Account. */
+/* Shared Settings dialog for FIZZ and FIZZ DEV: General, AI, Connections, Tools, Account. */
 (function () {
   "use strict";
   const F = window.FIZZ;
@@ -20,7 +20,7 @@
       <h2>Settings</h2>
       <div class="dlg-tabs" role="tablist">
         <button type="button" data-tab="general">General</button><button type="button" data-tab="ai">AI</button>
-        <button type="button" data-tab="connections">Connections</button><button type="button" data-tab="account">Account</button>
+        <button type="button" data-tab="connections">Connections</button><button type="button" data-tab="tools">Tools</button><button type="button" data-tab="account">Account</button>
       </div>
       <div data-pane="general" class="form">
         <label class="field"><span>Name</span><input class="input" name="name" maxlength="80" /></label>
@@ -47,6 +47,12 @@
       </div>
       <div data-pane="connections" class="form"><div class="conn-list" data-conn-list></div>
         <p class="muted-sm">Tokens for GitHub and Vercel are kept encrypted in a secure cookie that page scripts can't read. Google access lasts about an hour and stays in this tab only.</p></div>
+      <div data-pane="tools" class="form">
+        <div class="conn-list" data-tools></div>
+        <label class="check"><input type="checkbox" name="cloudSync" /><span>Sync chats and projects to my RanEddie ID<small>Use them on every device. Images and PDFs stay in the browser that made them.</small></span></label>
+        <label class="check"><input type="checkbox" name="reviewChanges" /><span>Review file changes before they're applied</span></label>
+        <label class="check"><input type="checkbox" name="askBeforeRun" /><span>Ask before Fizz Code runs commands<small>Off: it runs them in its own sandbox right away (every change can be undone).</small></span></label>
+      </div>
       <div data-pane="account" class="form"><div data-acct></div></div>
       <p class="err" data-err style="color:var(--danger);margin:0;font-size:14px"></p>
       <div class="dlg-actions"><button class="btn btn-outline" value="cancel" formnovalidate>Cancel</button><button class="btn" value="save" data-save>Save</button></div>
@@ -76,12 +82,28 @@
     const signIn = `<a class="btn btn-sm rid-signin-btn" href="${esc(F.auth.url("signin"))}"><img src="assets/raneddie-logo.png" alt="" />Sign in with RanEddie ID</a>`;
     const exp = `<button type="button" class="btn btn-outline btn-sm" data-export>Export my data</button>`;
     if (user.rid) return `<div class="conn"><span class="avatar">${esc(user.name.slice(0, 1).toUpperCase())}</span><div class="conn-body"><b>${esc(user.name)}</b><small>${esc(user.email)}</small><small class="conn-state">Signed in with RanEddie ID</small></div></div>
-      <p class="muted-sm">Your theme, response style, model and FIZZ DEV mode are saved to your RanEddie ID. Chats, projects and API keys stay in this browser.</p>
+      <p class="muted-sm">Your theme, response style, model and FIZZ DEV mode are saved to your RanEddie ID. API keys stay in this browser. Chats and projects sync to your account when cloud sync is on (Settings → Tools).</p>
       <div class="row-inline">${exp}<button type="button" class="btn btn-outline btn-sm" data-signout>Sign out</button></div>`;
     if (user.legacy) return `<p class="muted-sm">You're using an older FIZZ account saved only in this browser (${esc(user.email)}). Sign in with RanEddie ID to keep your settings on every device — your chats and projects stay here.</p>
       <div class="row-inline">${signIn}${exp}<button type="button" class="btn btn-outline btn-sm" data-signout>Sign out</button></div>`;
     return `<p class="muted-sm">You're using FIZZ without an account. Everything is saved in this browser. Sign in with your RanEddie ID — one account for FIZZ and RanEddie games — to keep your settings on every device.</p>
       <div class="row-inline">${signIn}<a class="btn btn-outline btn-sm" href="${esc(F.auth.url("signup"))}">Create a RanEddie ID</a>${exp}</div>`;
+  }
+
+  const TOOLS = [
+    { k: "search", name: "Web search & reading pages", on: (st) => Boolean(st.tools), state: (st) => (st.tools?.search === "wikipedia" ? "On — Wikipedia only" : st.tools?.search ? `On — ${st.tools.search}` : "Off"), hint: "For results from the whole web, the site owner adds BROWSERBASE_API_KEY, BRAVE_SEARCH_API_KEY or TAVILY_API_KEY." },
+    { k: "browser", name: "Cloud browser", on: (st) => Boolean(st.tools?.browser), hint: "Lets Fizz Code open any site, click, type and sign in with you. The site owner adds BROWSERBASE_API_KEY." },
+    { k: "sandbox", name: "Cloud sandbox", on: (st) => Boolean(st.tools?.sandbox), hint: "Fizz Code's own Linux computer (npm, git, Python). The site owner sets FIZZ_SANDBOX=on on Vercel." },
+    { k: "builds", name: "Android & desktop apps", on: (st) => Boolean(st.connections?.github?.connected), state: (st) => (st.connections?.github?.connected ? "On — builds run in your GitHub" : st.connections?.github?.configured ? "Connect GitHub to turn on" : "Off"), hint: "APK, AAB, .exe, .dmg and AppImage, built by GitHub Actions in your repository." },
+    { k: "sync", name: "Cloud sync", on: (st) => Boolean(st.tools?.sync), hint: "Needs RanEddie ID and Upstash Redis on the server." },
+  ];
+  async function renderTools(d) {
+    const st = await F.serverStatus().catch(() => ({}));
+    d.querySelector("[data-tools]").innerHTML = TOOLS.map((t) => {
+      const on = t.on(st);
+      return `<div class="conn"><span class="tool-dot ${on ? "on" : ""}" aria-hidden="true"></span><div class="conn-body"><b>${t.name}</b><small>${esc(t.hint)}</small><small class="conn-state">${esc(t.state ? t.state(st) : on ? "On" : "Off")}</small></div></div>`;
+    }).join("");
+    d.querySelector("[name=cloudSync]").closest("label").classList.toggle("hidden", !st.tools?.sync);
   }
 
   async function renderConnections(d) {
@@ -121,7 +143,11 @@
       d.querySelectorAll(".dlg-tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === t));
       d.querySelectorAll("[data-pane]").forEach((p) => p.classList.toggle("hidden", p.dataset.pane !== t));
       if (t === "connections") renderConnections(d);
+      if (t === "tools") renderTools(d);
     };
+    f.cloudSync.checked = s.cloudSync !== false;
+    f.reviewChanges.checked = Boolean(s.reviewChanges);
+    f.askBeforeRun.checked = Boolean(s.askBeforeRun);
     setTab(tab);
     F.serverStatus().then((st) => {
       d.querySelector("[data-ai-status]").textContent = st.ai?.configured
@@ -168,7 +194,11 @@
         model: f.model.value,
         style: f.style.value,
         instructions: f.instructions.value.trim(),
+        cloudSync: f.cloudSync.checked,
+        reviewChanges: f.reviewChanges.checked,
+        askBeforeRun: f.askBeforeRun.checked,
       });
+      if (s.cloudSync) F.sync?.now();
       ctx.save();
       d.close();
       F.toast(ctx.user.rid ? "Settings saved to your RanEddie ID" : "Settings saved");
