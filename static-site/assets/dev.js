@@ -241,7 +241,7 @@
       const def = T()[t.type] || {};
       let body = "";
       if (open) {
-        if (waiting) body = `<div class="stage-bar"><span class="muted-sm">Fizz Code wants to do this.</span><button class="btn btn-sm" data-approve="${m.id}:${idx}">Allow</button><button class="btn btn-outline btn-sm" data-deny="${m.id}:${idx}">Don't allow</button></div>`;
+        if (waiting) { const w = def.waiting?.(t) || {}; body = `<div class="stage-bar${w.handoff ? " handoff" : ""}"><span class="muted-sm">${esc(w.text || "Fizz Code wants to do this.")}</span><button class="btn btn-sm" data-approve="${m.id}:${idx}">${esc(w.ok || "Allow")}</button><button class="btn btn-outline btn-sm" data-deny="${m.id}:${idx}">${esc(w.cancel || "Don't allow")}</button></div>`; }
         else if (t.result) body = (t.result.html || outputHtml(t.result.text)) + (t.result.images || []).map((src) => `<img class="tool-img" src="${esc(src)}" alt="" />`).join("");
         else body = outputHtml(t.progress || t.body);
       }
@@ -265,6 +265,7 @@
     label = label && label[0].toUpperCase() + label.slice(1);
     if (writing) label = `Writing ${writing.path}…`;
     else if (running) label = `${toolLabel(running)}…`;
+    else if (!label && tools.length) { const w = tools.find((x) => x.status === "waiting") || tools[0]; label = toolLabel(w); }
     const key = `${m.id}:activity`;
     const open = state.expanded.has(key) || waiting;
     const busy = m.pending || running;
@@ -555,7 +556,14 @@
       if (stopLoop) break;
       const def = F.agentTools.registry[t.type];
       if (!def?.run || t.status === "done" || t.status === "failed" || t.status === "denied") continue;
-      if (t.status !== "approved" && def.needsApproval?.(t, ctx)) { t.status = "waiting"; save(); renderThread(); continue; }
+      if (t.status !== "approved" && def.needsApproval?.(t, ctx)) {
+        t.status = "waiting";
+        save();
+        renderThread();
+        const visible = reply.tools.filter((x) => !["ask", "push", "attach", "memory"].includes(x.type));
+        def.onWait?.(t, ctx, `${reply.id}:${visible.indexOf(t)}`);
+        continue;
+      }
       t.status = "running";
       renderThread();
       try {
@@ -590,6 +598,7 @@
       rerender: () => { renderThread(); renderTree(); },
       githubPush: (message) => githubPush(message, { ask: false }),
       send: (text) => sendText(text),
+      canSeeImages: () => visionModel(),
       needConnection,
       filesForUpload,
       isBinary,
@@ -1054,7 +1063,7 @@
     await F.blobs.warmData(project().files);
     const { entry, html } = buildPreview(state.previewPath);
     state.previewPath = entry;
-    $("#br-url").value = "/" + entry;
+    if (!F.web?.isWeb()) $("#br-url").value = "/" + entry;
     state.logs = [];
     renderConsole();
     $("#preview").srcdoc = html;
@@ -1676,16 +1685,27 @@
   });
 
   // browser pane
-  $("#br-refresh").addEventListener("click", refreshPreview);
+  $("#br-refresh").addEventListener("click", () => (F.web?.isWeb() ? F.web.reload() : refreshPreview()));
+  $("#br-back").addEventListener("click", () => F.web?.back());
+  $("#br-fwd").addEventListener("click", () => F.web?.forward());
   $("#br-select").addEventListener("click", (e) => {
     const on = !e.currentTarget.classList.contains("on");
     e.currentTarget.classList.toggle("on", on);
     $("#preview").contentWindow?.postMessage({ fizz: "select-mode", on }, "*");
     if (on) F.toast("Click an element in the preview to point Fizz Code at it");
   });
-  $("#br-url").addEventListener("keydown", (e) => { if (e.key === "Enter") { state.previewPath = e.target.value.replace(/^\/+/, ""); refreshPreview(); } });
+  $("#br-url").addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    const v = e.target.value;
+    e.target.blur();
+    if (F.web?.isWeb()) return F.web.go(v);
+    if (F.web?.fromPreview(v, project().files)) return;
+    state.previewPath = v.replace(/^\/+/, "");
+    refreshPreview();
+  });
+  $("#br-url").addEventListener("focus", (e) => e.target.select());
   $$("#br-devices button").forEach((b) => b.addEventListener("click", () => { $$("#br-devices button").forEach((x) => x.classList.toggle("on", x === b)); $("#preview").style.width = b.dataset.w; }));
-  $("#br-open").addEventListener("click", () => window.open(URL.createObjectURL(new Blob([buildPreview(state.previewPath).html], { type: "text/html" })), "_blank", "noopener"));
+  $("#br-open").addEventListener("click", () => F.web?.isWeb() ? F.web.openExternal() : window.open(URL.createObjectURL(new Blob([buildPreview(state.previewPath).html], { type: "text/html" })), "_blank", "noopener"));
   $("#console-toggle").addEventListener("click", (e) => {
     if (e.target.id === "console-clear") { state.logs = []; renderConsole(); return; }
     $("#console").classList.toggle("collapsed");
@@ -1748,6 +1768,7 @@
 
   window.addEventListener("fizz:settings", () => { state.mode = data.settings.devMode || state.mode; renderAll(); });
   window.addEventListener("fizz:synced", () => { if (!project()) selectProject(data.projects[0].id); renderAll(); });
+  F.web?.init({ refreshPreview: () => refreshPreview(), previewUrl: () => "/" + (state.previewPath || "index.html") });
   F.builds?.attach({ data, save, rerender: () => renderThread(), send: (text) => sendText(text) });
 
   // Shown again after switching from FIZZ: refresh layout-dependent widgets and accept a hand-off prompt.

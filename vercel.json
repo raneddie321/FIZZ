@@ -48,6 +48,10 @@
       "dest": "/api/sync.mjs"
     },
     {
+      "src": "/api/browser",
+      "dest": "/api/browser.mjs"
+    },
+    {
       "src": "/api/sandbox",
       "dest": "/api/sandbox.mjs"
     },
