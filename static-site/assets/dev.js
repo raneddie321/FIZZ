@@ -154,7 +154,7 @@
     const plans = [];
     prose = prose.replace(PLAN_RE, (_m, body) => {
       const items = body.split("\n").map((l) => /^\s*[-*]\s*\[( |x|X)\]\s*(.+)$/.exec(l)).filter(Boolean).map((m) => ({ done: m[1] !== " ", text: m[2].trim().slice(0, 160) }));
-      if (items.length) plans.push(items.slice(0, 8));
+      if (items.length) plans.push(items.slice(0, 14));
       return "";
     });
     const t = F.agentTools.parse(prose);
@@ -356,7 +356,11 @@
       const reverted = m.changes?.length && m.reverted;
       const canRestore = !last && !m.pending && project().history.some((h) => !h.reverted && h.at > (m.doneAt || m.at));
       const actions = m.pending ? "" : `<div class="a-actions">${m.content ? `<button data-copy="${i}">Copy</button>` : ""}${m.mode === "plan" && last && !m.error ? `<button data-approve-plan="${m.id}" class="primary">Approve plan &amp; build</button>` : ""}${m.changes?.length && !m.reverted ? `<button data-revert="${m.id}">Revert ${m.changes.length} change${m.changes.length === 1 ? "" : "s"}</button>` : ""}${reverted ? `<span style="padding:4px 8px">Changes reverted</span>` : ""}${canRestore ? `<button data-restore="${m.id}" title="Put every file back the way it was right after this reply">Restore to here</button>` : ""}${last && !m.error ? `<button data-regen>Regenerate</button>` : ""}${m.changes?.length ? `<button data-act="preview">Open preview</button><button data-push="${m.id}" class="${m.pushAsked ? "primary" : ""}">Push to GitHub</button>` : ""}${m.loopStopped && last ? `<button data-continue="${m.id}" class="primary">Keep going</button>` : ""}<span style="padding:4px 8px">${t} · ${esc(m.model || "")}${m.step > 1 ? ` · step ${m.step}` : ""}</span></div>`;
-      return `<div class="a-msg">${html}${thinking}${body}${cards}${askHtml}${actions}</div>`;
+      const check = m.verifying
+        ? `<div class="verify-note run"><span class="st run"></span><span>Checking the project…</span></div>`
+        : m.verified && !m.verified.fixing
+        ? `<div class="verify-note ${m.verified.ok ? "ok" : "warn"}">${F.icon(m.verified.ok ? "check" : "alert")}<span>${m.verified.ok ? `Checked ${m.verified.files} changed file${m.verified.files === 1 ? "" : "s"} — no errors found` : `${m.verified.count} problem${m.verified.count === 1 ? "" : "s"} still open`}</span>${m.verified.list ? `<ul>${m.verified.list.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}</div>` : "";
+      return `<div class="a-msg">${html}${thinking}${body}${cards}${askHtml}${check}${actions}</div>`;
     }).join("");
     if (atBottom || state.controller) sc.scrollTop = sc.scrollHeight;
     F.docs.hydrate(th, project().files);
@@ -417,7 +421,20 @@
 
   // ---------- AI ----------
   const isBinary = (v) => typeof v === "string" && v.startsWith("\u0000blob:");
-  function systemPrompt(skills = [], { mentions = [], selection = null } = {}) {
+  /** A one-line-per-file overview, so Fizz Code sees the whole project's shape even when contents are cut. */
+  function projectMap(p) {
+    const paths = Object.keys(p.files).filter((f) => !f.startsWith(".git/")).sort();
+    if (paths.length < 2) return "";
+    const rows = paths.slice(0, 400).map((f) => {
+      const v = p.files[f];
+      if (isBinary(v)) return `  ${f}  (binary)`;
+      const lines = v ? v.split("\n").length : 0;
+      const ex = /\.(m?js|jsx|ts|tsx)$/.test(f) ? [...v.matchAll(/\bexport\s+(?:default\s+)?(?:async\s+)?(?:function\*?|class|const|let|var)\s+([\w$]+)|\bexport\s+default\b/g)].map((m) => m[1] || "default").slice(0, 10) : [];
+      return `  ${f}  (${lines} lines${ex.length ? `; exports ${ex.join(", ")}` : ""})`;
+    });
+    return `PROJECT MAP (${paths.length} files):\n${rows.join("\n")}${paths.length > 400 ? `\n  …and ${paths.length - 400} more` : ""}`;
+  }
+  function systemPrompt(skills = [], { mentions = [], selection = null, text = "" } = {}) {
     const p = project();
     let budget = 160_000;
     const order = [...new Set([...mentions.filter((f) => p.files[f] !== undefined), "FIZZ.md", ...Object.keys(p.files)])].filter((f) => p.files[f] !== undefined);
@@ -432,15 +449,17 @@
     const memory = typeof p.files["FIZZ.md"] === "string" && !isBinary(p.files["FIZZ.md"]) ? p.files["FIZZ.md"].slice(0, 8000) : "";
     const tools = Object.entries(F.agentTools.registry).filter(([, d]) => d.prompt && (!d.available || d.available())).map(([, d]) => `- ${d.prompt}`)
       .concat(Object.values(F.agentTools.registry).filter((d) => d.unavailable && d.available && !d.available()).map((d) => `- ${d.unavailable}`)).join("\n");
+    const history = (chat()?.messages || []).filter((m) => m.role === "user" && !m.auto).slice(-6).map((m) => m.content || "").join("\n");
+    const brain = F.brain.compose({ text: text || history.split("\n").slice(-20).join("\n"), history, files: p.files, mode: state.mode });
     return [
-      "You are Fizz Code, the coding agent of FIZZ DEV by RANEDDIE. You help people build websites, web apps, games, documents and other software, and you work step by step like an engineer: plan, act, check the results, fix, finish.",
-      `Project: "${p.name}". The user's name is ${user.name}. Today is ${new Date().toDateString()}.`,
+      brain.text,
+      `# THIS SESSION\nProject: "${p.name}". The user's name is ${user.name}. Today is ${new Date().toDateString()}. The rules for the current mode below come first; where they differ from the handbook above, follow the mode.`,
       mode === "plan"
         ? "PLAN MODE. Do not write or edit files and do not use tools other than <fizz-ask>. Read the project, then answer with a concrete plan as a task list:\n<fizz-plan>\n- [ ] first task\n- [ ] second task\n</fizz-plan>\nfollowed by short notes on the approach, the files you will create or change and any risks. The user approves the plan before you build it."
         : mode === "ask"
         ? "ASK MODE. Answer questions and explain code. Do NOT write <fizz-file> or <fizz-edit> blocks unless the user explicitly asks for a file; show short snippets in Markdown code blocks instead."
-        : "BUILD MODE. Start with a short task list in this exact format (2–5 tasks, each one line):\n<fizz-plan>\n- [ ] first task\n- [ ] second task\n</fizz-plan>\nThen a one-sentence intro, then do the work. To create a file or replace it completely, output the COMPLETE file:\n<fizz-file path=\"relative/path.ext\">\n...entire file content...\n</fizz-file>\nTo change part of an existing file, prefer a patch (exact text, including indentation; the SEARCH text must appear once in the file):\n<fizz-edit path=\"relative/path.ext\">\n<<<<<<< SEARCH\nexact existing lines\n=======\nnew lines\n>>>>>>> REPLACE\n</fizz-edit>\nYou may put several SEARCH/REPLACE blocks in one <fizz-edit>. Never use placeholders like '// rest unchanged'. When the work is done, repeat the same <fizz-plan> with finished tasks marked [x], then summarize what you changed in a few bullet points.",
-      "Projects run in a browser preview: index.html is the entry point; use plain HTML, CSS and JavaScript (relative .css and .js files are inlined automatically). For npm packages in the preview, use ES modules with bare imports (import confetti from \"canvas-confetti\") or full https://esm.sh/ URLs — FIZZ DEV maps bare imports to esm.sh automatically.",
+        : "BUILD MODE. Start with a task list in this exact format (3–10 tasks, one line each, naming the files):\n<fizz-plan>\n- [ ] first task\n- [ ] second task\n</fizz-plan>\nThen a one-sentence intro, then do the work. To create a file or replace it completely, output the COMPLETE file:\n<fizz-file path=\"relative/path.ext\">\n...entire file content...\n</fizz-file>\nTo change part of an existing file, prefer a patch (exact text, including indentation; the SEARCH text must appear once in the file):\n<fizz-edit path=\"relative/path.ext\">\n<<<<<<< SEARCH\nexact existing lines\n=======\nnew lines\n>>>>>>> REPLACE\n</fizz-edit>\nYou may put several SEARCH/REPLACE blocks in one <fizz-edit>. Never use placeholders like '// rest unchanged'. For a new project, decide the file structure first and create every file it needs, in dependency order. When the work is done, repeat the same <fizz-plan> with finished tasks marked [x], then summarize what you changed in a few bullet points.",
+      "THE PREVIEW. Projects run in a browser preview with index.html as the entry point. Linked .css files and classic scripts are loaded from the project. ES modules work across files: <script type=\"module\" src=\"js/main.js\"></script> and import { x } from \"./state.js\" between project files (always with the .js extension). fetch(\"data/items.json\") returns project files. Bare imports (import confetti from \"canvas-confetti\") load from esm.sh automatically. Links between project pages work. Servers, build tools and npm scripts need the cloud sandbox.",
       `TOOLS. You can use these tags; FIZZ DEV runs them after your files are written, shows each as a step, and sends you the results in the next message so you can continue:\n${tools}\nUse tools to check your own work (run the script, take a screenshot of the preview) before you say it's done. Work in small steps. When everything works, finish without any tool tags.`,
       "ASKING. When something important is unclear (a preference, missing info, a choice with real trade-offs), ask instead of guessing:\n<fizz-ask question=\"Which style do you want?\" options=\"Minimal|Playful|Corporate\"/>\noptions are optional (separate with |; add multi=\"true\" to allow several). Stop after asking — the user's answer comes in the next message. Never ask for passwords, card numbers or other secrets in the chat.",
       "Be honest: never claim a command succeeded or that something works before you have seen the result.",
@@ -450,13 +469,17 @@
       F.skills.promptSection(skills),
       mentions.length ? `The user is pointing at these files: ${mentions.join(", ")}. Focus on them.` : "",
       selection ? `The user selected this element in the preview (${selection.label}, selector ${selection.selector}):\n${selection.html}` : "",
+      projectMap(p),
       ctx ? `Current project files:\n${ctx}` : "The project has no files yet.",
     ].filter(Boolean).join("\n\n");
   }
 
   // ---------- the agent loop ----------
-  const MAX_STEPS = () => Math.min(25, Math.max(1, Number(data.settings.agentSteps) || 10));
+  const MAX_STEPS = () => Math.min(40, Math.max(1, Number(data.settings.agentSteps) || 20));
   let stopLoop = false;
+  // Per turn: how many times a cut-off reply was continued and how many self-checks ran.
+  let turn = { continues: 0, verifies: 0 };
+  const MAX_CONTINUES = 4, MAX_VERIFIES = 2;
   const estimateTokens = (text) => Math.ceil(String(text || "").length / 3.6);
   function contextUse() {
     const c = chat();
@@ -494,7 +517,7 @@
   async function generate({ step = 1 } = {}) {
     const p = project();
     const c = chat();
-    if (step === 1) stopLoop = false;
+    if (step === 1) { stopLoop = false; turn = { continues: 0, verifies: 0 }; }
     if (contextUse().pct >= 85) await compactChat({ quiet: true });
     const lastUser = [...c.messages].reverse().find((m) => m.role === "user" && !m.auto) || {};
     const skills = F.skills.forMessage(data, p.skills || [], lastUser.content || "");
@@ -507,13 +530,13 @@
     let last = 0;
     try {
       const r = await F.aiStream(data.settings, {
-        system: systemPrompt(skills, { mentions: lastUser.mentions || [], selection: lastUser.selection || null }),
+        system: systemPrompt(skills, { mentions: lastUser.mentions || [], selection: lastUser.selection || null, text: lastUser.content || "" }),
         messages: c.messages.slice(0, -1).map((m) => (m.summary ? { ...m, role: "user" } : m)), signal: state.controller.signal,
         onText: (_d, full) => { reply.content = full; if (Date.now() - last > 70) { last = Date.now(); renderThread(); } },
       });
       reply.content = r.text;
       if (r.stop === "refusal" && !r.text) reply.error = "Fizz Code can't help with that request.";
-      if (r.stop === "max_tokens") reply.content += "\n\n*The response reached its maximum length — ask Fizz Code to continue.*";
+      if (r.stop === "max_tokens") reply.cutOff = true;
     } catch (e) {
       if (e.name === "AbortError") { reply.content += reply.content ? "\n\n*Stopped.*" : ""; stopLoop = true; }
       else if (e.message === "NO_KEY") Object.assign(reply, { error: "Add your key in Settings → AI, or switch to FIZZ AI.", soft: true });
@@ -545,14 +568,69 @@
     const results = (reply.tools || []).filter((t) => (t.status === "done" || t.status === "failed") && F.agentTools.registry[t.type]?.feedback);
     const editErrors = Object.entries(reply.editErrors || {});
     if (asked || waiting || stopLoop) return finishLoop(reply, asked ? "question" : waiting ? "approval" : "stopped");
-    if (!results.length && !editErrors.length) return finishLoop(reply, "done");
+    const cut = reply.cutOff && reply.mode === "build";
+    if (cut && (turn.continues >= MAX_CONTINUES || reply.step >= MAX_STEPS())) {
+      reply.content += "\n\n*The reply reached its maximum length — ask Fizz Code to continue.*";
+      reply.loopStopped = true; save(); renderThread();
+      return finishLoop(reply, "limit");
+    }
+    if (!cut && !results.length && !editErrors.length) return (await selfCheck(reply)) ? undefined : finishLoop(reply, "done");
     if (reply.step >= MAX_STEPS()) { reply.loopStopped = true; save(); renderThread(); return finishLoop(reply, "limit"); }
     const parts = results.map((t) => `<tool-result tool="${t.type}" request="${esc(toolLabel(t)).slice(0, 200)}" ok="${t.status === "done"}">\n${String(t.result?.text || "").slice(0, 12_000)}\n</tool-result>`);
     for (const [path, err] of editErrors) parts.push(`<tool-result tool="edit" request="${esc(path)}" ok="false">\n${err}\nThe file was not changed. Send the edit again with SEARCH text copied exactly from the current file, or rewrite the whole file with <fizz-file>.\n</tool-result>`);
     const images = results.filter((t) => t.result?.sendImages !== false).flatMap((t) => (t.result?.images || []).slice(0, 2)).slice(0, 3).map((src, k) => ({ type: "image", name: `screenshot-${k + 1}.jpg`, mime: src.slice(5, src.indexOf(";")), data: src.split(",")[1] }));
-    chat().messages.push({ id: F.uid(), role: "user", auto: true, autoLabel: `Sent ${parts.length} result${parts.length === 1 ? "" : "s"} back to Fizz Code`, content: `${parts.join("\n\n")}\n\nContinue the task from here. Fix anything that failed. If everything works, finish with the updated <fizz-plan> and a short summary, without tool tags.`, attachments: images, mode: state.mode, at: Date.now() });
+    let tail = "Continue the task from here. Fix anything that failed. If everything works, finish with the updated <fizz-plan> and a short summary, without tool tags.";
+    if (cut) {
+      turn.continues++;
+      const parsed = parseAssistant(reply.content);
+      const open = [...parsed.files, ...parsed.edits].filter((f) => !f.closed).map((f) => f.path);
+      const saved = (reply.changes || []).map((c) => c.path);
+      parts.unshift(`<tool-result tool="output-limit" ok="false">\nYour last reply hit the output length limit and was cut off${open.length ? ` in the middle of ${open.join(", ")} — that file was NOT saved` : ""}.${saved.length ? ` These files were saved: ${saved.join(", ")} — don't send them again.` : ""}\n</tool-result>`);
+      tail = `Continue exactly where you stopped.${open.length ? ` First write ${open.join(", ")} again completely, from the first line, in a new <fizz-file> block.` : ""} Then carry on with the remaining tasks. Keep each reply to a few files so it isn't cut off again.`;
+    }
+    chat().messages.push({ id: F.uid(), role: "user", auto: true, autoLabel: cut ? "The reply was cut off — continuing" : `Sent ${parts.length} result${parts.length === 1 ? "" : "s"} back to Fizz Code`, content: `${parts.join("\n\n")}\n\n${tail}`, attachments: images, mode: state.mode, at: Date.now() });
     save();
     return generate({ step: reply.step + 1 });
+  }
+
+  /** Paths Fizz Code wrote since the user's last message. */
+  function turnChanges() {
+    const msgs = chat()?.messages || [];
+    let from = msgs.length - 1;
+    while (from > 0 && !(msgs[from].role === "user" && !msgs[from].auto)) from--;
+    const files = project().files;
+    return [...new Set(msgs.slice(from).flatMap((m) => (m.role === "assistant" && !m.reverted ? (m.changes || []).map((c) => c.path) : [])))].filter((f) => files[f] !== undefined);
+  }
+  /**
+   * When Fizz Code says it's done: check the files it wrote (syntax, imports, links, JSON, CSS, runtime errors).
+   * Problems go straight back to it to fix; returns true when it's working on them.
+   */
+  async function selfCheck(reply) {
+    if (reply.mode !== "build" || reply.error || data.settings.autoVerify === false || !F.verify) return false;
+    const changed = turnChanges();
+    if (!changed.length) return false;
+    reply.verifying = true;
+    renderThread();
+    let result;
+    try { result = await F.verify.check(project().files, { changed, preview: previewErrors }); }
+    catch { result = null; }
+    reply.verifying = false;
+    if (!result || chat()?.messages.at(-1) !== reply) { renderThread(); return false; }
+    const { issues } = result;
+    if (issues.length && turn.verifies < MAX_VERIFIES && reply.step < MAX_STEPS() && !stopLoop) {
+      turn.verifies++;
+      reply.verified = { ok: false, count: issues.length, fixing: true };
+      const notice = `Checked the project and found ${issues.length} problem${issues.length === 1 ? "" : "s"} — Fizz Code is fixing ${issues.length === 1 ? "it" : "them"}`;
+      chat().messages.push({ id: F.uid(), role: "user", auto: true, notice, autoLabel: notice, content: `<tool-result tool="check" ok="false">\nFIZZ DEV checked the files you wrote and found these problems:\n${F.verify.format(issues)}\n</tool-result>\n\nFix every problem above at its root (use <fizz-edit> for small fixes), keep everything else as it is, and don't start new features. Then finish with the updated <fizz-plan> and a short summary.`, mode: "build", at: Date.now() });
+      save();
+      renderAll();
+      generate({ step: reply.step + 1 });
+      return true;
+    }
+    reply.verified = issues.length ? { ok: false, count: issues.length, list: issues.slice(0, 8).map((x) => `${x.path}${x.line ? `:${x.line}` : ""} — ${x.text}`) } : { ok: true, files: changed.length };
+    save();
+    renderThread();
+    return false;
   }
 
   function finishLoop(reply, why = "done") {
@@ -652,6 +730,28 @@
     const id = s.provider === "openrouter" ? s.openrouterModel : F.serverStatusCached?.()?.ai?.model || "";
     return /claude|gpt-4o|gpt-4\.1|gpt-5|gemini|vision|-vl|vl-|llava|pixtral|glm-4\.?5?v|qwen.*vl|grok-.*vision|llama-?4|mistral-(small|medium)-3/i.test(id || "");
   }
+  /** Renders a project page off-screen, waits for its scripts, and hands the frame and its console to `fn`. */
+  async function offscreen(path, { w = 1280, h = 800, wait = 1500 } = {}, fn) {
+    await F.blobs.warmData(project().files);
+    const { html, entry } = buildPreview(path);
+    if (!entry) return null;
+    const frame = document.createElement("iframe");
+    frame.setAttribute("sandbox", "allow-scripts allow-forms allow-modals");
+    frame.style.cssText = `position:fixed;left:-10000px;top:0;width:${w}px;height:${h}px;border:0;background:#fff`;
+    const logs = [];
+    const onLog = (e) => { if (e.source === frame.contentWindow && e.data?.fizz === "console" && /error|warn/.test(e.data.level)) logs.push({ level: e.data.level, text: String(e.data.text).replaceAll(VIRTUAL, "").slice(0, 300) }); };
+    addEventListener("message", onLog);
+    document.body.appendChild(frame);
+    try {
+      await new Promise((r) => { frame.onload = r; frame.srcdoc = html; });
+      await new Promise((r) => setTimeout(r, wait));
+      return await fn({ frame, entry, logs });
+    } finally {
+      removeEventListener("message", onLog);
+      frame.remove();
+    }
+  }
+  const previewErrors = (path) => offscreen(path, { wait: 1800 }, ({ logs }) => logs.filter((l) => l.level === "error").map((l) => l.text));
   F.agentTools.register("screenshot", {
     icon: "image", feedback: true,
     label: (t) => `Screenshot ${t.attrs.path || "the preview"}${t.attrs.device ? ` (${t.attrs.device})` : ""}`,
@@ -659,26 +759,14 @@
     prompt: '<fizz-screenshot path="index.html" device="desktop|tablet|phone"/> renders a page of the preview, waits for its scripts, and shows you a screenshot plus any console errors, so you can check the design and fix what looks wrong.',
     async run(t, ctx) {
       const [w, h] = { phone: [390, 844], tablet: [820, 1180] }[t.attrs.device] || [1280, 800];
-      await F.blobs.warmData(project().files);
-      const { html, entry } = buildPreview(t.attrs.path || state.previewPath);
-      if (!entry) return { ok: false, text: "There's no HTML page to screenshot yet." };
-      const frame = document.createElement("iframe");
-      frame.setAttribute("sandbox", "allow-scripts allow-forms allow-modals");
-      frame.style.cssText = `position:fixed;left:-10000px;top:0;width:${w}px;height:${h}px;border:0;background:#fff`;
-      const logs = [];
-      const onLog = (e) => { if (e.source === frame.contentWindow && e.data?.fizz === "console" && /error|warn/.test(e.data.level)) logs.push(`${e.data.level}: ${String(e.data.text).slice(0, 300)}`); };
-      addEventListener("message", onLog);
-      document.body.appendChild(frame);
-      try {
-        await new Promise((r) => { frame.onload = r; frame.srcdoc = html; });
-        await new Promise((r) => setTimeout(r, Number(t.attrs.wait) > 0 ? Math.min(8000, Number(t.attrs.wait)) : 1500));
+      const wait = Number(t.attrs.wait) > 0 ? Math.min(8000, Number(t.attrs.wait)) : 1500;
+      const out = await offscreen(t.attrs.path || state.previewPath, { w, h, wait }, async ({ frame, entry, logs }) => {
         const [img] = await F.docs.capture("", { frame, mode: "viewport", width: w, height: h, scale: 1, quality: 0.7 });
         const canSee = visionModel();
-        return { ok: true, images: [img], sendImages: canSee, text: `Screenshot of ${entry} at ${w}×${h}.${canSee ? "" : " (The current AI model can't view images, so only the console output is included.)"}${logs.length ? `\nConsole:\n${logs.slice(0, 15).join("\n")}` : "\nNo console errors."}` };
-      } finally {
-        removeEventListener("message", onLog);
-        frame.remove();
-      }
+        const lines = logs.map((l) => `${l.level}: ${l.text}`);
+        return { ok: true, images: [img], sendImages: canSee, text: `Screenshot of ${entry} at ${w}×${h}.${canSee ? "" : " (The current AI model can't view images, so only the console output is included.)"}${lines.length ? `\nConsole:\n${lines.slice(0, 15).join("\n")}` : "\nNo console errors."}` };
+      });
+      return out || { ok: false, text: "There's no HTML page to screenshot yet." };
     },
   });
 
@@ -1063,19 +1151,59 @@
   const SELECT_BRIDGE = `var sel=false,hov=null,box=null;function outline(el){if(!box){box=document.createElement("div");box.style.cssText="position:fixed;pointer-events:none;z-index:2147483647;border:2px solid #d0612e;background:rgba(208,97,46,.10);border-radius:4px;transition:all .06s"}if(!el){box.remove();return}var r=el.getBoundingClientRect();box.style.left=r.left+"px";box.style.top=r.top+"px";box.style.width=r.width+"px";box.style.height=r.height+"px";document.documentElement.appendChild(box)}function path(el){var p=[];while(el&&el.nodeType===1&&el!==document.documentElement&&p.length<5){if(el.id){p.unshift("#"+el.id);break}var s=el.tagName.toLowerCase(),c=(el.getAttribute("class")||"").trim().split(/\\s+/).filter(Boolean).slice(0,2);if(c.length)s+="."+c.join(".");var sib=el.parentNode?[].filter.call(el.parentNode.children,function(x){return x.tagName===el.tagName}):[];if(sib.length>1)s+=":nth-of-type("+(sib.indexOf(el)+1)+")";p.unshift(s);el=el.parentElement}return p.join(" > ")}addEventListener("message",function(e){if(e.data&&e.data.fizz==="select-mode"){sel=!!e.data.on;document.documentElement.style.cursor=sel?"crosshair":"";if(!sel)outline(null)}});addEventListener("mousemove",function(e){if(!sel)return;hov=e.target;outline(hov)},true);addEventListener("click",function(e){if(!sel)return;e.preventDefault();e.stopPropagation();var el=e.target,t=(el.innerText||el.getAttribute("alt")||el.getAttribute("aria-label")||"").trim().replace(/\\s+/g," ").slice(0,60);parent.postMessage({fizz:"selected",selector:path(el),label:el.tagName.toLowerCase()+(t?" \u201c"+t+"\u201d":""),html:el.outerHTML.slice(0,1500)},"*");sel=false;document.documentElement.style.cursor="";outline(null)},true);`;
   const BRIDGE = `<script>(function(){var P=parent;function s(l,a){try{P.postMessage({fizz:"console",level:l,text:Array.prototype.map.call(a,function(v){try{return typeof v==="string"?v:v instanceof Error?(v.stack||v.message):JSON.stringify(v)}catch(e){return String(v)}}).join(" ")},"*")}catch(e){}}["log","info","warn","error","debug"].forEach(function(l){var o=console[l];console[l]=function(){s(l,arguments);return o.apply(console,arguments)}});addEventListener("error",function(e){s("error",[e.message+(e.lineno?" (line "+e.lineno+")":"")])});addEventListener("unhandledrejection",function(e){s("error",["Unhandled rejection: "+(e.reason&&e.reason.message||e.reason)])});document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[href]");if(!a)return;var h=a.getAttribute("href");if(!h||/^(https?:|mailto:|tel:|#|javascript:)/i.test(h))return;e.preventDefault();P.postMessage({fizz:"navigate",href:h},"*")},true);${F.docs.CAPTURE_BRIDGE}${SELECT_BRIDGE}})();<\/script>`;
   /** Bare ES module imports (import x from "lib") resolve to esm.sh, so npm packages work without a build step. */
-  function withImportMap(html) {
-    if (/<script[^>]*type=["']importmap["']/i.test(html)) return html;
-    const names = new Set();
-    for (const m of html.matchAll(/<script\b[^>]*type=["']module["'][^>]*>([\s\S]*?)<\/script>/gi))
-      for (const im of m[1].matchAll(/\bimport\s*(?:[\w*{}\s,]+from\s*)?["']([^"'./][^"']*)["']|\bimport\(\s*["']([^"'./][^"']*)["']\s*\)/g)) {
-        const spec = im[1] || im[2];
-        if (spec && !/^(https?:|data:|blob:)/.test(spec)) names.add(spec);
-      }
-    if (!names.size) return html;
-    const imports = {};
-    for (const n of names) imports[n] = `https://esm.sh/${n}`;
-    const tag = `<script type="importmap">${JSON.stringify({ imports })}<\/script>`;
+  // ES modules across project files: every module becomes a data: URL behind an import map, so
+  // import { x } from "./state.js" works between files (cycles included), and bare imports go to esm.sh.
+  const SPEC_RE = /(\bimport\s*(?:[\w$*{}\s,]+?\s*from\s*)?|\bexport\s*(?:\*(?:\s*as\s+[\w$]+)?|\{[^}]*\})\s*from\s*)(["'])([^"'\n]+)\2|(\bimport\s*\(\s*)(["'])([^"'\n]+)\5(\s*\))/g;
+  const VIRTUAL = "@fizz-project/";
+  function moduleGraph(files, html, entry) {
+    const map = {}, bare = new Set(), queue = [];
+    const target = (from, spec) => {
+      if (/^(https?:|data:|blob:|\/\/)/.test(spec) || spec.startsWith(VIRTUAL)) return null;
+      if (!/^\.{0,2}\//.test(spec)) { bare.add(spec); return null; }
+      const path = spec.startsWith("/") ? resolvePath("", spec.slice(1)) : resolvePath(from, spec);
+      const hit = [path, `${path}.js`, `${path}/index.js`].find((f) => typeof files[f] === "string" && !isBinary(files[f]));
+      if (!hit) return null;
+      if (!(VIRTUAL + hit in map)) { map[VIRTUAL + hit] = ""; queue.push(hit); }
+      return VIRTUAL + hit;
+    };
+    const rewrite = (from, code) => code.replace(SPEC_RE, (m, a, q, spec, b, q2, spec2, c) => {
+      const t = target(from, spec ?? spec2);
+      return t ? (a !== undefined ? `${a}${q}${t}${q}` : `${b}${q2}${t}${q2}${c}`) : m;
+    });
+    html = html.replace(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi, (m, attrs, body) => {
+      if (!/type=["']module["']/i.test(attrs)) return m;
+      const src = /\bsrc=["']([^"']+)["']/i.exec(attrs);
+      if (src) { const t = target(entry, /^\.{0,2}\//.test(src[1]) || /^(https?:|data:|blob:|\/\/)/.test(src[1]) ? src[1] : `./${src[1]}`); return t ? `<script${attrs.replace(/\s*\bsrc=["'][^"']+["']/i, "")}>import "${t}";</script>` : m; }
+      return `<script${attrs}>${rewrite(entry, body)}</script>`;
+    });
+    while (queue.length) {
+      const path = queue.shift();
+      const type = /\.json$/i.test(path) ? "application/json" : "text/javascript";
+      const code = type === "application/json" ? files[path] : `${rewrite(path, files[path])}\n//# sourceURL=${path}`;
+      map[VIRTUAL + path] = `data:${type};charset=utf-8,${encodeURIComponent(code)}`;
+    }
+    for (const n of bare) map[n] = `https://esm.sh/${n}`;
+    if (!Object.keys(map).length) return html;
+    const own = /<script\b[^>]*type=["']importmap["'][^>]*>([\s\S]*?)<\/script>/i.exec(html);
+    let merged = { imports: map };
+    if (own) { try { const j = JSON.parse(own[1]); merged = { ...j, imports: { ...map, ...(j.imports || {}) } }; } catch {} html = html.replace(own[0], ""); }
+    const tag = `<script type="importmap">${JSON.stringify(merged).replace(/</g, "\\u003c")}<\/script>`;
     return /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (m) => m + tag) : tag + html;
+  }
+  // fetch("data/items.json") inside the preview answers from the project's files.
+  const MIME = { json: "application/json", txt: "text/plain", csv: "text/csv", md: "text/markdown", svg: "image/svg+xml", html: "text/html", xml: "application/xml", js: "text/javascript", css: "text/css" };
+  function fetchShim(files, entry) {
+    const text = {}, bin = {};
+    let budget = 4_000_000;
+    for (const [path, v] of Object.entries(files)) {
+      if (path === entry || path.startsWith(".fizz/") || path.startsWith(".github/")) continue;
+      if (isBinary(v)) { const d = F.blobs.dataSync(v); if (d && d.length < budget) { bin[path] = d; budget -= d.length; } }
+      else if (typeof v === "string" && v.length < budget && !/\.(m?js|css)$/i.test(path)) { text[path] = v; budget -= v.length; }
+    }
+    if (!Object.keys(text).length && !Object.keys(bin).length) return "";
+    const dir = entry.includes("/") ? entry.slice(0, entry.lastIndexOf("/") + 1) : "";
+    const json = (o) => JSON.stringify(o).replace(/</g, "\\u003c").replace(/\u2028|\u2029/g, (c) => (c === "\u2028" ? "\\u2028" : "\\u2029"));
+    return `<script>(function(){var T=${json(text)},B=${json(bin)},M=${json(MIME)},D=${json(dir)},of=window.fetch;function path(u){try{var x=new URL(u,"https://fizz.invalid/"+D);return x.host==="fizz.invalid"?decodeURIComponent(x.pathname.slice(1)):null}catch(e){return null}}window.fetch=function(i,o){var u=typeof i==="string"?i:i instanceof URL?i.href:null;if(u!==null&&!/^[a-z][a-z0-9+.-]*:|^\\/\\//i.test(u)){var p=path(u),h=Object.prototype.hasOwnProperty;if(p!==null&&h.call(B,p))return of(B[p]);if(p!==null&&h.call(T,p))return Promise.resolve(new Response(T[p],{status:200,headers:{"content-type":M[(p.split(".").pop()||"").toLowerCase()]||"text/plain"}}));if(p!==null)return Promise.resolve(new Response("Not found: "+p,{status:404,statusText:"Not Found"}))}return of.apply(this,arguments)}})();<\/script>`;
   }
   function resolvePath(base, href) {
     const parts = base.split("/").slice(0, -1);
@@ -1089,12 +1217,14 @@
     if (!entry) return { entry: "", html: `<body style="font-family:system-ui;color:#64748b;display:grid;place-items:center;min-height:100vh;margin:0;padding:24px;box-sizing:border-box;text-align:center"><p>No HTML file yet. Ask Fizz Code to build something.</p></body>` };
     let html = files[entry];
     html = html.replace(/<link\b[^>]*href=["']([^"']+\.css)["'][^>]*>/gi, (m, href) => { const f = files[resolvePath(entry, href)]; return f !== undefined ? `<style>\n${f}\n</style>` : m; });
-    html = html.replace(/<script\b([^>]*)\bsrc=["']([^"']+\.m?js)["']([^>]*)><\/script>/gi, (m, a, src, b) => { const f = files[resolvePath(entry, src)]; return f !== undefined ? `<script${a}${b}>\n${f.replace(/<\/script/gi, "<\\/script")}\n</script>` : m; });
+    html = html.replace(/<script\b([^>]*)\bsrc=["']([^"']+\.m?js)["']([^>]*)><\/script>/gi, (m, a, src, b) => { const f = files[resolvePath(entry, src)]; return f !== undefined && !/type=["']module["']/i.test(a + b) ? `<script${a}${b}>\n${f.replace(/<\/script/gi, "<\\/script")}\n</script>` : m; });
     // Images, fonts and other binary files: inline as data URLs (the preview runs on another origin).
     const asset = (ref) => { const f = files[resolvePath(entry, ref)]; return isBinary(f) ? F.blobs.dataSync(f) || ref : typeof f === "string" && /\.svg$/i.test(ref) ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(f)}` : ref; };
     html = html.replace(/(\s(?:src|href|poster)=["'])([^"'#?]+)(["'])/gi, (m, a, ref, b) => (/^(https?:|data:|mailto:|tel:|javascript:|\/\/)/i.test(ref) || /\.html?$/i.test(ref) ? m : a + asset(ref) + b));
     html = html.replace(/url\((["']?)([^"')]+)\1\)/gi, (m, q, ref) => (/^(https?:|data:|#)/i.test(ref) ? m : `url(${q}${asset(ref)}${q})`));
-    html = withImportMap(html);
+    html = moduleGraph(files, html, entry);
+    const shim = fetchShim(files, entry);
+    if (shim) html = /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (m) => m + shim) : shim + html;
     if (bridge) html = /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (m) => m + BRIDGE) : BRIDGE + html;
     return { entry, html };
   }
@@ -1114,7 +1244,7 @@
   }
   window.addEventListener("message", (e) => {
     if (e.source !== $("#preview").contentWindow || !e.data?.fizz) return;
-    if (e.data.fizz === "console") { state.logs.push({ level: e.data.level, text: String(e.data.text).slice(0, 4000) }); renderConsole(); }
+    if (e.data.fizz === "console") { state.logs.push({ level: e.data.level, text: String(e.data.text).replaceAll(VIRTUAL, "").slice(0, 4000) }); renderConsole(); }
     if (e.data.fizz === "selected") {
       state.selection = { selector: String(e.data.selector).slice(0, 300), label: String(e.data.label).slice(0, 90), html: String(e.data.html).slice(0, 1500) };
       $("#br-select").classList.remove("on");

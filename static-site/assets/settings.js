@@ -57,6 +57,8 @@
         <div class="conn-list" data-tools></div>
         <label class="check"><input type="checkbox" name="cloudSync" /><span>Sync chats and projects to my RanEddie ID<small>Use them on every device. Images and PDFs stay in the browser that made them.</small></span></label>
         <label class="check"><input type="checkbox" name="autoFixBuilds" /><span>Fix failed app builds automatically<small>When an APK, AAB or desktop build fails, Fizz Code reads the log on GitHub, fixes the project and builds again (up to 6 attempts). Keep FIZZ DEV open while it works.</small></span></label>
+        <label class="check"><input type="checkbox" name="autoVerify" /><span>Check Fizz Code's work automatically<small>When it finishes, FIZZ DEV checks the files it wrote (syntax, imports, links, errors in the preview) and has it fix what it finds.</small></span></label>
+        <label class="field"><span>Steps per task</span><input class="input" type="number" name="agentSteps" min="5" max="40" step="1" /><small class="muted-sm">How many rounds Fizz Code may work on its own before it asks you to keep going (5–40).</small></label>
         <label class="check"><input type="checkbox" name="reviewChanges" /><span>Review file changes before they're applied</span></label>
         <label class="check"><input type="checkbox" name="askBeforeRun" /><span>Ask before Fizz Code runs commands<small>Off: it runs them in its own sandbox right away (every change can be undone).</small></span></label>
       </div>
@@ -157,6 +159,8 @@
     f.cloudSync.checked = s.cloudSync !== false;
     f.reviewChanges.checked = Boolean(s.reviewChanges);
     f.autoFixBuilds.checked = s.autoFixBuilds !== false;
+    f.autoVerify.checked = s.autoVerify !== false;
+    f.agentSteps.value = String(Math.min(40, Math.max(5, Number(s.agentSteps) || 20)));
     f.askBeforeRun.checked = Boolean(s.askBeforeRun);
     setTab(tab);
     F.serverStatus().then((st) => {
@@ -223,6 +227,8 @@
         cloudSync: f.cloudSync.checked,
         reviewChanges: f.reviewChanges.checked,
         autoFixBuilds: f.autoFixBuilds.checked,
+        autoVerify: f.autoVerify.checked,
+        agentSteps: Math.min(40, Math.max(5, Number(f.agentSteps.value) || 20)),
         askBeforeRun: f.askBeforeRun.checked,
       });
       if (s.cloudSync) F.sync?.now();

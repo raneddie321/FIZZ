@@ -100,6 +100,19 @@ Any FIZZ answer that contains code has **Build in FIZZ DEV**, which hands the an
 - **Agent chat**: a live task list, one activity line per reply (click to see each diff, command and result),
   Build / Plan / Ask modes, questions with answer buttons, review-before-apply, restore to any reply,
   `@file` mentions, project memory (`FIZZ.md`), slash commands and **Skills** (`assets/skills.js`).
+- **Fizz Code's handbook** (`assets/fizz-brain.js` + `brain-design.js`, `brain-code.js`, `brain-platforms.js`):
+  a long engineering guide — how to plan, structure a project into many focused files, write complete code,
+  verify, debug and report — plus deep sections on design, components, JavaScript, games, data, servers,
+  Python, mobile, documents, extensions, deployment and more. Every request gets the core and the craft
+  sections, plus the topics that fit the task and the project (a game gets the game sections, and so on).
+  Each section is plain text you can edit.
+- **Real multi-file projects in the preview**: ES modules across files (`import { x } from "./state.js"`, folders
+  and circular imports included), `fetch("data/items.json")` of project files, bare npm imports via esm.sh.
+- **It checks its own work**: when Fizz Code says it's done, FIZZ DEV checks the files it wrote — JavaScript
+  syntax (acorn), imports of missing files or of names a module doesn't export, broken links and missing
+  assets in HTML, invalid JSON, unbalanced CSS, placeholder code, and errors while the page runs — and sends
+  what it finds back to Fizz Code to fix (up to 2 rounds; Settings → Tools). Replies cut off at the output
+  limit continue automatically, with the unfinished file rewritten. Up to 20 steps per task by default.
 - **AI providers** (Settings → AI): FIZZ AI (the site's own), your OpenRouter account, your **Google AI Studio**
   (Gemini) key, or your Anthropic key. Personal keys stay in the browser and go only to that provider.
 - **Fizz Code's tools** — it decides when to use them and gets the results back (agent loop):
