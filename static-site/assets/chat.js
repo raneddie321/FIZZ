@@ -265,8 +265,9 @@
     const mb = e.target.closest("[data-menu]");
     if (mb) {
       const c = data.conversations.find((x) => x.id === mb.dataset.menu);
-      const k = await menu(mb, [{ k: "rename", html: "Rename" }, { k: "archive", html: c.archived ? "Unarchive" : "Archive" }, "-", { k: "delete", html: "Delete", danger: true }]);
+      const k = await menu(mb, [{ k: "rename", html: "Rename" }, { k: "export", html: "Export as Markdown" }, { k: "archive", html: c.archived ? "Unarchive" : "Archive" }, "-", { k: "delete", html: "Delete", danger: true }]);
       if (k === "rename") { state.renaming = c.id; renderSide(); }
+      if (k === "export") F.download(`${(c.title || "chat").replace(/[^\w-]+/g, "-").slice(0, 60)}.md`, [`# ${c.title || "FIZZ chat"}`, ...c.messages.map((m) => `## ${m.role === "user" ? "You" : "FIZZ"}\n\n${m.content || ""}`)].join("\n\n") + "\n");
       if (k === "archive") { c.archived = !c.archived; save(); if (c.id === state.id && c.archived) newChat(); else renderSide(); F.toast(c.archived ? "Conversation archived" : "Conversation restored"); }
       if (k === "delete" && (await confirmDlg("Delete conversation?", `"${c.title}" will be permanently deleted.`))) {
         data.conversations = data.conversations.filter((x) => x.id !== c.id);

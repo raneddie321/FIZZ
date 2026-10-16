@@ -205,6 +205,10 @@
       ctx.onSaved?.();
     };
     d.showModal();
+    // Open without a focus ring on the first tab (keyboard users still Tab into it).
+    const body = d.querySelector(".dlg-body");
+    body.tabIndex = -1;
+    body.focus();
   }
 
   /** Call on page load: finishes an OpenRouter sign-in redirect if present. */

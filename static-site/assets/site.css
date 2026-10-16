@@ -393,3 +393,4 @@ dialog.dlg::backdrop { background: rgba(20, 19, 18, .45); }
 .rid-invite .x .i { width: 14px; height: 14px; }
 .pal-foot kbd, .disclaimer kbd { font: 10.5px var(--mono); padding: 1px 5px; border: 1px solid var(--border); border-radius: 4px; background: var(--card); margin-right: 3px; }
 svg.dots3 { stroke-width: 3; }
+.dlg-body:focus { outline: none; }

@@ -330,7 +330,7 @@
       }
       if (m.role === "user") {
         const chips = [...(m.attachments || []).map((a) => `<span class="chip">${esc(a.name)}</span>`), ...(m.mentions || []).map((f) => `<span class="chip mention">@${esc(f)}</span>`), ...(m.selection ? [`<span class="chip mention">${F.icon("target")}${esc(m.selection.label)}</span>`] : [])].join("");
-        return `<div class="u-wrap">${chips ? `<div class="chips">${chips}</div>` : ""}<div class="u-msg">${esc(m.content)}</div><div class="meta"><span>${{ ask: "Ask", plan: "Plan" }[m.mode] || "Build"}</span><span>${t}</span></div></div>`;
+        return `<div class="u-wrap">${chips ? `<div class="chips">${chips}</div>` : ""}${state.editing === m.id ? `<form class="u-edit" data-edit-form="${m.id}"><textarea class="textarea" name="text" rows="3">${esc(m.content)}</textarea><div class="u-edit-bar"><button type="button" class="btn btn-outline btn-sm" data-edit-cancel>Cancel</button><button class="btn btn-sm">Send</button></div></form>` : `<div class="u-msg">${esc(m.content)}</div>`}<div class="meta"><span>${{ ask: "Ask", plan: "Plan" }[m.mode] || "Build"}</span><span>${t}</span>${state.controller || state.editing ? "" : `<button type="button" data-edit-msg="${m.id}">Edit</button>`}</div></div>`;
       }
       const { html, prose, asks, cards } = stepsHtml(m);
       const last = m === lastAssistant;
@@ -1510,6 +1510,8 @@
       sendText("Approved — build it. Follow the plan.");
     }
     if (t.dataset.restore && !state.controller) restoreTo(t.dataset.restore);
+    if (t.dataset.editMsg && !state.controller) { state.editing = t.dataset.editMsg; renderThread(); const ta = $(`[data-edit-form="${CSS.escape(t.dataset.editMsg)}"] textarea`); ta?.focus(); ta?.setSelectionRange(ta.value.length, ta.value.length); }
+    if (t.hasAttribute("data-edit-cancel")) { state.editing = null; renderThread(); }
     if (t.dataset.continue && !state.controller) sendText("Keep going from where you stopped.");
     if (t.classList.contains("ask-opt")) {
       const box = t.closest(".ask");
@@ -1546,6 +1548,7 @@
     if (act === "preview") showTab("browser");
   });
   $("#notice").addEventListener("click", (e) => { if (e.target.closest("[data-act=settings-ai]")) openSettings("ai"); });
+  $("#thread").addEventListener("submit", (e) => { const f = e.target.closest("[data-edit-form]"); if (!f) return; e.preventDefault(); resendEdited(f.dataset.editForm, f.text.value); });
   $("#thread").addEventListener("submit", (e) => {
     const f = e.target.closest("[data-ask-form]");
     if (!f) return;
@@ -1632,13 +1635,14 @@
     const p = project();
     const items = [{ k: "zip", html: "Download project (.zip)" }, { k: "html1", html: "Download as one HTML file" }, { k: "icons", html: "Make app icons from an image…" }, "-", { k: "android", html: "Build Android app<small>APK + AAB</small>" }, { k: "desktop", html: "Build desktop app<small>Windows · macOS · Linux</small>" }, "-", { k: "gdoc-in", html: "Import a Google Doc…" }, { k: "gdoc-out", html: "Export summary to Google Docs" }];
     if (p.deploy?.url) items.push({ k: "live", html: `Open live site<small>${esc(p.deploy.url)}</small>` });
-    items.push("-", { k: "rename", html: "Rename project" }, { k: "clear", html: "Clear this chat" }, { k: "delete", html: "Delete project", danger: true });
+    items.push("-", { k: "export-chat", html: "Export this chat (Markdown)" }, { k: "rename", html: "Rename project" }, { k: "clear", html: "Clear this chat" }, { k: "delete", html: "Delete project", danger: true });
     moreAction(await menu(e.currentTarget, items));
   });
   async function moreAction(k) {
     const p = project();
     if (k === "android" || k === "desktop") return sendText(k === "android" ? "Build this project as an Android app (APK to install and AAB for Google Play). Make it mobile-friendly and add app icons first if needed." : "Build this project as a desktop app for Windows, macOS and Linux.");
     if (k === "zip") exportZip();
+    if (k === "export-chat") exportChat();
     if (k === "html1") { const entry = buildPreview(state.previewPath).entry; if (!entry) return F.toast("There's no HTML page yet."); F.download(`${p.name.replace(/[^\w-]+/g, "-") || "site"}.html`, await F.docs.singleHtml(toolContext({ id: "menu" }), entry)); }
     if (k === "icons") {
       const imgs = Object.keys(p.files).filter((f) => /\.(svg|png|jpe?g|webp)$/i.test(f));
@@ -1779,6 +1783,45 @@
     $("#qo-list").onclick = (e) => { const b = e.target.closest("[data-f]"); if (b) { d.close(); openFile(b.dataset.f); } };
   }
 
+  /** Edit an earlier message and send it again: later messages are removed and file changes made after it are undone. */
+  async function resendEdited(msgId, text) {
+    const c = chat();
+    const i = c.messages.findIndex((x) => x.id === msgId);
+    if (i < 0 || !text.trim()) return;
+    const m = c.messages[i];
+    const later = project().history.filter((h) => !h.reverted && h.at > m.at).reverse();
+    if (later.length && !(await dialog({ title: "Edit and send again?", desc: `${later.length} file change${later.length === 1 ? "" : "s"} Fizz Code made after this message will be undone (they stay in each file's History).`, ok: "Send" }))) return;
+    later.forEach(restore);
+    c.messages = c.messages.slice(0, i);
+    state.editing = null;
+    save();
+    renderAll();
+    sendText(text.trim());
+  }
+  /** The chat as Markdown, without tool tags. */
+  function chatMarkdown() {
+    const c = chat();
+    if (!c) return "";
+    const parts = [`# ${c.title || "FIZZ DEV chat"}`, `_${project().name} · exported ${new Date().toLocaleString()}_`];
+    for (const m of c.messages) {
+      if (m.role === "user" && m.auto) continue;
+      if (m.role === "user") { parts.push(`## You\n\n${m.content}`); continue; }
+      const prose = parseAssistant(m.content || "").prose.replace(/<fizz-[a-z]+[^>]*\/?>/g, "").trim();
+      const changes = (m.changes || []).map((x) => `- ${x.created ? "Created" : "Edited"} \`${x.path}\``).join("\n");
+      if (prose || changes) parts.push(`## Fizz Code\n\n${[prose, changes].filter(Boolean).join("\n\n")}`);
+    }
+    return parts.join("\n\n") + "\n";
+  }
+  function exportChat() {
+    const md = chatMarkdown();
+    if (!md) return F.toast("There's no chat to export yet.");
+    F.download(`${(chat().title || "chat").replace(/[^\w-]+/g, "-").slice(0, 60)}.md`, md);
+  }
+  function shortcuts() {
+    const rows = [["Ctrl K", "Command palette — every action, project and template"], ["Ctrl P", "Open a file"], ["Ctrl .", "Switch between FIZZ and FIZZ DEV"], ["Ctrl `", "Terminal"], ["Enter", "Send"], ["Shift Enter", "New line"], ["Esc", "Stop Fizz Code"], ["/", "Slash commands"], ["@", "Mention a file"], ["?", "This list"]];
+    dialog({ title: "Keyboard shortcuts", desc: "", extra: `<div class="kbd-list">${rows.map(([k, d]) => `<div><span>${k.split(" ").map((x) => `<kbd>${esc(x)}</kbd>`).join("")}</span><small>${esc(d)}</small></div>`).join("")}</div>`, ok: "Done" });
+  }
+
   // ---------- command palette (Ctrl+K) ----------
   function commands(q) {
     const list = [
@@ -1793,6 +1836,8 @@
       { g: "Files", label: "Download as one HTML file", run: () => moreAction("html1") },
       { g: "Files", label: "Make app icons…", run: () => moreAction("icons") },
       { g: "Files", label: "Project memory (FIZZ.md)…", run: () => openMemory() },
+      { g: "Chat", label: "Export this chat (Markdown)", run: () => exportChat() },
+      { g: "Settings", label: "Keyboard shortcuts", hint: "?", run: () => shortcuts() },
       { g: "Ship", label: "Push to GitHub", run: () => githubPush() },
       { g: "Ship", label: "Import from GitHub…", run: () => githubImport() },
       { g: "Ship", label: "Deploy to Vercel", run: () => deploy() },
@@ -1869,6 +1914,7 @@
     const mod = e.ctrlKey || e.metaKey;
     if (e.key === "Escape") { closeMenu(); if (state.controller) state.controller.abort(); }
     if (mod && e.key.toLowerCase() === "p") { e.preventDefault(); quickOpen(); }
+    if (e.key === "?" && !mod && !/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || "") && !document.activeElement?.closest?.(".xterm, .CodeMirror, #br-screen")) { e.preventDefault(); shortcuts(); }
     if (mod && e.key === "`") { e.preventDefault(); ui.tab === "terminal" && app.dataset.panel !== "closed" && !isNarrow() ? togglePanel() : showTab("terminal"); }
   });
   window.addEventListener("resize", () => { if (!isPhone() && app.dataset.view !== "chat") app.dataset.view = "chat"; });
