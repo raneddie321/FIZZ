@@ -322,6 +322,7 @@
     th.innerHTML = c.messages.map((m, i) => {
       const t = new Date(m.at || Date.now()).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
       // Tool results going back to Fizz Code are part of one continuous turn: they're already shown in each step.
+      if (m.role === "user" && m.auto && m.notice) return `<div class="auto-notice">${F.icon("wrench")}<span>${esc(m.notice)}</span></div>`;
       if (m.role === "user" && m.auto && !m.summary) return "";
       if (m.role === "user" && (m.auto || m.summary)) {
         const key = `${m.id}:auto`;
@@ -405,7 +406,7 @@
     $("#send").innerHTML = busy ? '<svg class="i" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor"/></svg>' : '<svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg>';
     $("#send").setAttribute("aria-label", busy ? "Stop" : "Send");
     const s = data.settings;
-    const missing = (s.provider === "openrouter" && !s.openrouterKey) || (s.provider === "anthropic" && !s.apiKey);
+    const missing = (s.provider === "openrouter" && !s.openrouterKey) || (s.provider === "anthropic" && !s.apiKey) || (s.provider === "gemini" && !s.geminiKey);
     F.serverStatus().then((st) => {
       const noServer = s.provider === "fizz" && !st.ai?.configured;
       $("#notice").innerHTML = missing || noServer
@@ -647,7 +648,7 @@
   /** Whether the current model can look at images (screenshots are sent only then). */
   function visionModel() {
     const s = data.settings;
-    if (s.provider === "anthropic") return true;
+    if (s.provider === "anthropic" || s.provider === "gemini") return true;
     const id = s.provider === "openrouter" ? s.openrouterModel : F.serverStatusCached?.()?.ai?.model || "";
     return /claude|gpt-4o|gpt-4\.1|gpt-5|gemini|vision|-vl|vl-|llava|pixtral|glm-4\.?5?v|qwen.*vl|grok-.*vision|llama-?4|mistral-(small|medium)-3/i.test(id || "");
   }
@@ -851,6 +852,18 @@
     await sendText(text, { attachments: state.pending });
   }
   /** Sends a message as the user (also used by answers, plan approval and "keep going"). */
+  /** A message FIZZ sends for the user (an automatic build fix): shown as a short notice, then Fizz Code works. */
+  async function sendAuto({ projectId, chatId, text, notice }) {
+    while (state.controller) await new Promise((r) => setTimeout(r, 1500));
+    if (projectId && projectId !== state.projectId && data.projects.some((p) => p.id === projectId)) selectProject(projectId);
+    if (chatId && project().chats.some((c) => c.id === chatId)) state.chatId = chatId;
+    if (!chat()) { const c = { id: F.uid(), title: "App build", messages: [], created: Date.now() }; project().chats.push(c); state.chatId = c.id; }
+    state.mode = "build";
+    chat().messages.push({ id: F.uid(), role: "user", auto: true, notice, autoLabel: notice, content: text, mode: "build", at: Date.now() });
+    save();
+    renderAll();
+    await generate();
+  }
   async function sendText(text, { attachments = [] } = {}) {
     if (state.controller) return;
     const p = project();
@@ -1931,7 +1944,7 @@
   window.addEventListener("fizz:synced", () => { if (!project()) selectProject(data.projects[0].id); renderAll(); });
   F.dev = { term: () => ensureTerm() };
   F.web?.init({ refreshPreview: () => refreshPreview(), previewUrl: () => "/" + (state.previewPath || "index.html") });
-  F.builds?.attach({ data, save, rerender: () => renderThread(), send: (text) => sendText(text) });
+  F.builds?.attach({ data, save, rerender: () => renderThread(), send: (text) => sendText(text), sendAuto, currentChat: () => state.chatId });
 
   // Shown again after switching from FIZZ: refresh layout-dependent widgets and accept a hand-off prompt.
   F.app.onShow("dev", (payload) => {

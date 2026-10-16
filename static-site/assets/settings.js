@@ -32,6 +32,7 @@
         <div class="provider-list" role="radiogroup" aria-label="AI provider">
           <label class="provider"><input type="radio" name="provider" value="fizz" /><span><b>FIZZ AI</b><small data-ai-status>Checking…</small></span></label>
           <label class="provider"><input type="radio" name="provider" value="openrouter" /><span><b>Your OpenRouter account</b><small>Hundreds of models (GLM, Qwen, DeepSeek, Llama, Claude, GPT…). Usage is billed to your OpenRouter account; free models available.</small></span></label>
+          <label class="provider"><input type="radio" name="provider" value="gemini" /><span><b>Your Google AI Studio key</b><small>Gemini models with your own key from aistudio.google.com — there's a free tier.</small></span></label>
           <label class="provider"><input type="radio" name="provider" value="anthropic" /><span><b>Your Anthropic API key</b><small>Use Claude models directly with your own key.</small></span></label>
         </div>
         <div data-sub="openrouter" class="form">
@@ -39,6 +40,11 @@
           <label class="field"><span>Or paste an OpenRouter key</span><input class="input" name="openrouterKey" type="password" autocomplete="off" placeholder="sk-or-…" /></label>
           <label class="field"><span>Model</span><input class="input mono" name="openrouterModel" list="or-models" placeholder="z-ai/glm-4.6" /><datalist id="or-models"></datalist>
             <small>Any model ID from openrouter.ai/models. <button type="button" class="link" data-or-models>Load model list</button></small></label>
+        </div>
+        <div data-sub="gemini" class="form">
+          <label class="field"><span>Google AI Studio API key</span><input class="input" name="geminiKey" type="password" autocomplete="off" placeholder="AIza…" /><small>Get one at aistudio.google.com → Get API key. Stored only in this browser and sent only to Google.</small></label>
+          <label class="field"><span>Model</span><input class="input mono" name="geminiModel" list="gemini-models" placeholder="gemini-3.8-flash" /><datalist id="gemini-models"></datalist>
+            <small><button type="button" class="link" data-gemini-models>Load my models</button> <span data-gemini-state class="muted-sm"></span></small></label>
         </div>
         <div data-sub="anthropic" class="form">
           <label class="field"><span>Anthropic API key</span><input class="input" name="apiKey" type="password" autocomplete="off" placeholder="sk-ant-…" /><small>Stored only in this browser and sent only to api.anthropic.com.</small></label>
@@ -50,6 +56,7 @@
       <div data-pane="tools" class="form">
         <div class="conn-list" data-tools></div>
         <label class="check"><input type="checkbox" name="cloudSync" /><span>Sync chats and projects to my RanEddie ID<small>Use them on every device. Images and PDFs stay in the browser that made them.</small></span></label>
+        <label class="check"><input type="checkbox" name="autoFixBuilds" /><span>Fix failed app builds automatically<small>When an APK, AAB or desktop build fails, Fizz Code reads the log on GitHub, fixes the project and builds again (up to 6 attempts). Keep FIZZ DEV open while it works.</small></span></label>
         <label class="check"><input type="checkbox" name="reviewChanges" /><span>Review file changes before they're applied</span></label>
         <label class="check"><input type="checkbox" name="askBeforeRun" /><span>Ask before Fizz Code runs commands<small>Off: it runs them in its own sandbox right away (every change can be undone).</small></span></label>
       </div>
@@ -127,6 +134,8 @@
     f.querySelectorAll("[name=provider]").forEach((r) => (r.checked = r.value === s.provider));
     f.openrouterKey.value = s.openrouterKey;
     f.openrouterModel.value = s.openrouterModel;
+    f.geminiKey.value = s.geminiKey || "";
+    f.geminiModel.value = s.geminiModel || "gemini-3.8-flash";
     f.apiKey.value = s.apiKey;
     f.model.innerHTML = F.MODELS.map((m) => `<option value="${m.id}">${m.chat} — ${m.note}</option>`).join("");
     f.model.value = s.model;
@@ -147,6 +156,7 @@
     };
     f.cloudSync.checked = s.cloudSync !== false;
     f.reviewChanges.checked = Boolean(s.reviewChanges);
+    f.autoFixBuilds.checked = s.autoFixBuilds !== false;
     f.askBeforeRun.checked = Boolean(s.askBeforeRun);
     setTab(tab);
     F.serverStatus().then((st) => {
@@ -171,6 +181,20 @@
           t.textContent = "Couldn't load models";
         }
       }
+      if (t.hasAttribute("data-gemini-models")) {
+        const key = f.geminiKey.value.trim();
+        const out = d.querySelector("[data-gemini-state]");
+        if (!key) { out.textContent = "Paste your key first."; return; }
+        out.textContent = "Checking your key…";
+        try {
+          const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=${encodeURIComponent(key)}`);
+          const j = await r.json();
+          if (!r.ok) throw new Error(j.error?.message || `Error ${r.status}`);
+          const models = (j.models || []).filter((m) => (m.supportedGenerationMethods || []).includes("generateContent") && /gemini/i.test(m.name)).map((m) => m.name.replace(/^models\//, ""));
+          d.querySelector("#gemini-models").innerHTML = models.map((m) => `<option value="${esc(m)}"></option>`).join("");
+          out.textContent = `Key works — ${models.length} models available.`;
+        } catch (err) { out.textContent = `That key didn't work: ${err.message}`; }
+      }
       if (t.dataset.connect) {
         try { await F.conn.connect(t.dataset.connect); renderConnections(d); } catch (err) { F.toast(err.message); }
       }
@@ -191,11 +215,14 @@
         openrouterKey: f.openrouterKey.value.trim(),
         openrouterModel: f.openrouterModel.value.trim() || "z-ai/glm-4.6",
         apiKey: f.apiKey.value.trim(),
+        geminiKey: f.geminiKey.value.trim(),
+        geminiModel: f.geminiModel.value.trim() || "gemini-3.8-flash",
         model: f.model.value,
         style: f.style.value,
         instructions: f.instructions.value.trim(),
         cloudSync: f.cloudSync.checked,
         reviewChanges: f.reviewChanges.checked,
+        autoFixBuilds: f.autoFixBuilds.checked,
         askBeforeRun: f.askBeforeRun.checked,
       });
       if (s.cloudSync) F.sync?.now();

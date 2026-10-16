@@ -100,6 +100,8 @@ Any FIZZ answer that contains code has **Build in FIZZ DEV**, which hands the an
 - **Agent chat**: a live task list, one activity line per reply (click to see each diff, command and result),
   Build / Plan / Ask modes, questions with answer buttons, review-before-apply, restore to any reply,
   `@file` mentions, project memory (`FIZZ.md`), slash commands and **Skills** (`assets/skills.js`).
+- **AI providers** (Settings → AI): FIZZ AI (the site's own), your OpenRouter account, your **Google AI Studio**
+  (Gemini) key, or your Anthropic key. Personal keys stay in the browser and go only to that provider.
 - **Fizz Code's tools** — it decides when to use them and gets the results back (agent loop):
   - `<fizz-run>`: the browser terminal — `node`, `python` (Pyodide), file commands; scripts can write
     Word, Excel, PowerPoint and PDF files.
@@ -115,8 +117,9 @@ Any FIZZ answer that contains code has **Build in FIZZ DEV**, which hands the an
   - `<fizz-build target="android|desktop">`: real apps built by GitHub Actions in your repository —
     Android APK + AAB (Capacitor 8; signed with your key from repository secrets, or a new key it makes
     for you in private repositories) and desktop apps for Windows (.exe), macOS (.dmg) and Linux
-    (.AppImage) (Electron). A live card in the chat shows progress and the downloads; if a build fails,
-    **Ask Fizz Code to fix it** sends the log.
+    (.AppImage) (Electron). A live card in the chat shows progress and the downloads. If a build fails,
+    FIZZ reads the failed job's log on GitHub and Fizz Code fixes the project (its code or the build files)
+    and builds again by itself, up to 6 attempts (Settings → Tools → *Fix failed app builds automatically*).
   - `<fizz-screenshot>`, `<fizz-export>` (PDF from HTML), `<fizz-attach>` (file cards), `<fizz-ask>`, `<fizz-plan>`.
 - **Terminal**: the prompt is `fizzdev/<user>/<project>`; a bash-like shell (pipes, `&&`, `||`, `;`, redirects, `$VARS`,
   globs) with ~60 built-in commands on the project files (grep, sed, awk, find, jq, curl, zip…), Node and Python

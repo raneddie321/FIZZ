@@ -113,7 +113,7 @@
   function loadData(user) {
     if (dataCache[user.id]) return dataCache[user.id];
     const d = (dataCache[user.id] = store.get(`fizz.data.${user.id}`, null) || {});
-    d.settings = Object.assign({ provider: "fizz", apiKey: "", openrouterKey: "", openrouterModel: "z-ai/glm-4.6", instructions: "", model: "claude-opus-5-5", style: "balanced" }, d.settings || {});
+    d.settings = Object.assign({ provider: "fizz", apiKey: "", openrouterKey: "", openrouterModel: "z-ai/glm-4.6", geminiKey: "", geminiModel: "gemini-3.8-flash", instructions: "", model: "claude-opus-5-5", style: "balanced" }, d.settings || {});
     d.conversations ||= [];
     d.projects ||= [];
     return d;
@@ -201,6 +201,11 @@
       try { const j = await res.json(); msg = j.error?.message || msg; } catch {}
       if (res.status === 404) msg = "FIZZ AI isn't available on this deployment. Connect OpenRouter or add an API key in Settings → AI.";
       if (res.status === 401 && url.includes("openrouter")) msg = "OpenRouter rejected your key. Reconnect it in Settings → AI.";
+      if (url.includes("generativelanguage")) {
+        if (res.status === 400 && /api key/i.test(msg) || res.status === 401 || res.status === 403) msg = "Google AI Studio rejected your API key. Check it in Settings → AI (aistudio.google.com → Get API key).";
+        else if (res.status === 404) msg = `Google doesn't have the model "${payload.model}". Pick another model in Settings → AI.`;
+        else if (res.status === 429) msg = "Your Google AI Studio key has reached its rate limit. Wait a minute, or switch model in Settings → AI.";
+      }
       const e = new Error(msg);
       e.status = res.status;
       throw e;
@@ -249,6 +254,11 @@
       if (!settings.apiKey) throw new Error("NO_KEY");
       return streamChat({ apiKey: settings.apiKey, model: model || settings.model, system, messages: history.map(toApiContent), signal, onText });
     }
+    if (settings.provider === "gemini") {
+      if (!settings.geminiKey) throw new Error("NO_KEY");
+      // Google AI Studio's OpenAI-compatible endpoint, called straight from the browser with the user's key.
+      return streamOpenAI("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", { Authorization: `Bearer ${settings.geminiKey}` }, { model: settings.geminiModel || "gemini-3.8-flash", stream: true, messages: [{ role: "system", content: system }, ...history.map(toOpenAI)] }, signal, onText);
+    }
     if (settings.provider === "openrouter") {
       if (!settings.openrouterKey) throw new Error("NO_KEY");
       return streamOpenAI("https://openrouter.ai/api/v1/chat/completions", { Authorization: `Bearer ${settings.openrouterKey}`, "X-Title": "FIZZ" }, { model: settings.openrouterModel || "z-ai/glm-4.6", stream: true, messages: [{ role: "system", content: system }, ...history.map(toOpenAI)] }, signal, onText);
@@ -258,6 +268,7 @@
 
   function providerLabel(settings, product = "chat") {
     if (settings.provider === "openrouter") return settings.openrouterModel || "OpenRouter";
+    if (settings.provider === "gemini") return settings.geminiModel || "Gemini";
     if (settings.provider === "anthropic") return (MODELS.find((m) => m.id === settings.model) || MODELS[0])[product];
     return product === "dev" ? "Fizz Code 1.0" : "FIZZ 1.0";
   }

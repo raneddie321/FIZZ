@@ -108,7 +108,7 @@
     const send = $("#send");
     send.innerHTML = state.controller ? '<svg class="i" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor"/></svg>' : '<svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg>';
     send.setAttribute("aria-label", state.controller ? "Stop generating" : "Send");
-    const missing = (data.settings.provider === "openrouter" && !data.settings.openrouterKey) || (data.settings.provider === "anthropic" && !data.settings.apiKey);
+    const missing = (data.settings.provider === "openrouter" && !data.settings.openrouterKey) || (data.settings.provider === "anthropic" && !data.settings.apiKey) || (data.settings.provider === "gemini" && !data.settings.geminiKey);
     F.serverStatus().then((st) => {
       const noServer = data.settings.provider === "fizz" && !st.ai?.configured;
       $("#key-notice").innerHTML = missing || noServer

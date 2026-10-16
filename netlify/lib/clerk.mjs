@@ -68,7 +68,7 @@ export async function sessionUser(req) {
 const FIELDS = {
   theme: (v) => ["light", "dark", "system"].includes(v),
   style: (v) => ["balanced", "concise", "detailed"].includes(v),
-  provider: (v) => ["fizz", "openrouter", "anthropic"].includes(v),
+  provider: (v) => ["fizz", "openrouter", "anthropic", "gemini"].includes(v),
   model: (v) => typeof v === "string" && /^[\w.:/-]{1,60}$/.test(v),
   orModel: (v) => typeof v === "string" && /^[\w.:/-]{1,80}$/.test(v),
   devMode: (v) => ["build", "ask"].includes(v),
