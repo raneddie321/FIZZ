@@ -18,32 +18,64 @@
   function send(stream, args) { self.postMessage({ type: "out", stream, text: args.map(fmt).join(" ") }); }
   const consoleShim = { log: (...a) => send("out", a), info: (...a) => send("out", a), debug: (...a) => send("out", a), warn: (...a) => send("err", a), error: (...a) => send("err", a), table: (...a) => send("out", a) };
   class Exit { constructor(code) { this.code = code; } }
-  self.onmessage = (e) => {
-    const { files, entry, args } = e.data;
+  // Document libraries the scripts can use (loaded on first use): require("docx"), require("xlsx")…
+  const LIBS = { docx: ["docx.min.js", "docx"], xlsx: ["xlsx.full.min.js", "XLSX"], pptxgenjs: ["pptxgen.bundle.js", "PptxGenJS"], jspdf: ["jspdf.umd.min.js", "jspdf"], "pdf-lib": ["pdf-lib.min.js", "PDFLib"] };
+  let BASE = "";
+  function lib(name) {
+    const l = LIBS[name];
+    if (!l) return null;
+    if (!self[l[1]]) importScripts(BASE + "vendor/docs/" + l[0]);
+    return self[l[1]];
+  }
+  const writes = [];
+  function writeOut(path, data) {
+    path = String(path).replace(/^\\.?\\/+/, "");
+    if (typeof data === "string") { self.postMessage({ type: "file", path, text: data }); return; }
+    const p = Promise.resolve(data instanceof Blob ? data.arrayBuffer() : data).then((d) => {
+      const buf = d instanceof ArrayBuffer ? d : d && d.buffer ? d.buffer.slice(d.byteOffset, d.byteOffset + d.byteLength) : null;
+      if (!buf) throw new Error("fizz.writeFile: data must be a string, Uint8Array, ArrayBuffer or Blob");
+      self.postMessage({ type: "file", path, bytes: buf }, [buf]);
+    });
+    writes.push(p);
+    return p;
+  }
+  self.onmessage = async (e) => {
+    const { files, entry, args, base } = e.data;
+    BASE = base || "";
     const dir = (p) => p.includes("/") ? p.slice(0, p.lastIndexOf("/")) : "";
     const norm = (p) => { const out = []; for (const s of p.split("/")) { if (!s || s === ".") continue; if (s === "..") out.pop(); else out.push(s); } return out.join("/"); };
     const cache = {};
     const process = { argv: ["node", entry, ...args], env: {}, platform: "browser", cwd: () => "/", exit: (c = 0) => { throw new Exit(c); }, stdout: { write: (s) => send("raw", [String(s)]) } };
+    const readText = (p) => { p = norm(p); if (typeof files[p] !== "string") throw new Error("ENOENT: no such file '" + p + "'" + (files[p] === null ? " (binary files can't be read here)" : "")); return files[p]; };
+    const fizz = { writeFile: writeOut, readFile: readText, use: (n) => { const m = lib(n); if (!m) throw new Error("Unknown library " + n + ". Available: " + Object.keys(LIBS).join(", ")); return m; } };
+    self.fizz = fizz;
+    const fs = { writeFileSync: (p, d) => { writeOut(p, d); }, readFileSync: (p) => readText(p), existsSync: (p) => files[norm(p)] !== undefined, promises: { writeFile: async (p, d) => writeOut(p, d), readFile: async (p) => readText(p) } };
     function req(from, name) {
-      if (!name.startsWith(".") && !name.startsWith("/")) throw new Error("Module '" + name + "' isn't available in the browser runner (only your project's own files can be required).");
+      if (name === "fs" || name === "node:fs") return fs;
+      if (name === "fs/promises" || name === "node:fs/promises") return fs.promises;
+      if (name === "path" || name === "node:path") return { join: (...a) => norm(a.join("/")), basename: (p) => p.split("/").pop(), dirname: dir, extname: (p) => (p.match(/\\.[^./]+$/) || [""])[0] };
+      if (LIBS[name]) { const m = lib(name); return name === "jspdf" ? m : m; }
+      if (!name.startsWith(".") && !name.startsWith("/")) throw new Error("Module '" + name + "' isn't available in the browser runner. Available: your project's files, fs, path and " + Object.keys(LIBS).join(", ") + ".");
       let p = norm((name.startsWith("/") ? "" : dir(from) + "/") + name);
       for (const c of [p, p + ".js", p + ".cjs", p + "/index.js"]) if (files[c] !== undefined) { p = c; break; }
       if (p.endsWith(".json") && files[p] !== undefined) return JSON.parse(files[p]);
       return load(p);
     }
-    function load(p) {
+    const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+    function load(p, top) {
       if (cache[p]) return cache[p].exports;
-      if (files[p] === undefined) throw new Error("Cannot find module '" + p + "'");
+      if (typeof files[p] !== "string") throw new Error("Cannot find module '" + p + "'");
       const module = { exports: {} };
       cache[p] = module;
       let fn;
-      try { fn = new Function("module", "exports", "require", "console", "process", "__filename", "__dirname", files[p]); }
+      const Ctor = top ? AsyncFunction : Function;
+      try { fn = new Ctor("module", "exports", "require", "console", "process", "__filename", "__dirname", "fizz", files[p]); }
       catch (err) { if (/import|export/.test(String(err.message))) throw new Error(p + ": ES module syntax (import/export) isn't supported by the browser runner. Use require()/module.exports, or run it in a full sandbox."); throw err; }
-      fn(module, module.exports, (n) => req(p, n), consoleShim, process, p, dir(p));
-      return module.exports;
+      const out = fn(module, module.exports, (n) => req(p, n), consoleShim, process, p, dir(p), fizz);
+      return top ? out : module.exports;
     }
     let code = 0;
-    try { load(entry); } catch (err) { if (err instanceof Exit) code = err.code; else { send("err", [err && err.stack ? err.stack.split("\\n").slice(0, 6).join("\\n") : String(err)]); code = 1; } }
+    try { await load(entry, true); await Promise.all(writes); } catch (err) { if (err instanceof Exit) code = err.code; else { send("err", [err && err.stack ? err.stack.split("\\n").slice(0, 6).join("\\n") : String(err)]); code = 1; } }
     let idle = 0;
     const check = () => { if (live.size === 0) { if (++idle >= 2) return self.postMessage({ type: "done", code }); } else idle = 0; _st(check, 50); };
     _st(check, 0);
@@ -65,6 +97,7 @@
     return out;
   }
 
+  const F = window.FIZZ;
   function createTerminal(host, api) {
     const term = new Terminal({
       fontFamily: 'ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace',
@@ -111,18 +144,25 @@
       return new Promise((resolve) => {
         const worker = new Worker(URL.createObjectURL(new Blob([WORKER_SRC], { type: "text/javascript" })));
         const kill = (code, msg) => { worker.terminate(); if (msg) wl(msg); busy = null; resolve(code); };
-        const timer = setTimeout(() => kill(124, `${C.red}Stopped: the script ran longer than 15 seconds.${C.reset}`), 15000);
+        const timer = setTimeout(() => kill(124, `${C.red}Stopped: the script ran longer than 60 seconds.${C.reset}`), 60000);
         busy = () => { clearTimeout(timer); kill(130, "^C"); };
+        const pendingWrites = [];
         worker.onmessage = (e) => {
           const m = e.data;
+          if (m.type === "file") {
+            const job = m.bytes ? api.writeBinary(abs(m.path), m.bytes) : Promise.resolve(api.write(abs(m.path), m.text));
+            pendingWrites.push(job.then(() => wl(`${C.dim}wrote ${m.path}${m.bytes ? ` (${F.blobs.human(m.bytes.byteLength)})` : ""}${C.reset}`)).catch((err) => wl(`${C.red}couldn't save ${m.path}: ${err.message}${C.reset}`)));
+            return;
+          }
           if (m.type === "out") {
             const text = m.text.replace(/\n/g, "\r\n");
             if (m.stream === "raw") w(text);
             else wl(m.stream === "err" ? `${C.red}${text}${C.reset}` : text);
-          } else if (m.type === "done") { clearTimeout(timer); kill(m.code); }
+          } else if (m.type === "done") { clearTimeout(timer); Promise.all(pendingWrites).then(() => kill(m.code)); }
         };
         worker.onerror = (e) => { clearTimeout(timer); kill(1, `${C.red}${e.message}${C.reset}`); };
-        worker.postMessage({ files: files(), entry: path, args });
+        const text = Object.fromEntries(Object.entries(files()).map(([k, v]) => [k, F.blobs?.isBlob(v) ? null : v]));
+        worker.postMessage({ files: text, entry: path, args, base: new URL(".", location.href).href });
       });
     }
 
@@ -164,7 +204,7 @@
           print("."); walk(abs(args[0] || ""), ""); break;
         }
         case "cd": { const t = abs(args[0] || "/"); if (!isDir(t)) return fail(`no such directory: ${args[0]}`); cwd = t; break; }
-        case "cat": { if (!args.length) return fail("missing file"); for (const a of args) { const p = abs(a); if (!isFile(p)) return fail(`${a}: No such file`); print(files()[p].replace(/\n$/, "")); } break; }
+        case "cat": { if (!args.length) return fail("missing file"); for (const a of args) { const p = abs(a); if (!isFile(p)) return fail(`${a}: No such file`); const v = files()[p]; print(F.blobs?.isBlob(v) ? `${C.dim}${a}: binary file (${F.blobs.describe(v)})${C.reset}` : v.replace(/\n$/, "")); } break; }
         case "head": case "tail": {
           let n = 10, rest = args;
           if (args[0] === "-n") { n = Number(args[1]) || 10; rest = args.slice(2); }

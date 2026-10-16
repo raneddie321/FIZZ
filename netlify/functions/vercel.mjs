@@ -32,7 +32,9 @@ export default async (req, context) => {
       for (const [path, content] of Object.entries(body.files || {})) {
         const p = normalizePath(path);
         if (!p) return error(400, `Invalid file path: ${path}`);
-        files.push({ file: p, data: String(content) });
+        // Binary files (images, PDFs, documents) arrive as { base64 }.
+        if (content && typeof content === "object" && typeof content.base64 === "string") files.push({ file: p, data: content.base64, encoding: "base64" });
+        else files.push({ file: p, data: String(content) });
       }
       if (!files.length) return error(400, "This project has no files to deploy.");
       const d = await vc(session.t, "/v13/deployments", {

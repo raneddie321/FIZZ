@@ -278,7 +278,8 @@
       ? `<div class="tasks"><button class="tasks-head" data-step="${planKey}" aria-expanded="${planOpen}"><svg class="i" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/></svg>${doneN} out of ${plan.length} tasks completed<svg class="i chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>${planOpen ? `<ol>${plan.map((t, i) => `<li class="${t.done ? "done" : ""}"><span class="tk">${t.done ? "✓" : ""}</span><span>${i + 1}. ${esc(t.text)}</span></li>`).join("")}</ol>` : ""}</div>`
       : "";
     const stageBar = staged.filter((x) => !x.decided).length > 1 ? `<div class="stage-bar all"><span>${staged.filter((x) => !x.decided).length} changes waiting for review</span><button class="btn btn-sm" data-accept-all="${m.id}">Accept all</button><button class="btn btn-outline btn-sm" data-reject-all="${m.id}">Reject all</button></div>` : "";
-    const cards = replyTools(m, parsed).filter((t) => T()[t.type]?.card && t.result?.html).map((t) => t.result.html).join("");
+    const outs = [...new Set([...(m.outputs || []), ...replyTools(m, parsed).filter((t) => t.type === "attach" && t.result?.files).flatMap((t) => t.result.files)])];
+    const cards = outs.length ? `<div class="file-cards">${outs.map((f) => F.docs.card(project().files, f)).join("")}</div>` : "";
     return { html: skills + planHtml + activity + stageBar, prose: parsed.prose, asks: parsed.tools.filter((t) => t.type === "ask"), cards };
   }
 
@@ -332,6 +333,7 @@
       return `<div class="a-msg">${html}${thinking}${body}${cards}${askHtml}${actions}</div>`;
     }).join("");
     if (atBottom || state.controller) sc.scrollTop = sc.scrollHeight;
+    F.docs.hydrate(th, project().files);
     if (ui.tab === "activity") renderActivity();
   }
 
@@ -546,6 +548,7 @@
     const parsed = parseAssistant(reply.content, { fences: reply.mode === "build" });
     if (!reply.tools) reply.tools = parsed.tools.map((t) => ({ ...t, status: "queued" }));
     const ctx = toolContext(reply);
+    const before = { ...project().files };
     for (const [idx, t] of reply.tools.entries()) {
       if (stopLoop) break;
       const def = F.agentTools.registry[t.type];
@@ -565,6 +568,12 @@
       renderThread();
       void idx;
     }
+    // Documents and images made in this step are shown to the user as file cards.
+    const DOC = /\.(pdf|docx|xlsx|pptx|png|jpe?g|gif|webp|ico|svg|zip|csv)$/i;
+    const made = Object.keys(project().files).filter((f) => DOC.test(f) && project().files[f] !== before[f]);
+    const fromTools = reply.tools.flatMap((t) => (t.type !== "attach" && t.result?.files) || []).filter((f) => DOC.test(f));
+    reply.outputs = [...new Set([...(reply.outputs || []), ...made.filter((f) => !/^icons\//.test(f) || made.length < 4), ...fromTools.filter((f) => !/^icons\//.test(f))])].slice(0, 12);
+    if (reply.outputs.length) { save(); renderThread(); }
   }
   /** What tools get to work with: the project, the terminal, previews and a way to add files. */
   function toolContext(reply) {
@@ -585,7 +594,7 @@
     icon: "$", feedback: true,
     label: (t) => t.body.split("\n")[0].slice(0, 120),
     summary: (k) => `ran ${k} command${k === 1 ? "" : "s"}`,
-    prompt: "<fizz-run>command</fizz-run> runs one command in the project's terminal: ls, cat, tree, grep, head, tail, wc, mkdir, mv, cp, rm, echo > file, `node file.js` (JavaScript in an isolated worker) and `python file.py` (Python 3 in the browser). No npm install or git here.",
+    prompt: "<fizz-run>command</fizz-run> runs one command in the project's terminal: ls, cat, tree, grep, head, tail, wc, mkdir, mv, cp, rm, echo > file, `node file.js` (JavaScript in an isolated worker; top-level await works) and `python file.py` (Python 3 in the browser). Scripts can make real documents: require('docx') (Word), require('xlsx') (Excel, SheetJS), require('pptxgenjs') (PowerPoint), require('jspdf') / require('pdf-lib') (PDF), and save them with fizz.writeFile('out/report.docx', data) (data: string, Uint8Array, ArrayBuffer or Blob; e.g. await docx.Packer.toBlob(doc), XLSX.write(wb, { type: 'array', bookType: 'xlsx' }), await pptx.write({ outputType: 'uint8array' }), pdf.output('arraybuffer')). Then show the file with <fizz-attach path='…'/>. No npm install or git here.",
     needsApproval: () => data.settings.askBeforeRun === true,
     async run(t, ctx) {
       const term = ctx.term();
@@ -807,7 +816,8 @@
   function ensureTerm() {
       if (!term) term = F.createTerminal($("#term-host"), {
         files: () => project().files,
-        write: (path, content) => { writeFile(path, content, { source: "terminal" }); save(); renderTree(); renderHeader(); if (path === state.file) loadEditor(); },
+        write: (path, content) => { writeFile(path, content, { source: "terminal" }); save(); renderTree(); renderHeader(); if (path === state.file) renderEditor(); },
+        writeBinary: async (path, bytes) => { const marker = await F.blobs.put(bytes, F.blobs.mimeFor(path)); writeFile(path, marker, { source: "terminal" }); save(); renderTree(); renderHeader(); if (path === state.file) renderEditor(); },
         remove: (path) => { removeFile(path, { source: "terminal" }); save(); renderTree(); renderHeader(); renderEditor(); },
         openFile: (path) => openFile(path),
         preview: (path) => { state.previewPath = path || ""; showTab("browser"); refreshPreview(); },
@@ -931,6 +941,23 @@
     $("#editor-bar").innerHTML = `<span class="path">${esc(state.file)}</span><span id="saved"></span><span class="spacer"></span>
       ${change ? `<button data-ed="diff" class="${state.editorView === "diff" ? "on" : ""}">Diff</button><button data-ed="revert" title="Undo the last change to this file">Revert</button>` : ""}
       <button data-ed="history">History</button><button data-ed="rename">Rename</button><button data-ed="delete">Delete</button>`;
+    const value = p.files[state.file];
+    const bin = isBinary(value);
+    $("#bin-host").classList.toggle("hidden", !bin);
+    if (bin) {
+      $("#diff-host").classList.add("hidden");
+      $("#editor-host").classList.add("hidden");
+      const path = state.file;
+      const kind = /\.(png|jpe?g|gif|webp|ico)$/i.test(path) ? "image" : /\.pdf$/i.test(path) ? "pdf" : "file";
+      $("#bin-host").innerHTML = `<div class="bin-view">${kind === "file" ? F.docs.card(p.files, path) : `<div class="bin-bar"><span>${esc(F.blobs.describe(value))}</span><button class="btn btn-sm" data-dl="${esc(path)}">Download</button></div>`}<div class="bin-stage" data-kind="${kind}"></div></div>`;
+      F.blobs.url(value).then((u) => {
+        const st = $("#bin-host .bin-stage");
+        if (!st || state.file !== path) return;
+        if (kind === "image") st.innerHTML = `<img src="${esc(u)}" alt="${esc(path)}" />`;
+        if (kind === "pdf") st.innerHTML = `<iframe src="${esc(u)}" title="${esc(path)}"></iframe>`;
+      });
+      return;
+    }
     const diff = state.editorView === "diff" && change;
     $("#diff-host").classList.toggle("hidden", !diff);
     $("#editor-host").classList.toggle("hidden", Boolean(diff));
@@ -939,13 +966,28 @@
   }
 
   // ---------- browser preview ----------
-  const BRIDGE = `<script>(function(){var P=parent;function s(l,a){try{P.postMessage({fizz:"console",level:l,text:Array.prototype.map.call(a,function(v){try{return typeof v==="string"?v:v instanceof Error?(v.stack||v.message):JSON.stringify(v)}catch(e){return String(v)}}).join(" ")},"*")}catch(e){}}["log","info","warn","error","debug"].forEach(function(l){var o=console[l];console[l]=function(){s(l,arguments);return o.apply(console,arguments)}});addEventListener("error",function(e){s("error",[e.message+(e.lineno?" (line "+e.lineno+")":"")])});addEventListener("unhandledrejection",function(e){s("error",["Unhandled rejection: "+(e.reason&&e.reason.message||e.reason)])});document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[href]");if(!a)return;var h=a.getAttribute("href");if(!h||/^(https?:|mailto:|tel:|#|javascript:)/i.test(h))return;e.preventDefault();P.postMessage({fizz:"navigate",href:h},"*")},true)})();<\/script>`;
+  const BRIDGE = `<script>(function(){var P=parent;function s(l,a){try{P.postMessage({fizz:"console",level:l,text:Array.prototype.map.call(a,function(v){try{return typeof v==="string"?v:v instanceof Error?(v.stack||v.message):JSON.stringify(v)}catch(e){return String(v)}}).join(" ")},"*")}catch(e){}}["log","info","warn","error","debug"].forEach(function(l){var o=console[l];console[l]=function(){s(l,arguments);return o.apply(console,arguments)}});addEventListener("error",function(e){s("error",[e.message+(e.lineno?" (line "+e.lineno+")":"")])});addEventListener("unhandledrejection",function(e){s("error",["Unhandled rejection: "+(e.reason&&e.reason.message||e.reason)])});document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[href]");if(!a)return;var h=a.getAttribute("href");if(!h||/^(https?:|mailto:|tel:|#|javascript:)/i.test(h))return;e.preventDefault();P.postMessage({fizz:"navigate",href:h},"*")},true);${F.docs.CAPTURE_BRIDGE}})();<\/script>`;
+  /** Bare ES module imports (import x from "lib") resolve to esm.sh, so npm packages work without a build step. */
+  function withImportMap(html) {
+    if (/<script[^>]*type=["']importmap["']/i.test(html)) return html;
+    const names = new Set();
+    for (const m of html.matchAll(/<script\b[^>]*type=["']module["'][^>]*>([\s\S]*?)<\/script>/gi))
+      for (const im of m[1].matchAll(/\bimport\s*(?:[\w*{}\s,]+from\s*)?["']([^"'./][^"']*)["']|\bimport\(\s*["']([^"'./][^"']*)["']\s*\)/g)) {
+        const spec = im[1] || im[2];
+        if (spec && !/^(https?:|data:|blob:)/.test(spec)) names.add(spec);
+      }
+    if (!names.size) return html;
+    const imports = {};
+    for (const n of names) imports[n] = `https://esm.sh/${n}`;
+    const tag = `<script type="importmap">${JSON.stringify({ imports })}<\/script>`;
+    return /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (m) => m + tag) : tag + html;
+  }
   function resolvePath(base, href) {
     const parts = base.split("/").slice(0, -1);
     for (const s of href.split("#")[0].split("?")[0].split("/")) { if (!s || s === ".") continue; if (s === "..") parts.pop(); else parts.push(s); }
     return parts.join("/");
   }
-  function buildPreview(path) {
+  function buildPreview(path, { bridge = true } = {}) {
     const p = project();
     const files = p.files;
     const entry = path && files[path] !== undefined ? path : files["index.html"] !== undefined ? "index.html" : Object.keys(files).find((f) => /\.html?$/.test(f));
@@ -953,10 +995,16 @@
     let html = files[entry];
     html = html.replace(/<link\b[^>]*href=["']([^"']+\.css)["'][^>]*>/gi, (m, href) => { const f = files[resolvePath(entry, href)]; return f !== undefined ? `<style>\n${f}\n</style>` : m; });
     html = html.replace(/<script\b([^>]*)\bsrc=["']([^"']+\.m?js)["']([^>]*)><\/script>/gi, (m, a, src, b) => { const f = files[resolvePath(entry, src)]; return f !== undefined ? `<script${a}${b}>\n${f.replace(/<\/script/gi, "<\\/script")}\n</script>` : m; });
-    html = /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (m) => m + BRIDGE) : BRIDGE + html;
+    // Images, fonts and other binary files: inline as data URLs (the preview runs on another origin).
+    const asset = (ref) => { const f = files[resolvePath(entry, ref)]; return isBinary(f) ? F.blobs.dataSync(f) || ref : typeof f === "string" && /\.svg$/i.test(ref) ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(f)}` : ref; };
+    html = html.replace(/(\s(?:src|href|poster)=["'])([^"'#?]+)(["'])/gi, (m, a, ref, b) => (/^(https?:|data:|mailto:|tel:|javascript:|\/\/)/i.test(ref) || /\.html?$/i.test(ref) ? m : a + asset(ref) + b));
+    html = html.replace(/url\((["']?)([^"')]+)\1\)/gi, (m, q, ref) => (/^(https?:|data:|#)/i.test(ref) ? m : `url(${q}${asset(ref)}${q})`));
+    html = withImportMap(html);
+    if (bridge) html = /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (m) => m + BRIDGE) : BRIDGE + html;
     return { entry, html };
   }
-  function refreshPreview() {
+  async function refreshPreview() {
+    await F.blobs.warmData(project().files);
     const { entry, html } = buildPreview(state.previewPath);
     state.previewPath = entry;
     $("#br-url").value = "/" + entry;
@@ -1037,7 +1085,8 @@
     if (ok) F.conn.connect(provider);
     return false;
   }
-  const filesForUpload = () => Object.fromEntries(Object.entries(project().files));
+  /** Files for GitHub and Vercel: text as is, binary files as { base64 }. */
+  const filesForUpload = async () => Object.fromEntries(await Promise.all(Object.entries(project().files).map(async ([k, v]) => [k, isBinary(v) ? { base64: await F.blobs.base64(v) } : v])));
 
   async function githubPush(message = "Update from FIZZ DEV") {
     const p = project();
@@ -1057,7 +1106,7 @@
     if (!v) return;
     F.toast("Pushing to GitHub…");
     try {
-      const r = await F.conn.github.push(target.owner, target.repo, v.branch, v.message, filesForUpload());
+      const r = await F.conn.github.push(target.owner, target.repo, v.branch, v.message, await filesForUpload());
       p.git = { ...target, branch: v.branch, lastSha: r.sha, at: Date.now() };
       save();
       renderHeader();
@@ -1096,7 +1145,7 @@
     c.messages.push(note);
     renderAll();
     try {
-      const d = await F.conn.vercel.deploy(v.name, filesForUpload(), v.production);
+      const d = await F.conn.vercel.deploy(v.name, await filesForUpload(), v.production);
       Object.assign(note.deploy, { id: d.id, url: d.url, state: d.state || "BUILDING" });
       p.deploy = { name: v.name, id: d.id, url: d.url, state: note.deploy.state, at: Date.now() };
       renderAll();
@@ -1155,7 +1204,7 @@
     const p = project();
     if (!Object.keys(p.files).length) return F.toast("This project has no files yet.");
     const zip = new JSZip();
-    for (const [path, content] of Object.entries(p.files)) zip.file(path, content);
+    for (const [path, content] of Object.entries(p.files)) zip.file(path, isBinary(content) ? await F.blobs.get(content) : content);
     F.download(`${p.name.replace(/[^\w-]+/g, "-") || "project"}.zip`, await zip.generateAsync({ type: "blob" }));
   }
 
@@ -1323,6 +1372,8 @@
     if (t.dataset.copy !== undefined) { navigator.clipboard.writeText(c.messages[+t.dataset.copy].content); F.toast("Copied"); }
     if (t.dataset.revert) revertMessage(t.dataset.revert);
     if (t.dataset.push) { const m = c.messages.find((x) => x.id === t.dataset.push); githubPush(m?.pushMessage || c.title || "Update from FIZZ DEV"); }
+    if (t.dataset.dl) return F.docs.downloadFile(project().files, t.dataset.dl);
+    if (t.dataset.openFile) { showTab("code"); return openFile(t.dataset.openFile); }
     const msgOf = (v) => c.messages.find((x) => x.id === v.split(":")[0]);
     // A tool that waits for permission: allow it (and keep the agent going) or refuse.
     if ((t.dataset.approve || t.dataset.deny) && !state.controller) {
@@ -1480,11 +1531,18 @@
   $("#deploy-btn").addEventListener("click", deploy);
   $("#more-btn").addEventListener("click", async (e) => {
     const p = project();
-    const items = [{ k: "zip", html: "Download project (.zip)" }, { k: "gdoc-in", html: "Import a Google Doc…" }, { k: "gdoc-out", html: "Export summary to Google Docs" }];
+    const items = [{ k: "zip", html: "Download project (.zip)" }, { k: "html1", html: "Download as one HTML file" }, { k: "icons", html: "Make app icons from an image…" }, { k: "gdoc-in", html: "Import a Google Doc…" }, { k: "gdoc-out", html: "Export summary to Google Docs" }];
     if (p.deploy?.url) items.push({ k: "live", html: `Open live site<small>${esc(p.deploy.url)}</small>` });
     items.push("-", { k: "rename", html: "Rename project" }, { k: "clear", html: "Clear this chat" }, { k: "delete", html: "Delete project", danger: true });
     const k = await menu(e.currentTarget, items);
     if (k === "zip") exportZip();
+    if (k === "html1") { const entry = buildPreview(state.previewPath).entry; if (!entry) return F.toast("There's no HTML page yet."); F.download(`${p.name.replace(/[^\w-]+/g, "-") || "site"}.html`, await F.docs.singleHtml(toolContext({ id: "menu" }), entry)); }
+    if (k === "icons") {
+      const imgs = Object.keys(p.files).filter((f) => /\.(svg|png|jpe?g|webp)$/i.test(f));
+      if (!imgs.length) return F.toast("Add an SVG or PNG logo to the project first.");
+      const v = await dialog({ title: "Make app icons", desc: "Creates icons in every size, favicon.ico and a web app manifest.", fields: [{ name: "from", label: "Source image", type: "select", value: imgs[0], options: imgs.map((f) => ({ value: f, label: f })) }], ok: "Create icons" });
+      if (v) { try { const made = await F.docs.iconSet(toolContext({ id: "menu" }), v.from); save(); renderAll(); F.toast(`Created ${made.length} icon files`); } catch (err) { F.toast(err.message); } }
+    }
     if (k === "gdoc-in") importGoogleDoc();
     if (k === "gdoc-out") exportGoogleDoc();
     if (k === "live") window.open(p.deploy.url, "_blank", "noopener");

@@ -77,7 +77,9 @@ export default async (req, context) => {
         const tree = await inBatches(entries, 10, async ([path, content]) => {
           const p = normalizePath(path);
           if (!p) throw Object.assign(new Error(`Invalid file path: ${path}`), { status: 400 });
-          const blob = await gh(t, `${base}/git/blobs`, { method: "POST", body: JSON.stringify({ content: String(content), encoding: "utf-8" }) });
+          // Binary files (images, PDFs, documents) arrive as { base64 }.
+          const payload = content && typeof content === "object" && typeof content.base64 === "string" ? { content: content.base64, encoding: "base64" } : { content: String(content), encoding: "utf-8" };
+          const blob = await gh(t, `${base}/git/blobs`, { method: "POST", body: JSON.stringify(payload) });
           return { path: p, mode: "100644", type: "blob", sha: blob.sha };
         });
         // base_tree keeps repository files that aren't part of this project.
