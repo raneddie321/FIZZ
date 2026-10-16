@@ -522,7 +522,7 @@
     if (reply.step >= MAX_STEPS()) { reply.loopStopped = true; save(); renderThread(); return finishLoop(reply, "limit"); }
     const parts = results.map((t) => `<tool-result tool="${t.type}" request="${esc(toolLabel(t)).slice(0, 200)}" ok="${t.status === "done"}">\n${String(t.result?.text || "").slice(0, 12_000)}\n</tool-result>`);
     for (const [path, err] of editErrors) parts.push(`<tool-result tool="edit" request="${esc(path)}" ok="false">\n${err}\nThe file was not changed. Send the edit again with SEARCH text copied exactly from the current file, or rewrite the whole file with <fizz-file>.\n</tool-result>`);
-    const images = results.flatMap((t) => (t.result?.images || []).slice(0, 2)).slice(0, 3).map((src, k) => ({ type: "image", name: `screenshot-${k + 1}.jpg`, mime: src.slice(5, src.indexOf(";")), data: src.split(",")[1] }));
+    const images = results.filter((t) => t.result?.sendImages !== false).flatMap((t) => (t.result?.images || []).slice(0, 2)).slice(0, 3).map((src, k) => ({ type: "image", name: `screenshot-${k + 1}.jpg`, mime: src.slice(5, src.indexOf(";")), data: src.split(",")[1] }));
     chat().messages.push({ id: F.uid(), role: "user", auto: true, autoLabel: `Sent ${parts.length} result${parts.length === 1 ? "" : "s"} back to Fizz Code`, content: `${parts.join("\n\n")}\n\nContinue the task from here. Fix anything that failed. If everything works, finish with the updated <fizz-plan> and a short summary, without tool tags.`, attachments: images, mode: state.mode, at: Date.now() });
     save();
     return generate({ step: reply.step + 1 });
@@ -601,6 +601,43 @@
       const r = await term.capture(t.body.split("\n")[0].slice(0, 500));
       renderTree();
       return { ok: !r.failed, text: r.text };
+    },
+  });
+
+  /** Whether the current model can look at images (screenshots are sent only then). */
+  function visionModel() {
+    const s = data.settings;
+    if (s.provider === "anthropic") return true;
+    const id = s.provider === "openrouter" ? s.openrouterModel : F.serverStatusCached?.()?.ai?.model || "";
+    return /claude|gpt-4o|gpt-4\.1|gpt-5|gemini|vision|-vl|vl-|llava|pixtral|glm-4\.?5?v|qwen.*vl|grok-.*vision|llama-?4|mistral-(small|medium)-3/i.test(id || "");
+  }
+  F.agentTools.register("screenshot", {
+    icon: "◫", feedback: true,
+    label: (t) => `Screenshot ${t.attrs.path || "the preview"}${t.attrs.device ? ` (${t.attrs.device})` : ""}`,
+    summary: (k) => `took ${k} screenshot${k === 1 ? "" : "s"}`,
+    prompt: '<fizz-screenshot path="index.html" device="desktop|tablet|phone"/> renders a page of the preview, waits for its scripts, and shows you a screenshot plus any console errors, so you can check the design and fix what looks wrong.',
+    async run(t, ctx) {
+      const [w, h] = { phone: [390, 844], tablet: [820, 1180] }[t.attrs.device] || [1280, 800];
+      await F.blobs.warmData(project().files);
+      const { html, entry } = buildPreview(t.attrs.path || state.previewPath);
+      if (!entry) return { ok: false, text: "There's no HTML page to screenshot yet." };
+      const frame = document.createElement("iframe");
+      frame.setAttribute("sandbox", "allow-scripts allow-forms allow-modals");
+      frame.style.cssText = `position:fixed;left:-10000px;top:0;width:${w}px;height:${h}px;border:0;background:#fff`;
+      const logs = [];
+      const onLog = (e) => { if (e.source === frame.contentWindow && e.data?.fizz === "console" && /error|warn/.test(e.data.level)) logs.push(`${e.data.level}: ${String(e.data.text).slice(0, 300)}`); };
+      addEventListener("message", onLog);
+      document.body.appendChild(frame);
+      try {
+        await new Promise((r) => { frame.onload = r; frame.srcdoc = html; });
+        await new Promise((r) => setTimeout(r, Number(t.attrs.wait) > 0 ? Math.min(8000, Number(t.attrs.wait)) : 1500));
+        const [img] = await F.docs.capture("", { frame, mode: "viewport", width: w, height: h, scale: 1, quality: 0.7 });
+        const canSee = visionModel();
+        return { ok: true, images: [img], sendImages: canSee, text: `Screenshot of ${entry} at ${w}×${h}.${canSee ? "" : " (The current AI model can't view images, so only the console output is included.)"}${logs.length ? `\nConsole:\n${logs.slice(0, 15).join("\n")}` : "\nNo console errors."}` };
+      } finally {
+        removeEventListener("message", onLog);
+        frame.remove();
+      }
     },
   });
 
@@ -966,7 +1003,9 @@
   }
 
   // ---------- browser preview ----------
-  const BRIDGE = `<script>(function(){var P=parent;function s(l,a){try{P.postMessage({fizz:"console",level:l,text:Array.prototype.map.call(a,function(v){try{return typeof v==="string"?v:v instanceof Error?(v.stack||v.message):JSON.stringify(v)}catch(e){return String(v)}}).join(" ")},"*")}catch(e){}}["log","info","warn","error","debug"].forEach(function(l){var o=console[l];console[l]=function(){s(l,arguments);return o.apply(console,arguments)}});addEventListener("error",function(e){s("error",[e.message+(e.lineno?" (line "+e.lineno+")":"")])});addEventListener("unhandledrejection",function(e){s("error",["Unhandled rejection: "+(e.reason&&e.reason.message||e.reason)])});document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[href]");if(!a)return;var h=a.getAttribute("href");if(!h||/^(https?:|mailto:|tel:|#|javascript:)/i.test(h))return;e.preventDefault();P.postMessage({fizz:"navigate",href:h},"*")},true);${F.docs.CAPTURE_BRIDGE}})();<\/script>`;
+  // Design mode: hover outlines elements; a click sends a description of the element to FIZZ DEV.
+  const SELECT_BRIDGE = `var sel=false,hov=null,box=null;function outline(el){if(!box){box=document.createElement("div");box.style.cssText="position:fixed;pointer-events:none;z-index:2147483647;border:2px solid #1ccaff;background:rgba(28,202,255,.12);border-radius:4px;transition:all .06s"}if(!el){box.remove();return}var r=el.getBoundingClientRect();box.style.left=r.left+"px";box.style.top=r.top+"px";box.style.width=r.width+"px";box.style.height=r.height+"px";document.documentElement.appendChild(box)}function path(el){var p=[];while(el&&el.nodeType===1&&el!==document.documentElement&&p.length<5){if(el.id){p.unshift("#"+el.id);break}var s=el.tagName.toLowerCase(),c=(el.getAttribute("class")||"").trim().split(/\\s+/).filter(Boolean).slice(0,2);if(c.length)s+="."+c.join(".");var sib=el.parentNode?[].filter.call(el.parentNode.children,function(x){return x.tagName===el.tagName}):[];if(sib.length>1)s+=":nth-of-type("+(sib.indexOf(el)+1)+")";p.unshift(s);el=el.parentElement}return p.join(" > ")}addEventListener("message",function(e){if(e.data&&e.data.fizz==="select-mode"){sel=!!e.data.on;document.documentElement.style.cursor=sel?"crosshair":"";if(!sel)outline(null)}});addEventListener("mousemove",function(e){if(!sel)return;hov=e.target;outline(hov)},true);addEventListener("click",function(e){if(!sel)return;e.preventDefault();e.stopPropagation();var el=e.target,t=(el.innerText||el.getAttribute("alt")||el.getAttribute("aria-label")||"").trim().replace(/\\s+/g," ").slice(0,60);parent.postMessage({fizz:"selected",selector:path(el),label:el.tagName.toLowerCase()+(t?" \u201c"+t+"\u201d":""),html:el.outerHTML.slice(0,1500)},"*");sel=false;document.documentElement.style.cursor="";outline(null)},true);`;
+  const BRIDGE = `<script>(function(){var P=parent;function s(l,a){try{P.postMessage({fizz:"console",level:l,text:Array.prototype.map.call(a,function(v){try{return typeof v==="string"?v:v instanceof Error?(v.stack||v.message):JSON.stringify(v)}catch(e){return String(v)}}).join(" ")},"*")}catch(e){}}["log","info","warn","error","debug"].forEach(function(l){var o=console[l];console[l]=function(){s(l,arguments);return o.apply(console,arguments)}});addEventListener("error",function(e){s("error",[e.message+(e.lineno?" (line "+e.lineno+")":"")])});addEventListener("unhandledrejection",function(e){s("error",["Unhandled rejection: "+(e.reason&&e.reason.message||e.reason)])});document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[href]");if(!a)return;var h=a.getAttribute("href");if(!h||/^(https?:|mailto:|tel:|#|javascript:)/i.test(h))return;e.preventDefault();P.postMessage({fizz:"navigate",href:h},"*")},true);${F.docs.CAPTURE_BRIDGE}${SELECT_BRIDGE}})();<\/script>`;
   /** Bare ES module imports (import x from "lib") resolve to esm.sh, so npm packages work without a build step. */
   function withImportMap(html) {
     if (/<script[^>]*type=["']importmap["']/i.test(html)) return html;
@@ -1020,6 +1059,14 @@
   window.addEventListener("message", (e) => {
     if (e.source !== $("#preview").contentWindow || !e.data?.fizz) return;
     if (e.data.fizz === "console") { state.logs.push({ level: e.data.level, text: String(e.data.text).slice(0, 4000) }); renderConsole(); }
+    if (e.data.fizz === "selected") {
+      state.selection = { selector: String(e.data.selector).slice(0, 300), label: String(e.data.label).slice(0, 90), html: String(e.data.html).slice(0, 1500) };
+      $("#br-select").classList.remove("on");
+      renderComposer();
+      if (isPhone()) setView("chat");
+      $("#input").focus();
+      F.toast("Element selected — describe the change you want");
+    }
     if (e.data.fizz === "navigate") {
       const target = resolvePath(state.previewPath || "index.html", String(e.data.href));
       const files = project().files;
@@ -1614,6 +1661,12 @@
 
   // browser pane
   $("#br-refresh").addEventListener("click", refreshPreview);
+  $("#br-select").addEventListener("click", (e) => {
+    const on = !e.currentTarget.classList.contains("on");
+    e.currentTarget.classList.toggle("on", on);
+    $("#preview").contentWindow?.postMessage({ fizz: "select-mode", on }, "*");
+    if (on) F.toast("Click an element in the preview to point Fizz Code at it");
+  });
   $("#br-url").addEventListener("keydown", (e) => { if (e.key === "Enter") { state.previewPath = e.target.value.replace(/^\/+/, ""); refreshPreview(); } });
   $$("#br-devices button").forEach((b) => b.addEventListener("click", () => { $$("#br-devices button").forEach((x) => x.classList.toggle("on", x === b)); $("#preview").style.width = b.dataset.w; }));
   $("#br-open").addEventListener("click", () => window.open(URL.createObjectURL(new Blob([buildPreview(state.previewPath).html], { type: "text/html" })), "_blank", "noopener"));

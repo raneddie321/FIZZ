@@ -181,10 +181,14 @@
       statusPromise = fetch("/api/status", { credentials: "same-origin", cache: "no-store" })
         .then((r) => (r.ok && (r.headers.get("content-type") || "").includes("json") ? r.json() : null))
         .catch(() => null)
-        .then((s) => s || { server: false, ai: { configured: false }, connections: {}, google: { configured: false } });
+        .then((s) => s || { server: false, ai: { configured: false }, connections: {}, google: { configured: false } })
+        .then((s) => (statusCache = s));
     }
     return statusPromise;
   }
+  let statusCache = null;
+  /** The last /api/status answer, or null before it arrives. */
+  const serverStatusCached = () => statusCache;
 
   // ---------- OpenAI-compatible streaming (FIZZ server proxy and OpenRouter) ----------
   async function streamOpenAI(url, headers, payload, signal, onText) {
@@ -376,6 +380,6 @@
     });
   }
 
-  window.FIZZ = { app, serverStatus, aiStream, providerLabel, openrouterConnect, openrouterFinish, toOpenAI, store, esc, uid, theme, auth, loadData, saveData, MODELS, streamChat, readAttachment, toApiContent, markdown, toast, download, validEmail };
+  window.FIZZ = { app, serverStatus, serverStatusCached, aiStream, providerLabel, openrouterConnect, openrouterFinish, toOpenAI, store, esc, uid, theme, auth, loadData, saveData, MODELS, streamChat, readAttachment, toApiContent, markdown, toast, download, validEmail };
   theme.init();
 })();
