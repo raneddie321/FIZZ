@@ -217,3 +217,89 @@
 .dev-welcome h1 { font-weight: 500; }
 .a-actions button.primary { color: var(--primary); font-weight: 600; }
 .a-actions button.primary:hover { background: var(--primary-soft); color: var(--primary); }
+
+/* ---- Agent chat (activity lines, task cards, prose) ---- */
+#dev-app .dev-thread { max-width: 760px; gap: 18px; padding-top: 28px; }
+.u-wrap { display: grid; justify-items: end; gap: 4px; }
+.u-wrap .chips { justify-content: flex-end; }
+#dev-app .u-msg { max-width: min(85%, 560px); border: 0; border-radius: 20px; padding: 10px 16px; background: var(--surface-2); font-size: 15px; }
+.dark #dev-app .u-msg { background: #23262d; }
+.u-wrap .meta { display: flex; gap: 8px; font-size: 11.5px; color: var(--muted); opacity: 0; transition: opacity .15s; padding-right: 6px; }
+.u-wrap:hover .meta { opacity: 1; }
+@media (hover: none) { .u-wrap .meta { opacity: 1; } }
+#dev-app .a-msg { gap: 12px; }
+#dev-app .a-msg .md { font-size: 15px; line-height: 1.7; }
+.act-line, .act-head { display: inline-flex; align-items: center; gap: 10px; max-width: 100%; font-size: 14.5px; color: var(--muted); }
+.act-line b { color: var(--fg); font-weight: 500; }
+.act-line small { color: var(--muted); }
+.act-head { border: 0; background: none; padding: 2px 0; text-align: left; cursor: pointer; }
+.act-head:hover { color: var(--fg); }
+.act-head > span:not(.st):not(.act-ic):not(.act-warn) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.act-head .chev { width: 14px; height: 14px; transition: transform .15s; opacity: .7; }
+.act-head[aria-expanded="true"] .chev { transform: rotate(90deg); }
+.act-ic { width: 18px; height: 18px; flex: none; display: grid; place-items: center; border-radius: 5px; font-size: 11px; color: var(--primary); background: var(--primary-soft); }
+.act-warn { font-size: 12px; color: var(--warning); }
+.activity { display: grid; gap: 6px; }
+.activity .steps { margin-left: 8px; padding-left: 18px; border-left: 1px solid var(--border); gap: 2px; }
+.activity .step { border: 0; background: none; border-radius: 8px; }
+.activity .step-head { padding: 4px 8px; font-size: 12.5px; border-radius: 8px; }
+.activity .step-body { border: 1px solid var(--border); border-radius: 10px; margin: 4px 0 6px; }
+.tasks { border: 1px solid var(--border); border-radius: 14px; background: var(--surface); overflow: hidden; }
+.dark .tasks { background: #1a1d23; }
+.tasks-head { display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 14px; border: 0; background: none; font-size: 14px; color: var(--muted); text-align: left; }
+.tasks-head .chev { margin-left: auto; width: 16px; height: 16px; transition: transform .15s; }
+.tasks-head[aria-expanded="false"] .chev { transform: rotate(-90deg); }
+.tasks ol { list-style: none; margin: 0; padding: 0 14px 12px; display: grid; gap: 6px; }
+.tasks li, .act-task { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; color: var(--fg); }
+.tasks li.done span:last-child { color: var(--muted); text-decoration: line-through; }
+.tk { width: 16px; height: 16px; margin-top: 2px; flex: none; border-radius: 50%; border: 1.5px solid var(--muted); display: grid; place-items: center; font-size: 10px; box-sizing: border-box; }
+.done > .tk { border-color: var(--success); background: var(--success); color: #fff; }
+
+/* ---- Composer: one big rounded box ---- */
+#dev-app .composer { border-radius: 28px; padding: 4px 6px; }
+#dev-app .composer textarea { padding: 14px 14px 6px; font-size: 16px; }
+#dev-app .composer .row { gap: 6px; padding: 4px 4px 6px; }
+#dev-app .composer #attach { width: 38px; height: 38px; border: 0; color: var(--fg); }
+#dev-app .composer #attach:hover { background: var(--accent); }
+#dev-app .model-btn { border: 0; height: 34px; padding: 0 10px; color: var(--fg); font-weight: 600; border-radius: 10px; }
+#dev-app .model-btn:hover { background: var(--accent); }
+#dev-app .mic { width: 36px; height: 36px; border-radius: 999px; color: var(--fg); }
+#dev-app .mic.on { color: #fff; background: var(--danger); animation: mic-pulse 1.4s ease-in-out infinite; }
+@keyframes mic-pulse { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--danger) 25%, transparent); } }
+#dev-app .send { width: 38px; height: 38px; }
+.skill-chips { padding: 10px 12px 0; }
+.chip.skill { background: var(--primary-soft); color: var(--primary); border-color: transparent; font-weight: 600; }
+.chip.skill > span { font-size: 12px; }
+
+/* ---- Activity pane ---- */
+.pane-activity { overflow: auto; }
+.activity-pane { width: 100%; padding: 14px; display: grid; gap: 12px; align-content: start; }
+.act-sec { border: 1px solid var(--border); border-radius: 14px; background: var(--bg); padding: 12px 14px; display: grid; gap: 8px; }
+.act-sec h3 { margin: 0 0 2px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.act-row { display: flex; justify-content: space-between; gap: 10px; font-size: 13.5px; }
+.act-row b, .act-row small { color: var(--muted); font-weight: 500; }
+.act-task small { margin-left: auto; color: var(--muted); font-size: 12px; white-space: nowrap; }
+.act-task.done > span:nth-child(2) { color: var(--muted); }
+.act-file { display: flex; justify-content: space-between; gap: 10px; border: 0; background: none; padding: 4px 6px; margin: 0 -6px; border-radius: 8px; font: 13px var(--mono); text-align: left; }
+.act-file:hover { background: var(--accent); }
+.act-file span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.act-empty { margin: 0; font-size: 13px; color: var(--muted); }
+
+/* ---- Skills dialog ---- */
+.skills-dlg { width: min(640px, calc(100vw - 24px)); }
+.skill-list { display: grid; gap: 6px; max-height: 56vh; overflow: auto; margin: 12px 0; }
+.skill-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; }
+.skill-row.off { opacity: .6; }
+.skill-ic { width: 32px; height: 32px; flex: none; display: grid; place-items: center; border-radius: 9px; background: var(--primary-soft); color: var(--primary); font-weight: 700; }
+.skill-body { flex: 1; min-width: 0; display: grid; }
+.skill-body b { font-size: 14px; }
+.skill-body small { font-size: 12.5px; color: var(--muted); }
+.switch { position: relative; width: 38px; height: 22px; flex: none; }
+.switch input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.switch span { position: absolute; inset: 0; border-radius: 99px; background: var(--input); transition: background .15s; pointer-events: none; }
+.switch span::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .15s; }
+.switch input:checked + span { background: var(--primary); }
+.switch input:checked + span::after { transform: translateX(16px); }
+.switch input:focus-visible + span { outline: 2px solid var(--primary); outline-offset: 2px; }
+.menu .label { text-transform: none; }
+.skill-list:focus-visible { outline: none; }

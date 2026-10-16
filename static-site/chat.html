@@ -32,6 +32,7 @@
 <script src="assets/connections.js"></script>
 <script src="assets/settings.js"></script>
 <script src="assets/terminal.js"></script>
+<script src="assets/skills.js"></script>
 </head>
 <body class="apps">
 <div class="chat-app" id="chat-app">
@@ -119,18 +120,20 @@
         <div class="slash hidden" id="slash" role="listbox"></div>
         <form class="composer" id="composer">
           <div class="chips hidden" id="pending"></div>
+          <div class="chips skill-chips hidden" id="skill-chips"></div>
           <textarea id="input" rows="1" aria-label="Message" spellcheck="false"></textarea>
           <div class="row">
-            <button type="button" class="icon-btn" id="attach" aria-haspopup="menu" aria-label="Attach"><span data-icon="clip"></span></button>
+            <button type="button" class="icon-btn" id="attach" aria-haspopup="menu" aria-label="Add files and skills" title="Add files and skills"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
             <input type="file" id="file" multiple hidden />
             <div class="mode" role="radiogroup" aria-label="Mode">
               <button type="button" role="radio" data-mode="build">Build</button><button type="button" role="radio" data-mode="ask">Ask</button>
             </div>
             <button type="button" class="model-btn" id="model-btn"></button>
+            <button type="button" class="icon-btn mic" id="mic" aria-label="Dictate" title="Dictate"><svg class="i" viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
             <button type="submit" class="send" id="send" aria-label="Send"><svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
           </div>
         </form>
-        <p class="disclaimer">Review changes before you ship. Type / for commands.</p>
+        <p class="disclaimer">Fizz Code can make mistakes. Review changes before you ship · / for commands · + for skills</p>
       </div>
     </div>
   </main>
@@ -139,7 +142,7 @@
   <div class="resizer" id="resizer" role="separator" aria-orientation="vertical" aria-label="Resize panel" tabindex="0"></div>
   <section class="panel" id="panel" aria-label="Workspace">
     <div class="panel-tabs" role="tablist">
-      <button role="tab" data-tab="code">Code</button><button role="tab" data-tab="terminal">Terminal</button><button role="tab" data-tab="browser">Browser</button>
+      <button role="tab" data-tab="code">Code</button><button role="tab" data-tab="terminal">Terminal</button><button role="tab" data-tab="browser">Browser</button><button role="tab" data-tab="activity">Activity</button>
       <span class="spacer"></span>
       <button class="icon-btn" id="panel-close" aria-label="Close panel">✕</button>
     </div>
@@ -157,6 +160,8 @@
         <div class="editor-empty" id="editor-empty"><p>Select a file, or ask Fizz Code to build something.</p></div>
       </div>
     </div>
+
+    <div class="pane pane-activity" data-pane="activity"><div class="activity-pane" id="activity"></div></div>
 
     <div class="pane pane-terminal" data-pane="terminal"><div class="term-host" id="term-host"></div></div>
 
@@ -181,6 +186,7 @@
     <button data-goto="code"><span data-icon="code"></span>Code</button>
     <button data-goto="terminal"><span data-icon="terminal"></span>Terminal</button>
     <button data-goto="browser"><span data-icon="globe"></span>Browser</button>
+    <button data-goto="activity"><span data-icon="history"></span>Activity</button>
   </nav>
 
 <dialog class="dlg" id="prompt-dlg"><form method="dialog" class="dlg-body" id="prompt-form"></form></dialog>

@@ -84,6 +84,14 @@ Any FIZZ answer that contains code has **Build in FIZZ DEV**, which hands the an
 
 ## FIZZ DEV features
 
+- Agent chat in the style of agent apps: a live task list (`N out of M tasks completed`), one activity line per reply
+  (`Created 3 files and ran 1 command`, click to see each file diff and command output), plain prose, a large
+  rounded composer with **+** (files, Drive, skills), model picker, dictation and send. An **Activity** panel tab
+  shows Progress, Outputs (changed files), Skills and Sources for the chat.
+- **Skills** (`assets/skills.js`): 10 built-in instruction packs (web design, browser games, dashboards, Hebrew & RTL,
+  accessibility, debugging, tests, refactor, SEO, PWA) and your own. Turn one on with **+**, or it applies
+  automatically when your message matches what it's for. Manage them with `/skills`.
+
 - Agent chat with Build / Ask modes, step timeline (`Created index.html +24 −0`), expandable diffs,
   "Revert changes from this message", slash commands (`/new /files /preview /terminal /export /deploy /push /clear`).
 - Side panel: **Code** (CodeMirror, tabs, autosave, diff, history, revert), **Terminal** (shell over project
