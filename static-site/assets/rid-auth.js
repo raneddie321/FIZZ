@@ -27,11 +27,8 @@
     return { code, message: FRIENDLY[code] || first?.longMessage || first?.message || e.longMessage || e.message || "Something went wrong. Please try again.", param: first?.meta?.paramName };
   }
   const isEmail = (s) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(s.trim());
-  const passwordChecks = (pw) => [
-    { ok: pw.length >= 8, label: "At least 8 characters" },
-    { ok: /[a-z]/.test(pw) && /[A-Z]/.test(pw), label: "Upper & lowercase letters" },
-    { ok: /\d/.test(pw), label: "A number" },
-  ];
+  // The only rule is 8+ characters (Clerk enforces its own on top); the meter suggests the rest.
+  const passwordChecks = (pw) => [{ ok: pw.length >= 8, label: "At least 8 characters" }];
   function passwordStrength(pw) {
     if (!pw) return { score: 0, label: "" };
     let s = 0;
@@ -116,7 +113,7 @@
 
   // ---------- state + rendering ----------
   let clerk = null;
-  const S = { mode: modeFromUrl(), step: "email", email: params.get("email") || "", password: "", confirm: "", code: "", month: "", day: "", year: "", country: "", username: "", human: "idle", humanFix: null, error: null, fe: {}, busy: false };
+  const S = { mode: modeFromUrl(), step: "email", email: params.get("email") || "", password: "", confirm: "", code: "", month: "", day: "", year: "", country: "", username: "", human: "idle", humanFix: null, error: null, fe: {}, busy: false, emailTaken: false };
   const set = (patch) => { Object.assign(S, patch); render(); };
   const go = (step) => set({ step, error: null, fe: {} });
 
@@ -159,7 +156,7 @@
       i.type = i.type === "password" ? "text" : "password";
       b.setAttribute("aria-label", i.type === "password" ? "Show password" : "Hide password");
     }
-    if (b.dataset.mode) { e.preventDefault(); history.replaceState(null, "", b.getAttribute("href")); set({ mode: b.dataset.mode, step: "email", error: null, fe: {} }); }
+    if (b.dataset.mode) { e.preventDefault(); history.replaceState(null, "", b.getAttribute("href")); set({ mode: b.dataset.mode, step: "email", error: null, fe: {}, emailTaken: false }); }
   });
   card.addEventListener("submit", (e) => { e.preventDefault(); actions[`${S.mode}:${S.step}`]?.(); });
   card.addEventListener("click", (e) => {
@@ -204,7 +201,8 @@
     const loading = S.busy;
     if (S.step === "email") return `<form novalidate>${sp}${heading("Create your RanEddie ID", "One account for FIZZ and all RanEddie games. Let's start with your email.")}
       ${field({ label: "Email", name: "email", type: "email", value: S.email, error: S.fe.email, attrs: 'autocomplete="email" inputmode="email" placeholder="you@example.com" autofocus' })}
-      <div class="mt6">${button("Next")}</div>
+      ${S.emailTaken ? alertBox(`You already have an account with this email. <a href="${withRedirect("signin", `&email=${encodeURIComponent(S.email.trim())}`)}" data-mode="signin">Sign in instead</a>`) : ""}
+      <div class="mt6">${button("Next", { loading })}</div>
       <p class="rid-foot">Already have a RanEddie ID? <a href="${withRedirect("signin")}" data-mode="signin">Sign in</a></p></form>`;
     if (S.step === "password") return `<form novalidate>${back()}${sp}${heading("Create a password", "Make it strong — it protects your account.")}${chip(S.email)}
       ${field({ label: "Password", name: "password", type: "password", value: S.password, error: S.fe.password, attrs: 'autocomplete="new-password" autofocus' })}
@@ -317,7 +315,19 @@
     "signin:resend": async () => { try { await sendSecondFactorCode(signIn()); set({ error: null }); F.toast("New code sent"); } catch (e) { fail(e); } },
 
     // sign up
-    "signup:email": () => { if (!isEmail(S.email)) return set({ fe: { email: "Enter a valid email address." } }); go("password"); },
+    "signup:email": async () => {
+      if (!isEmail(S.email)) return set({ emailTaken: false, fe: { email: "Enter a valid email address." } });
+      // Tell the player right away when the email already has a RanEddie ID (Clerk would refuse it later anyway)
+      set({ busy: true, emailTaken: false, fe: {} });
+      let taken = false;
+      try {
+        const res = await fetch("/api/email-taken", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: S.email.trim() }) });
+        taken = res.ok && (await res.json()).taken === true;
+      } catch { /* offline: carry on */ }
+      if (taken) return set({ busy: false, emailTaken: true, fe: { email: "This email already has a RanEddie ID." } });
+      set({ busy: false });
+      go("password");
+    },
     "signup:password": () => {
       const fe = {};
       if (!passwordChecks(S.password).every((c) => c.ok)) fe.password = "Your password doesn't meet all the requirements yet.";

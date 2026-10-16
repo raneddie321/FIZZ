@@ -44,6 +44,10 @@
       "dest": "/api/account.mjs"
     },
     {
+      "src": "/api/email-taken",
+      "dest": "/api/email-taken.mjs"
+    },
+    {
       "src": "/api/ai/chat",
       "dest": "/api/ai/chat.mjs"
     },
