@@ -173,7 +173,7 @@
       ? list.map((p) => {
           const on = p.id === state.projectId;
           const chats = on || q ? p.chats.slice().reverse().filter((c) => !q || on || c.title.toLowerCase().includes(q)) : [];
-          return `<div class="proj ${on ? "on" : ""}"><svg class="folder" viewBox="0 0 24 24" aria-hidden="true" style="color:${p.color}"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><button class="name" data-project="${p.id}" title="${esc(p.name)}">${esc(p.name)}</button><button class="icon-btn more" data-pmenu="${p.id}" aria-label="Options for ${esc(p.name)}">⋯</button></div>
+          return `<div class="proj ${on ? "on" : ""}"><svg class="folder" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><button class="name" data-project="${p.id}" title="${esc(p.name)}">${esc(p.name)}</button><button class="icon-btn more" data-pmenu="${p.id}" aria-label="Options for ${esc(p.name)}">⋯</button></div>
             ${chats.length ? `<div class="proj-chats">${chats.map((c) => `<a href="#" data-project="${p.id}" data-chat="${c.id}" class="${c.id === state.chatId ? "on" : ""}">${esc(c.title)}</a>`).join("")}</div>` : ""}`;
         }).join("")
       : `<p class="empty-list">${q ? "No matches." : "No projects yet."}</p>`;
@@ -192,18 +192,18 @@
   // ---------- thread ----------
   // Templates on the welcome screen: each fills in a prompt for Fizz Code.
   const STARTERS = [
-    ["🌐", "Landing page", "Build a modern landing page for a coffee shop with a menu, opening hours and a contact form"],
-    ["🎮", "Browser game", "Make a bubble-popping canvas game with a score, sound effects and a 30-second timer"],
-    ["📊", "Dashboard", "Create an admin dashboard with stats cards, a bar chart and a sortable table"],
-    ["📱", "Android app", "Build a mobile-first habit tracker (touch-friendly, saves to localStorage, works offline), make app icons, then build it as an Android app (APK + AAB)"],
-    ["🖥", "Desktop app", "Build a Markdown notes app with a sidebar and a live preview, then build it as a desktop app for Windows, macOS and Linux"],
-    ["📄", "CV as PDF", "Design a modern one-page CV and export it as an A4 PDF. Ask me for my details first"],
-    ["📽", "Presentation", "Make a 6-slide PowerPoint presentation (.pptx) with a clean design. Ask me for the topic first"],
-    ["📈", "Excel budget", "Create an Excel workbook (.xlsx) for a monthly budget with categories, formulas and a summary sheet"],
-    ["🐍", "Python data", "Write a Python script that creates sample sales data, analyses it and saves a summary as CSV and a chart as PNG"],
-    ["🔎", "Research page", "Search the web for the most popular JavaScript frameworks right now and build a comparison page with sources"],
-    ["👤", "Portfolio", "Build a minimal developer portfolio with projects, an about section and dark mode"],
-    ["🧩", "Chrome extension", "Make a Chrome extension (Manifest V3) that shows a word count for the selected text, with a popup"],
+    ["layout", "Landing page", "Build a modern landing page for a coffee shop with a menu, opening hours and a contact form"],
+    ["gamepad", "Browser game", "Make a bubble-popping canvas game with a score, sound effects and a 30-second timer"],
+    ["chart", "Dashboard", "Create an admin dashboard with stats cards, a bar chart and a sortable table"],
+    ["phone", "Android app", "Build a mobile-first habit tracker (touch-friendly, saves to localStorage, works offline), make app icons, then build it as an Android app (APK + AAB)"],
+    ["monitor", "Desktop app", "Build a Markdown notes app with a sidebar and a live preview, then build it as a desktop app for Windows, macOS and Linux"],
+    ["file", "CV as PDF", "Design a modern one-page CV and export it as an A4 PDF. Ask me for my details first"],
+    ["slides", "Presentation", "Make a 6-slide PowerPoint presentation (.pptx) with a clean design. Ask me for the topic first"],
+    ["sheet", "Excel budget", "Create an Excel workbook (.xlsx) for a monthly budget with categories, formulas and a summary sheet"],
+    ["terminal", "Python data", "Write a Python script that creates sample sales data, analyses it and saves a summary as CSV and a chart as PNG"],
+    ["search", "Research page", "Search the web for the most popular JavaScript frameworks right now and build a comparison page with sources"],
+    ["user", "Portfolio", "Build a minimal developer portfolio with projects, an about section and dark mode"],
+    ["plug", "Chrome extension", "Make a Chrome extension (Manifest V3) that shows a word count for the selected text, with a popup"],
   ];
 
 
@@ -213,17 +213,23 @@
   /** Tools as the reply knows them: run state once applied, or the parsed tags while it streams. */
   const replyTools = (m, parsed) => m.tools || (m.runs ? m.runs.map((r) => ({ type: "run", body: r.cmd, status: r.done ? (r.failed ? "failed" : "done") : "queued", result: r.done ? { ok: !r.failed, text: r.text } : null })) : parsed.tools.map((t) => ({ ...t, status: "queued" })));
 
+  /** The icon for a reply's activity line: what it mostly did. */
+  function actIcon(tools, m) {
+    if ((m.changes || []).length || (m.staged || []).length) return "file";
+    const t = tools.find((x) => T()[x.type]?.icon);
+    return t ? T()[t.type].icon : "zap";
+  }
   function stepsHtml(m) {
     const parsed = parseAssistant(m.content || "", { fences: m.mode === "build" || !m.mode });
     const rows = [];
-    if (m.readCount) rows.push(`<div class="step"><div class="step-head"><span class="st done">✓</span><span class="verb">Read</span><span class="path">${m.readCount} project file${m.readCount === 1 ? "" : "s"}</span></div></div>`);
+    if (m.readCount) rows.push(`<div class="step"><div class="step-head"><span class="st done"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></span><span class="verb">Read</span><span class="path">${m.readCount} project file${m.readCount === 1 ? "" : "s"}</span></div></div>`);
     const staged = m.staged || [];
     const fileRow = (path, idx, { running, content, kind, failed }) => {
       const key = `${m.id}:${idx}`;
       const change = (m.changes || []).find((c) => c.path === path);
       const stage = staged.find((x) => x.path === path);
       const suggestion = !m.pending && !change && !stage && m.mode === "ask";
-      const st = running ? '<span class="st run"></span>' : stage && !stage.decided ? '<span class="st">›</span>' : change || suggestion ? '<span class="st done">✓</span>' : '<span class="st fail">!</span>';
+      const st = running ? '<span class="st run"></span>' : stage && !stage.decided ? '<span class="st"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>' : change || suggestion ? '<span class="st done"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></span>' : '<span class="st fail"><svg viewBox="0 0 24 24"><path d="M12 7v6M12 17h.01"/></svg></span>';
       const verb = running ? "Writing" : stage && !stage.decided ? "Proposed" : suggestion ? "Suggested" : failed ? "Couldn't edit" : change?.created ? "Created" : change ? (kind === "edit" ? "Patched" : "Edited") : stage?.decided === "rejected" ? "Rejected" : "Skipped";
       const stats = change || stage;
       const delta = stats ? `<span class="delta"><span class="add">+${stats.added}</span> <span class="del">−${stats.removed}</span></span>` : running ? `<span class="delta muted-sm">${(content || "").split("\n").length} lines</span>` : "";
@@ -247,7 +253,7 @@
       const key = `${m.id}:t${idx}`;
       const waiting = t.status === "waiting";
       const open = state.expanded.has(key) || waiting;
-      const st = t.status === "running" ? '<span class="st run"></span>' : t.status === "failed" ? '<span class="st fail">!</span>' : t.status === "done" ? '<span class="st done">✓</span>' : '<span class="st">›</span>';
+      const st = t.status === "running" ? '<span class="st run"></span>' : t.status === "failed" ? '<span class="st fail"><svg viewBox="0 0 24 24"><path d="M12 7v6M12 17h.01"/></svg></span>' : t.status === "done" ? '<span class="st done"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></span>' : '<span class="st"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>';
       const def = T()[t.type] || {};
       let body = "";
       if (open) {
@@ -255,9 +261,9 @@
         else if (t.result) body = (t.result.html || outputHtml(t.result.text)) + (t.result.images || []).map((src) => `<img class="tool-img" src="${esc(src)}" alt="" />`).join("");
         else body = outputHtml(t.progress || t.body);
       }
-      rows.push(`<div class="step"><button class="step-head" data-step="${key}" aria-expanded="${open}">${st}<span class="verb">${esc(def.icon || "")}</span><span class="path">${esc(toolLabel(t))}</span>${t.status === "failed" ? '<span class="delta del">failed</span>' : ""}</button>${open ? `<div class="step-body">${body}</div>` : ""}</div>`);
+      rows.push(`<div class="step"><button class="step-head" data-step="${key}" aria-expanded="${open}">${st}<span class="verb">${def.icon ? F.icon(def.icon) : ""}</span><span class="path">${esc(toolLabel(t))}</span>${t.status === "failed" ? '<span class="delta del">failed</span>' : ""}</button>${open ? `<div class="step-body">${body}</div>` : ""}</div>`);
     });
-    if (m.deploy) rows.push(`<div class="step"><div class="step-head"><span class="st ${m.deploy.state === "ERROR" ? "fail" : m.deploy.state === "READY" ? "done" : "run"}">${m.deploy.state === "READY" ? "✓" : m.deploy.state === "ERROR" ? "!" : ""}</span><span class="verb">Deploy</span><span class="path">${esc(m.deploy.url || "")}</span><span class="delta">${esc(m.deploy.state || "")}</span></div></div>`);
+    if (m.deploy) rows.push(`<div class="step"><div class="step-head"><span class="st ${m.deploy.state === "ERROR" ? "fail" : m.deploy.state === "READY" ? "done" : "run"}">${m.deploy.state === "READY" ? '<svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>' : m.deploy.state === "ERROR" ? '<svg viewBox="0 0 24 24"><path d="M12 7v6M12 17h.01"/></svg>' : ""}</span><span class="verb">Deploy</span><span class="path">${esc(m.deploy.url || "")}</span><span class="delta">${esc(m.deploy.state || "")}</span></div></div>`);
 
     // One summary line per message, like "Read 4 files, created 2 files and ran 1 command" — click to see each step.
     const created = (m.changes || []).filter((c) => c.created).length;
@@ -272,6 +278,9 @@
     const failed = tools.some((x) => x.status === "failed") || Object.keys(m.editErrors || {}).length > 0;
     const waiting = tools.some((x) => x.status === "waiting") || staged.some((x) => !x.decided);
     let label = bits.length ? bits.join(", ").replace(/, ([^,]*)$/, " and $1") : "";
+    // A few tool calls and no file changes: say exactly what happened ("Clicked “Sign up”").
+    const doneTools = tools.filter((x) => x.status === "done" || x.status === "failed");
+    if (!created && !edited && !staged.length && doneTools.length && doneTools.length <= 3 && doneTools.length === tools.length) label = doneTools.map((x) => toolLabel(x)).join(" · ");
     label = label && label[0].toUpperCase() + label.slice(1);
     if (writing) label = `Writing ${writing.path}…`;
     else if (running) label = `${toolLabel(running)}…`;
@@ -280,9 +289,9 @@
     const open = state.expanded.has(key) || waiting;
     const busy = m.pending || running;
     const activity = rows.length && label
-      ? `<div class="activity"><button class="act-head" data-step="${key}" aria-expanded="${open}">${busy ? '<span class="st run"></span>' : `<span class="act-ic">${failed ? "!" : "⌘"}</span>`}<span>${esc(label)}</span>${failed && !busy ? '<span class="act-warn">needs attention</span>' : ""}${waiting ? '<span class="act-warn">waiting for you</span>' : ""}<svg class="i chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>${open ? `<div class="steps">${rows.join("")}</div>` : ""}</div>`
+      ? `<div class="activity"><button class="act-head" data-step="${key}" aria-expanded="${open}">${busy ? '<span class="st run"></span>' : `<span class="act-ic${failed ? " fail" : ""}">${F.icon(failed ? "alert" : actIcon(tools, m))}</span>`}<span>${esc(label)}</span>${failed && !busy ? '<span class="act-warn">needs attention</span>' : ""}${waiting ? '<span class="act-warn">waiting for you</span>' : ""}<svg class="i chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>${open ? `<div class="steps">${rows.join("")}</div>` : ""}</div>`
       : "";
-    const skills = (m.skills || []).map((k) => `<div class="act-line"><span class="act-ic">${esc(k.icon || "✦")}</span><span>Used the <b>${esc(k.name)}</b> skill${k.auto ? " <small>(automatic)</small>" : ""}</span></div>`).join("");
+    const skills = (m.skills || []).map((k) => `<div class="act-line"><span class="act-ic">${F.skills.glyph(k)}</span><span>Used the <b>${esc(k.name)}</b> skill${k.auto ? " <small>(automatic)</small>" : ""}</span></div>`).join("");
     const plan = parsed.plan;
     const planKey = `${m.id}:plan`;
     const planOpen = !state.expanded.has(planKey);
@@ -302,7 +311,7 @@
     if (!c || !c.messages.length) {
       const empty = !Object.keys(project().files).length;
       th.innerHTML = `<div class="dev-welcome"><div><h1>${empty ? "What do you want to build?" : `Continue ${esc(project().name)}`}</h1><p>${empty ? "Describe it and Fizz Code writes the files. You'll see the code and a live preview side by side." : "Ask for a change, a fix or a new feature."}</p></div>
-        <div class="starter${state.allTemplates ? " all" : ""}">${STARTERS.map(([ic, t, p], i) => `<button data-starter="${i}" title="${esc(p)}"><span class="st-ic">${ic}</span><b>${t}</b><span>${esc(p)}</span></button>`).join("")}</div>
+        <div class="starter${state.allTemplates ? " all" : ""}">${STARTERS.map(([ic, t, p], i) => `<button data-starter="${i}" title="${esc(p)}"><span class="st-ic">${F.icon(ic)}</span><b>${t}</b><span>${esc(p)}</span></button>`).join("")}</div>
         ${state.allTemplates ? "" : `<button type="button" class="link" data-all-templates>More templates (${STARTERS.length - 6})</button>`}
         <div class="connect-row"><button class="btn btn-outline btn-sm" data-act="gh-import">Import from GitHub</button><button class="btn btn-outline btn-sm" data-act="gdoc-import">Import a Google Doc</button><button class="btn btn-outline btn-sm" data-act="settings-conn">Connections</button></div></div>`;
       return;
@@ -312,13 +321,15 @@
     const lastAssistant = [...c.messages].reverse().find((x) => x.role === "assistant");
     th.innerHTML = c.messages.map((m, i) => {
       const t = new Date(m.at || Date.now()).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+      // Tool results going back to Fizz Code are part of one continuous turn: they're already shown in each step.
+      if (m.role === "user" && m.auto && !m.summary) return "";
       if (m.role === "user" && (m.auto || m.summary)) {
         const key = `${m.id}:auto`;
         const open = state.expanded.has(key);
-        return `<div class="auto-msg"><button class="act-head" data-step="${key}" aria-expanded="${open}"><span class="act-ic">${m.summary ? "≡" : "↳"}</span><span>${esc(m.summary ? "Earlier messages were summarised to save context" : m.autoLabel || "Sent the results back to Fizz Code")}</span><svg class="i chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>${open ? `<div class="step-body auto-body">${outputHtml(m.content)}</div>` : ""}</div>`;
+        return `<div class="auto-msg"><button class="act-head" data-step="${key}" aria-expanded="${open}"><span class="act-ic">${F.icon(m.summary ? "list" : "reply")}</span><span>${esc(m.summary ? "Earlier messages were summarised to save context" : m.autoLabel || "Sent the results back to Fizz Code")}</span><svg class="i chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>${open ? `<div class="step-body auto-body">${outputHtml(m.content)}</div>` : ""}</div>`;
       }
       if (m.role === "user") {
-        const chips = [...(m.attachments || []).map((a) => `<span class="chip">${esc(a.name)}</span>`), ...(m.mentions || []).map((f) => `<span class="chip mention">@${esc(f)}</span>`), ...(m.selection ? [`<span class="chip mention">🎯 ${esc(m.selection.label)}</span>`] : [])].join("");
+        const chips = [...(m.attachments || []).map((a) => `<span class="chip">${esc(a.name)}</span>`), ...(m.mentions || []).map((f) => `<span class="chip mention">@${esc(f)}</span>`), ...(m.selection ? [`<span class="chip mention">${F.icon("target")}${esc(m.selection.label)}</span>`] : [])].join("");
         return `<div class="u-wrap">${chips ? `<div class="chips">${chips}</div>` : ""}<div class="u-msg">${esc(m.content)}</div><div class="meta"><span>${{ ask: "Ask", plan: "Plan" }[m.mode] || "Build"}</span><span>${t}</span></div></div>`;
       }
       const { html, prose, asks, cards } = stepsHtml(m);
@@ -330,7 +341,7 @@
         : prose ? `<div class="md">${F.markdown(prose)}</div>` : "";
       const askHtml = asks.map((q, k) => {
         const answered = m.answers?.[k];
-        if (answered) return `<div class="ask done"><b>${esc(q.attrs.question || "Question")}</b><span class="ask-answer">↳ ${esc(answered)}</span></div>`;
+        if (answered) return `<div class="ask done"><b>${esc(q.attrs.question || "Question")}</b><span class="ask-answer">${esc(answered)}</span></div>`;
         if (m.pending || !last) return "";
         const opts = (q.attrs.options || "").split("|").map((o) => o.trim()).filter(Boolean).slice(0, 8);
         const multi = q.attrs.multi === "true";
@@ -340,7 +351,7 @@
       }).join("");
       const next = c.messages[i + 1];
       const turnEnd = !next || (next.role === "user" && !next.auto);
-      if (!turnEnd && !m.pending) return `<div class="a-msg">${html}${thinking}${body}${cards}${askHtml}<div class="a-actions"><span style="padding:4px 8px">${t} · step ${m.step || 1}</span></div></div>`;
+      if (!turnEnd && !m.pending) return `<div class="a-msg mid">${html}${thinking}${body}${cards}${askHtml}</div>`;
       const reverted = m.changes?.length && m.reverted;
       const canRestore = !last && !m.pending && project().history.some((h) => !h.reverted && h.at > (m.doneAt || m.at));
       const actions = m.pending ? "" : `<div class="a-actions">${m.content ? `<button data-copy="${i}">Copy</button>` : ""}${m.mode === "plan" && last && !m.error ? `<button data-approve-plan="${m.id}" class="primary">Approve plan &amp; build</button>` : ""}${m.changes?.length && !m.reverted ? `<button data-revert="${m.id}">Revert ${m.changes.length} change${m.changes.length === 1 ? "" : "s"}</button>` : ""}${reverted ? `<span style="padding:4px 8px">Changes reverted</span>` : ""}${canRestore ? `<button data-restore="${m.id}" title="Put every file back the way it was right after this reply">Restore to here</button>` : ""}${last && !m.error ? `<button data-regen>Regenerate</button>` : ""}${m.changes?.length ? `<button data-act="preview">Open preview</button><button data-push="${m.id}" class="${m.pushAsked ? "primary" : ""}">Push to GitHub</button>` : ""}${m.loopStopped && last ? `<button data-continue="${m.id}" class="primary">Keep going</button>` : ""}<span style="padding:4px 8px">${t} · ${esc(m.model || "")}${m.step > 1 ? ` · step ${m.step}` : ""}</span></div>`;
@@ -368,18 +379,18 @@
     $("#activity").innerHTML = !msgs.length
       ? `<p class="act-empty">Progress, outputs and skills for this chat appear here.</p>`
       : sec("Activity", `<div class="act-row"><span>Skills</span><b>${skills.size} used</b></div><div class="act-row"><span>Tool steps</span><b>${cmds.length}</b></div><div class="act-row"><span>Messages</span><b>${replies.length}</b></div>`)
-        + sec("Progress", plan ? plan.map((t) => `<div class="act-task ${t.done ? "done" : ""}"><span class="tk">${t.done ? "✓" : ""}</span><span>${esc(t.text)}</span><small>${t.done ? "Done" : state.controller && last === replies.at(-1) ? "In progress" : "Pending"}</small></div>`).join("") : `<p class="act-empty">No task list yet.</p>`)
+        + sec("Progress", plan ? plan.map((t) => `<div class="act-task ${t.done ? "done" : ""}"><span class="tk">${t.done ? '<svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>' : ""}</span><span>${esc(t.text)}</span><small>${t.done ? "Done" : state.controller && last === replies.at(-1) ? "In progress" : "Pending"}</small></div>`).join("") : `<p class="act-empty">No task list yet.</p>`)
         + sec("Outputs", outputs.size ? [...outputs.values()].map((ch) => `<button class="act-file" data-open-file="${esc(ch.path)}"><span>${esc(ch.path)}</span><small><span class="add">+${ch.added}</span> <span class="del">−${ch.removed}</span></small></button>`).join("") : `<p class="act-empty">No files changed yet.</p>`)
-        + sec("Skills", skills.size ? [...skills.values()].map((k) => `<div class="act-row"><span>${esc(k.icon || "✦")} ${esc(k.name)}</span><small>${k.n}×</small></div>`).join("") : `<p class="act-empty">None used. Press + in the composer to add one.</p>`)
+        + sec("Skills", skills.size ? [...skills.values()].map((k) => `<div class="act-row"><span>${esc(k.name)}</span><small>${k.n}×</small></div>`).join("") : `<p class="act-empty">None used. Press + in the composer to add one.</p>`)
         + sec("Sources", sources.length ? sources.map((a) => `<div class="act-row"><span>${esc(a.name)}</span></div>`).join("") : `<p class="act-empty">No attachments.</p>`);
   }
 
   function renderComposer() {
     $("#input").placeholder = { ask: "Ask Fizz Code about your code…", plan: "Describe what to plan — Fizz Code builds after you approve" }[state.mode] || "Work with Fizz Code  ·  @ to mention a file";
     const pinned = (project().skills || []).map((id) => F.skills.byId(data, id)).filter((x) => x?.enabled);
-    $("#skill-chips").innerHTML = pinned.map((k) => `<span class="chip skill"><span>${esc(k.icon || "✦")}</span>${esc(k.name)}<button type="button" data-unskill="${k.id}" aria-label="Turn off ${esc(k.name)}">✕</button></span>`).join("");
+    $("#skill-chips").innerHTML = pinned.map((k) => `<span class="chip skill">${F.skills.glyph(k)}${esc(k.name)}<button type="button" data-unskill="${k.id}" aria-label="Turn off ${esc(k.name)}">${F.icon("x")}</button></span>`).join("");
     $("#skill-chips").classList.toggle("hidden", !pinned.length && !state.selection);
-    if (state.selection) $("#skill-chips").insertAdjacentHTML("afterbegin", `<span class="chip mention">🎯 ${esc(state.selection.label)}<button type="button" data-unselect aria-label="Clear selection">✕</button></span>`);
+    if (state.selection) $("#skill-chips").insertAdjacentHTML("afterbegin", `<span class="chip mention">${F.icon("target")}${esc(state.selection.label)}<button type="button" data-unselect aria-label="Clear selection">${F.icon("x")}</button></span>`);
     const cu = contextUse();
     const ring = $("#ctx");
     ring.style.setProperty("--p", cu.pct);
@@ -388,7 +399,7 @@
     ring.setAttribute("aria-label", ring.title);
     $$(".mode button").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.mode === state.mode)));
     $("#model-btn").innerHTML = `${esc(F.providerLabel(data.settings, "dev"))} <svg class="i" viewBox="0 0 24 24" style="width:14px"><path d="M6 9l6 6 6-6"/></svg>`;
-    $("#pending").innerHTML = state.pending.map((a, i) => `<span class="chip">${esc(a.name)}<button type="button" data-rm="${i}" aria-label="Remove ${esc(a.name)}">✕</button></span>`).join("");
+    $("#pending").innerHTML = state.pending.map((a, i) => `<span class="chip">${esc(a.name)}<button type="button" data-rm="${i}" aria-label="Remove ${esc(a.name)}">${F.icon("x")}</button></span>`).join("");
     $("#pending").classList.toggle("hidden", !state.pending.length);
     const busy = Boolean(state.controller);
     $("#send").innerHTML = busy ? '<svg class="i" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor"/></svg>' : '<svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg>';
@@ -418,7 +429,8 @@
     }).join("\n");
     const mode = state.mode;
     const memory = typeof p.files["FIZZ.md"] === "string" && !isBinary(p.files["FIZZ.md"]) ? p.files["FIZZ.md"].slice(0, 8000) : "";
-    const tools = Object.entries(F.agentTools.registry).filter(([, d]) => d.prompt && (!d.available || d.available())).map(([, d]) => `- ${d.prompt}`).join("\n");
+    const tools = Object.entries(F.agentTools.registry).filter(([, d]) => d.prompt && (!d.available || d.available())).map(([, d]) => `- ${d.prompt}`)
+      .concat(Object.values(F.agentTools.registry).filter((d) => d.unavailable && d.available && !d.available()).map((d) => `- ${d.unavailable}`)).join("\n");
     return [
       "You are Fizz Code, the coding agent of FIZZ DEV by RANEDDIE. You help people build websites, web apps, games, documents and other software, and you work step by step like an engineer: plan, act, check the results, fix, finish.",
       `Project: "${p.name}". The user's name is ${user.name}. Today is ${new Date().toDateString()}.`,
@@ -546,7 +558,7 @@
     renderAll();
     const c = chat();
     if (document.hidden || F.app.current() !== "dev") {
-      document.title = `${why === "question" || why === "approval" || why === "review" ? "● Waiting for you" : "✓ Done"} · FIZZ DEV`;
+      document.title = `${why === "question" || why === "approval" || why === "review" ? "Waiting for you" : "Done"} · FIZZ DEV`;
       try {
         if (data.settings.notify !== false && "Notification" in window && Notification.permission === "granted") {
           const n = new Notification(why === "question" ? "Fizz Code has a question" : why === "approval" || why === "review" ? "Fizz Code is waiting for you" : reply.error ? "Fizz Code stopped with an error" : "Fizz Code finished", { body: c?.title || project().name, icon: "assets/mark-fizz-dev.png", tag: "fizz-dev" });
@@ -555,7 +567,7 @@
       } catch {}
     }
   }
-  document.addEventListener("visibilitychange", () => { if (!document.hidden && /· FIZZ DEV$/.test(document.title) && /^(✓|●)/.test(document.title)) renderHeader(); });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && /· FIZZ DEV$/.test(document.title) && /^(Done|Waiting for you) ·/.test(document.title)) renderHeader(); });
 
   // ---------- tools ----------
   async function runTools(reply) {
@@ -619,10 +631,10 @@
   // The project terminal: commands run on the project's files right away (every change is in the file history,
   // so it can be reverted). Turn on "Ask before running commands" in Settings to approve each one.
   F.agentTools.register("run", {
-    icon: "$", feedback: true,
+    icon: "terminal", feedback: true,
     label: (t) => t.body.split("\n")[0].slice(0, 120),
     summary: (k) => `ran ${k} command${k === 1 ? "" : "s"}`,
-    prompt: "<fizz-run>command</fizz-run> runs one command in the project's terminal: ls, cat, tree, grep, head, tail, wc, mkdir, mv, cp, rm, echo > file, `node file.js` (JavaScript in an isolated worker; top-level await works) and `python file.py` (Python 3 in the browser). Scripts can make real documents: require('docx') (Word), require('xlsx') (Excel, SheetJS), require('pptxgenjs') (PowerPoint), require('jspdf') / require('pdf-lib') (PDF), and save them with fizz.writeFile('out/report.docx', data) (data: string, Uint8Array, ArrayBuffer or Blob; e.g. await docx.Packer.toBlob(doc), XLSX.write(wb, { type: 'array', bookType: 'xlsx' }), await pptx.write({ outputType: 'uint8array' }), pdf.output('arraybuffer')). Then show the file with <fizz-attach path='…'/>. No npm install or git here — use <fizz-sandbox> for those when it's listed.",
+    prompt: "<fizz-run>command</fizz-run> runs a command line in the project's terminal (a bash-like shell: pipes, &&, ||, ;, > >> <, $VARS, * globs). Built in and instant: ls, cat, grep -rn, find, sed -i, awk, sort, uniq, wc, head, tail, cut, tr, diff, jq, xargs, tee, mkdir -p, rm -rf, cp -r, mv, touch, curl/wget (save pages with -o), zip/unzip, base64, `node file.js` (JavaScript in an isolated worker; top-level await works) and `python file.py` / `pip install` (Python 3 in the browser). Scripts can make real documents: require('docx') (Word), require('xlsx') (Excel, SheetJS), require('pptxgenjs') (PowerPoint), require('jspdf') / require('pdf-lib') (PDF), and save them with fizz.writeFile('out/report.docx', data) (data: string, Uint8Array, ArrayBuffer or Blob; e.g. await docx.Packer.toBlob(doc), XLSX.write(wb, { type: 'array', bookType: 'xlsx' }), await pptx.write({ outputType: 'uint8array' }), pdf.output('arraybuffer')). Then show the file with <fizz-attach path='…'/>. npm, npx, git, make and other programs run in real Linux in the cloud sandbox automatically (when it's turned on for this site).",
     needsApproval: () => data.settings.askBeforeRun === true,
     async run(t, ctx) {
       const term = ctx.term();
@@ -640,7 +652,7 @@
     return /claude|gpt-4o|gpt-4\.1|gpt-5|gemini|vision|-vl|vl-|llava|pixtral|glm-4\.?5?v|qwen.*vl|grok-.*vision|llama-?4|mistral-(small|medium)-3/i.test(id || "");
   }
   F.agentTools.register("screenshot", {
-    icon: "◫", feedback: true,
+    icon: "image", feedback: true,
     label: (t) => `Screenshot ${t.attrs.path || "the preview"}${t.attrs.device ? ` (${t.attrs.device})` : ""}`,
     summary: (k) => `took ${k} screenshot${k === 1 ? "" : "s"}`,
     prompt: '<fizz-screenshot path="index.html" device="desktop|tablet|phone"/> renders a page of the preview, waits for its scripts, and shows you a screenshot plus any console errors, so you can check the design and fix what looks wrong.',
@@ -887,6 +899,9 @@
         openFile: (path) => openFile(path),
         preview: (path) => { state.previewPath = path || ""; showTab("browser"); refreshPreview(); },
         projectName: () => project().name,
+        userName: () => user.name || user.email?.split("@")[0] || "user",
+        sandboxAvailable: () => Boolean(F.serverStatusCached?.()?.tools?.sandbox),
+        sandbox: (cmd, opts) => F.cloudTools.sandbox(cmd, { ...opts, project: project(), write: (p, c) => { writeFile(p, c, { source: "terminal" }); save(); renderTree(); renderHeader(); if (p === state.file) renderEditor(); } }),
       });
       return term;
   }
@@ -926,7 +941,7 @@
         if (k.endsWith("/")) {
           const dir = prefix + k.slice(0, -1);
           const closed = state.collapsedDirs.has(dir);
-          return `<button class="dir" data-dir="${esc(dir)}" ${pad} role="treeitem" aria-expanded="${!closed}">${closed ? "▸" : "▾"} ${esc(k)}</button>${closed ? "" : walk(node[k], depth + 1, dir + "/")}`;
+          return `<button class="dir" data-dir="${esc(dir)}" ${pad} role="treeitem" aria-expanded="${!closed}"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>${esc(k)}</button>${closed ? "" : walk(node[k], depth + 1, dir + "/")}`;
         }
         const path = node[k];
         return `<button data-file="${esc(path)}" ${pad} role="treeitem" class="${path === state.file ? "on" : ""} ${changed.has(path) ? "changed" : ""}" title="${esc(path)}">${esc(k)}</button>`;
@@ -1032,7 +1047,7 @@
 
   // ---------- browser preview ----------
   // Design mode: hover outlines elements; a click sends a description of the element to FIZZ DEV.
-  const SELECT_BRIDGE = `var sel=false,hov=null,box=null;function outline(el){if(!box){box=document.createElement("div");box.style.cssText="position:fixed;pointer-events:none;z-index:2147483647;border:2px solid #1ccaff;background:rgba(28,202,255,.12);border-radius:4px;transition:all .06s"}if(!el){box.remove();return}var r=el.getBoundingClientRect();box.style.left=r.left+"px";box.style.top=r.top+"px";box.style.width=r.width+"px";box.style.height=r.height+"px";document.documentElement.appendChild(box)}function path(el){var p=[];while(el&&el.nodeType===1&&el!==document.documentElement&&p.length<5){if(el.id){p.unshift("#"+el.id);break}var s=el.tagName.toLowerCase(),c=(el.getAttribute("class")||"").trim().split(/\\s+/).filter(Boolean).slice(0,2);if(c.length)s+="."+c.join(".");var sib=el.parentNode?[].filter.call(el.parentNode.children,function(x){return x.tagName===el.tagName}):[];if(sib.length>1)s+=":nth-of-type("+(sib.indexOf(el)+1)+")";p.unshift(s);el=el.parentElement}return p.join(" > ")}addEventListener("message",function(e){if(e.data&&e.data.fizz==="select-mode"){sel=!!e.data.on;document.documentElement.style.cursor=sel?"crosshair":"";if(!sel)outline(null)}});addEventListener("mousemove",function(e){if(!sel)return;hov=e.target;outline(hov)},true);addEventListener("click",function(e){if(!sel)return;e.preventDefault();e.stopPropagation();var el=e.target,t=(el.innerText||el.getAttribute("alt")||el.getAttribute("aria-label")||"").trim().replace(/\\s+/g," ").slice(0,60);parent.postMessage({fizz:"selected",selector:path(el),label:el.tagName.toLowerCase()+(t?" \u201c"+t+"\u201d":""),html:el.outerHTML.slice(0,1500)},"*");sel=false;document.documentElement.style.cursor="";outline(null)},true);`;
+  const SELECT_BRIDGE = `var sel=false,hov=null,box=null;function outline(el){if(!box){box=document.createElement("div");box.style.cssText="position:fixed;pointer-events:none;z-index:2147483647;border:2px solid #d0612e;background:rgba(208,97,46,.10);border-radius:4px;transition:all .06s"}if(!el){box.remove();return}var r=el.getBoundingClientRect();box.style.left=r.left+"px";box.style.top=r.top+"px";box.style.width=r.width+"px";box.style.height=r.height+"px";document.documentElement.appendChild(box)}function path(el){var p=[];while(el&&el.nodeType===1&&el!==document.documentElement&&p.length<5){if(el.id){p.unshift("#"+el.id);break}var s=el.tagName.toLowerCase(),c=(el.getAttribute("class")||"").trim().split(/\\s+/).filter(Boolean).slice(0,2);if(c.length)s+="."+c.join(".");var sib=el.parentNode?[].filter.call(el.parentNode.children,function(x){return x.tagName===el.tagName}):[];if(sib.length>1)s+=":nth-of-type("+(sib.indexOf(el)+1)+")";p.unshift(s);el=el.parentElement}return p.join(" > ")}addEventListener("message",function(e){if(e.data&&e.data.fizz==="select-mode"){sel=!!e.data.on;document.documentElement.style.cursor=sel?"crosshair":"";if(!sel)outline(null)}});addEventListener("mousemove",function(e){if(!sel)return;hov=e.target;outline(hov)},true);addEventListener("click",function(e){if(!sel)return;e.preventDefault();e.stopPropagation();var el=e.target,t=(el.innerText||el.getAttribute("alt")||el.getAttribute("aria-label")||"").trim().replace(/\\s+/g," ").slice(0,60);parent.postMessage({fizz:"selected",selector:path(el),label:el.tagName.toLowerCase()+(t?" \u201c"+t+"\u201d":""),html:el.outerHTML.slice(0,1500)},"*");sel=false;document.documentElement.style.cursor="";outline(null)},true);`;
   const BRIDGE = `<script>(function(){var P=parent;function s(l,a){try{P.postMessage({fizz:"console",level:l,text:Array.prototype.map.call(a,function(v){try{return typeof v==="string"?v:v instanceof Error?(v.stack||v.message):JSON.stringify(v)}catch(e){return String(v)}}).join(" ")},"*")}catch(e){}}["log","info","warn","error","debug"].forEach(function(l){var o=console[l];console[l]=function(){s(l,arguments);return o.apply(console,arguments)}});addEventListener("error",function(e){s("error",[e.message+(e.lineno?" (line "+e.lineno+")":"")])});addEventListener("unhandledrejection",function(e){s("error",["Unhandled rejection: "+(e.reason&&e.reason.message||e.reason)])});document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[href]");if(!a)return;var h=a.getAttribute("href");if(!h||/^(https?:|mailto:|tel:|#|javascript:)/i.test(h))return;e.preventDefault();P.postMessage({fizz:"navigate",href:h},"*")},true);${F.docs.CAPTURE_BRIDGE}${SELECT_BRIDGE}})();<\/script>`;
   /** Bare ES module imports (import x from "lib") resolve to esm.sh, so npm packages work without a build step. */
   function withImportMap(html) {
@@ -1396,11 +1411,11 @@
     const k = await menu(e.currentTarget, [
       { k: "local", html: "Add photos & files" }, { k: "drive", html: "From Google Drive" }, "-",
       { label: "Skills" },
-      ...skills.map((x) => ({ k: `skill:${x.id}`, html: `<span>${pinned.includes(x.id) ? "✓ " : ""}${esc(x.icon || "✦")} ${esc(x.name)}<small>${esc(x.description || "")}</small></span>` })),
+      ...skills.map((x) => ({ k: `skill:${x.id}`, html: `${F.skills.glyph(x)}<span>${esc(x.name)}<small>${esc(x.description || "")}</small></span>${pinned.includes(x.id) ? `<span class="menu-check">${F.icon("check")}</span>` : ""}` })),
       { k: "skills", html: "Manage skills…" }, "-",
       { label: "Agent" },
-      { k: "opt:reviewChanges", html: `${data.settings.reviewChanges ? "✓ " : ""}Review changes before applying` },
-      { k: "opt:askBeforeRun", html: `${data.settings.askBeforeRun ? "✓ " : ""}Ask before running commands` },
+      { k: "opt:reviewChanges", html: `<span>Review changes before applying</span>${data.settings.reviewChanges ? `<span class="menu-check">${F.icon("check")}</span>` : ""}` },
+      { k: "opt:askBeforeRun", html: `<span>Ask before running commands</span>${data.settings.askBeforeRun ? `<span class="menu-check">${F.icon("check")}</span>` : ""}` },
       { k: "memory", html: "Project memory (FIZZ.md)…" },
     ]);
     if (k?.startsWith("opt:")) { const o = k.slice(4); data.settings[o] = !data.settings[o]; save(); F.toast(`${o === "reviewChanges" ? "Review changes" : "Ask before running"}: ${data.settings[o] ? "on" : "off"}`); }
@@ -1796,7 +1811,7 @@
       { g: "Settings", label: "Skills…", run: () => manageSkills() },
       { g: "Settings", label: `${data.settings.reviewChanges ? "Stop reviewing" : "Review"} changes before applying`, run: () => { data.settings.reviewChanges = !data.settings.reviewChanges; save(); F.toast(`Review changes: ${data.settings.reviewChanges ? "on" : "off"}`); } },
       ...data.projects.filter((p) => p.id !== state.projectId).map((p) => ({ g: "Projects", label: p.name, hint: `${Object.keys(p.files).length} files`, run: () => selectProject(p.id) })),
-      ...STARTERS.map(([ic, t, pr]) => ({ g: "Templates", label: `${ic} ${t}`, run: () => { newChat(); $("#input").value = pr; grow(); $("#input").focus(); } })),
+      ...STARTERS.map(([ic, t, pr]) => ({ g: "Templates", label: t, icon: ic, run: () => { newChat(); $("#input").value = pr; grow(); $("#input").focus(); } })),
     ];
     const words = q.toLowerCase().split(/\s+/).filter(Boolean);
     const hits = words.length ? list.filter((c) => words.every((w) => `${c.g} ${c.label} ${c.hint || ""}`.toLowerCase().includes(w))) : list.filter((c) => c.g !== "Templates");
@@ -1806,6 +1821,7 @@
     }
     return hits.slice(0, 60);
   }
+  const PAL_ICON = { Chat: "chat", Files: "file", Ship: "upload", View: "layout", Settings: "gear", Projects: "folder", Templates: "spark", Web: "globe", "Fizz Code": "send" };
   function palette() {
     const $ = (q) => document.querySelector(q);
     let d = $("#palette");
@@ -1813,7 +1829,7 @@
       d = document.createElement("dialog");
       d.id = "palette";
       d.className = "dlg palette";
-      d.innerHTML = `<div class="pal-body"><input class="input" id="pal-q" placeholder="Type a command, a project, or something to search…" autocomplete="off" spellcheck="false" /><div class="pal-list" id="pal-list" role="listbox"></div><div class="pal-foot"><span>↑↓ to move</span><span>Enter to run</span><span>Esc to close</span></div></div>`;
+      d.innerHTML = `<div class="pal-body"><input class="input" id="pal-q" placeholder="Type a command, a project, or something to search…" autocomplete="off" spellcheck="false" /><div class="pal-list" id="pal-list" role="listbox"></div><div class="pal-foot"><span><kbd>↑</kbd><kbd>↓</kbd> move</span><span><kbd>Enter</kbd> run</span><span><kbd>Esc</kbd> close</span></div></div>`;
       document.body.appendChild(d);
       d.addEventListener("click", (e) => { if (e.target === d) d.close(); });
     }
@@ -1823,7 +1839,7 @@
       items = commands(input.value);
       idx = Math.min(idx, Math.max(0, items.length - 1));
       let g = "";
-      $("#pal-list").innerHTML = items.length ? items.map((c, i) => { const head = c.g !== g ? `<div class="pal-g">${esc((g = c.g))}</div>` : ""; return `${head}<button type="button" data-i="${i}" class="${i === idx ? "on" : ""}" role="option" aria-selected="${i === idx}"><span>${esc(c.label)}</span>${c.hint ? `<small>${esc(c.hint)}</small>` : ""}</button>`; }).join("") : `<p class="muted-sm" style="padding:12px">Nothing found.</p>`;
+      $("#pal-list").innerHTML = items.length ? items.map((c, i) => { const head = c.g !== g ? `<div class="pal-g">${esc((g = c.g))}</div>` : ""; return `${head}<button type="button" data-i="${i}" class="${i === idx ? "on" : ""}" role="option" aria-selected="${i === idx}">${F.icon(c.icon || PAL_ICON[c.g] || "dot")}<span>${esc(c.label)}</span>${c.hint ? `<small>${esc(c.hint)}</small>` : ""}</button>`; }).join("") : `<p class="muted-sm" style="padding:12px">Nothing found.</p>`;
       $("#pal-list .on")?.scrollIntoView({ block: "nearest" });
     };
     const run = (i) => { const c = items[i]; if (!c) return; d.close(); setTimeout(() => c.run(), 0); };
@@ -1867,6 +1883,7 @@
 
   window.addEventListener("fizz:settings", () => { state.mode = data.settings.devMode || state.mode; renderAll(); });
   window.addEventListener("fizz:synced", () => { if (!project()) selectProject(data.projects[0].id); renderAll(); });
+  F.dev = { term: () => ensureTerm() };
   F.web?.init({ refreshPreview: () => refreshPreview(), previewUrl: () => "/" + (state.previewPath || "index.html") });
   F.builds?.attach({ data, save, rerender: () => renderThread(), send: (text) => sendText(text) });
 

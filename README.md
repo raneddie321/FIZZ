@@ -44,9 +44,9 @@ Never put secrets in code or in chat. Set them only in Netlify or Vercel (Vercel
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | RanEddie ID sign-in (optional for users) | Same value as the RanEddie ID project (Clerk → API keys). Public by design. |
 | `CLERK_SECRET_KEY` | Saving FIZZ settings to the RanEddie ID | Same value as the RanEddie ID project. Secret. |
 | `KV_REST_API_URL`, `KV_REST_API_TOKEN` | Cloud sync, reliable daily limits, saved browser logins | Vercel → **Storage → Upstash Redis** → connect to the project (sets both). |
-| `BROWSERBASE_API_KEY` | Cloud browser (Fizz Code opens sites, clicks, types, signs in with you) and full web search | browserbase.com → Settings → API keys. Secret. Browser time is billed by Browserbase. |
+| `BROWSERBASE_API_KEY` | optional: Browserbase as the cloud browser (instead of FIZZ's own) and full web search | browserbase.com → Settings → API keys. Secret. Browser time is billed by Browserbase. |
 | `BROWSERBASE_PROJECT_ID` | optional | Only if your Browserbase account has several projects. |
-| `FIZZ_SANDBOX` | Fizz Code's own Linux sandbox (npm, git, Python, servers) — **Vercel only** | Set to `on`. Uses Vercel Sandbox (billed by Vercel); no key needed on Vercel. |
+| `FIZZ_SANDBOX` | **Turns on the cloud features — Vercel only**: Fizz Code's Linux sandbox (npm, git, Python, servers), real bash in the terminal for npm/git/any program, and FIZZ's own **cloud browser** (Chromium in the user's sandbox: any site, live screen, Fizz Code clicks/types/signs up with you) | Set to `on`. Uses Vercel Sandbox (billed by Vercel); no key needed on Vercel. The browser installs itself the first time (about a minute). `FIZZ_BROWSER=off` turns only the browser off. |
 | `BRAVE_SEARCH_API_KEY` or `TAVILY_API_KEY` | optional web search without Browserbase | api.search.brave.com or tavily.com. Without any search key, search uses Wikipedia. |
 | `FIZZ_SEARCH_LIMIT`, `FIZZ_READ_LIMIT`, `FIZZ_BROWSER_LIMIT`, `FIZZ_SANDBOX_LIMIT` | optional | Daily limits per user (defaults 200, 400, 600, 60). |
 | `FIZZ_BROWSER_MINUTES` | optional | How long a cloud browser session can stay open, default `30`. |
@@ -106,8 +106,9 @@ Any FIZZ answer that contains code has **Build in FIZZ DEV**, which hands the an
   - `<fizz-sandbox>`: its own Linux machine in the cloud (Vercel Sandbox) for `npm install`, tests, builds,
     `git` and servers with a public link. Runs without asking (unless *Ask before running* is on).
   - `<fizz-search>` / `<fizz-fetch>`: web search and reading pages.
-  - `<fizz-browser>`: a real Chrome in the cloud (Browserbase) the user watches and uses live in the
-    Browser tab. It opens sites, clicks, types, scrolls and manages tabs. For logins it asks whether you
+  - `<fizz-browser>`: a real Chrome in the cloud — FIZZ's own (Chromium in the user's Vercel Sandbox,
+    `netlify/lib/browser-agent.js`) or Browserbase — that the user watches and uses live in the Browser tab.
+    Asked to do something on a website, it does it instead of explaining. It opens sites, clicks, types, scrolls and manages tabs. For logins it asks whether you
     have an account and hands over (**Your turn**) so *you* type passwords in the browser; password and
     card fields are never typed by the AI, CAPTCHAs are handed over, and clicks that buy, send, post or
     delete need your OK. Logins are remembered per user.
@@ -117,6 +118,10 @@ Any FIZZ answer that contains code has **Build in FIZZ DEV**, which hands the an
     (.AppImage) (Electron). A live card in the chat shows progress and the downloads; if a build fails,
     **Ask Fizz Code to fix it** sends the log.
   - `<fizz-screenshot>`, `<fizz-export>` (PDF from HTML), `<fizz-attach>` (file cards), `<fizz-ask>`, `<fizz-plan>`.
+- **Terminal**: the prompt is `fizzdev/<user>/<project>`; a bash-like shell (pipes, `&&`, `||`, `;`, redirects, `$VARS`,
+  globs) with ~60 built-in commands on the project files (grep, sed, awk, find, jq, curl, zip…), Node and Python
+  in the browser, and real Linux bash in the cloud sandbox for npm, git and every other program (`cloud` switches all
+  commands there).
 - **Side panel**: Code (CodeMirror, history, diff, binary viewer), Terminal, **Browser** — the project preview
   plus web tabs: search, YouTube videos, any site that allows frames, a reader view for the rest, and the cloud
   browser — and Activity.
@@ -135,6 +140,7 @@ python3 scripts/build-static-pages.py     # regenerate public pages after editin
 node tests/netlify/functions.test.mjs     # server function tests (fake credentials)
 node tests/netlify/tools.test.mjs         # web, sync, sandbox and GitHub Actions functions
 CDP_URL=ws://… node tests/netlify/browser.test.mjs   # cloud browser actions, against a local Chrome
+node scripts/build-browser-agent.mjs      # after editing netlify/lib/browser-agent.js
 cd static-site && python3 -m http.server  # preview the static site locally
 ```
 

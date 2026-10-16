@@ -103,7 +103,7 @@
 
   function renderComposer() {
     $("#model-btn").innerHTML = `${esc(F.providerLabel(data.settings, "chat"))} <svg class="i" viewBox="0 0 24 24" style="width:14px"><path d="M6 9l6 6 6-6"/></svg>`;
-    $("#pending").innerHTML = state.pending.map((a, i) => `<span class="chip">${icon(a.type === "image" ? "image" : "file")}${esc(a.name)}<button type="button" data-rm="${i}" aria-label="Remove ${esc(a.name)}">✕</button></span>`).join("");
+    $("#pending").innerHTML = state.pending.map((a, i) => `<span class="chip">${icon(a.type === "image" ? "image" : "file")}${esc(a.name)}<button type="button" data-rm="${i}" aria-label="Remove ${esc(a.name)}">${F.icon("x")}</button></span>`).join("");
     $("#pending").classList.toggle("hidden", !state.pending.length);
     const send = $("#send");
     send.innerHTML = state.controller ? '<svg class="i" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor"/></svg>' : '<svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg>';

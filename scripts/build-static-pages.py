@@ -12,6 +12,9 @@ HEAD = """<!doctype html>
 <title>{title}</title>
 <meta name="description" content="{desc}" />
 <link rel="icon" href="icon.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" />
 <link rel="stylesheet" href="assets/site.css" />
 <script>try{{var t=localStorage.getItem("fizz.theme");t=t?JSON.parse(t):"system";if(t==="dark"||(t!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}}catch(e){{}}</script>
 <script src="assets/core.js" defer></script>
@@ -216,6 +219,9 @@ RID_HEAD = """<!doctype html>
 <link rel="icon" href="icon.svg" />
 <link rel="preconnect" href="https://fonts.googleapis.com" /><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&family=Sora:wght@600..800&display=swap" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" />
 <link rel="stylesheet" href="assets/site.css" />
 <link rel="stylesheet" href="assets/rid.css" />
 <script src="assets/core.js" defer></script>
@@ -228,7 +234,7 @@ RID_HEAD = """<!doctype html>
 <main class="rid-main">
   <a class="rid-brand" href="index.html" aria-label="RanEddie ID home"><img src="assets/raneddie-logo.png" alt="" width="56" height="44" /><span>RanEddie <span class="rid-gradient-text">ID</span></span></a>
   <div class="rid-card" id="rid-card"><noscript><p>Turn on JavaScript to sign in with RanEddie ID.</p></noscript></div>
-  <footer class="rid-footer"><span>© RanEddie</span><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><span>🔒 Secured by Clerk</span></footer>
+  <footer class="rid-footer"><span>© RanEddie</span><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><span>Secured by Clerk</span></footer>
 </main>
 </body>
 </html>

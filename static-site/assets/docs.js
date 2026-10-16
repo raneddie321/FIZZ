@@ -168,7 +168,7 @@
 
   // ---------- tools ----------
   F.agentTools.register("export", {
-    icon: "⇩", feedback: true,
+    icon: "download", feedback: true,
     label: (t) => `Export ${t.attrs.from || ""} → ${t.attrs.to || t.attrs.format || ""}`,
     summary: (k) => `exported ${k} file${k === 1 ? "" : "s"}`,
     prompt: '<fizz-export from="doc.html" to="doc.pdf" format="a4|letter|a5" landscape="false"/> turns an HTML page of the project into a PDF (lay out each page as an element exactly 794×1123px for A4 so pages break cleanly; text becomes an image, so for selectable text write a jsPDF/pdf-lib script instead). <fizz-export from="logo.svg" to="logo.png" width="512"/> makes a PNG from an SVG or image. <fizz-export from="logo.svg" format="icons"/> makes a full app icon set (icons/icon-*.png, favicon.ico, apple-touch-icon, manifest.webmanifest).',
@@ -189,7 +189,7 @@
     },
   });
   F.agentTools.register("attach", {
-    icon: "📎", card: true,
+    icon: "clip", card: true,
     label: (t) => `Attach ${t.attrs.path || t.body}`,
     prompt: '<fizz-attach path="report.pdf"/> shows a project file to the user as a card with Download (use it for documents, images and files you made for them).',
     async run(t, ctx) {

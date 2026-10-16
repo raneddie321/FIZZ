@@ -56,7 +56,8 @@ await assert.rejects(act(state, { action: "click", id: "999" }), /no element \[9
 // ---------- /api/browser with a fake Browserbase API (and the same real Chrome) ----------
 process.env.FIZZ_SECRET = "test-secret-test-secret-test-secret-123";
 process.env.BROWSERBASE_API_KEY = "bb_fake";
-const vBrowser = await import("../../api/browser.mjs");
+const { route } = await import("../../netlify/lib/vercel-adapter.mjs");
+const vBrowser = route((await import("../../netlify/functions/browser.mjs")).default, []);
 const realFetch = globalThis.fetch;
 const bbCalls = [];
 globalThis.fetch = async (url, init = {}) => {
@@ -98,4 +99,32 @@ assert.ok(bbCalls.includes("POST /sessions/sess_1"), "released");
 res = await vBrowser.POST(new Request(`${O}/api/browser`, { method: "POST", headers: { origin: "https://evil.example", cookie }, body: "{}" }));
 assert.equal(res.status, 403);
 globalThis.fetch = realFetch;
+
+// ---------- FIZZ's own cloud browser (Vercel Sandbox) with a fake sandbox pointing at a local agent ----------
+if (process.env.AGENT_URL) {
+  delete process.env.BROWSERBASE_API_KEY;
+  process.env.FIZZ_SANDBOX = "on";
+  process.env.FIZZ_SANDBOX_LOCAL = "1";
+  const { setSandboxModule } = await import("../../netlify/lib/sandbox.mjs");
+  const { tokenFor } = await import("../../netlify/lib/sandbox-browser.mjs");
+  const ran = [];
+  setSandboxModule({ Sandbox: { getOrCreate: async (o) => ({ name: o.name, domain: () => process.env.AGENT_URL, writeFiles: async () => {}, runCommand: async (c) => { ran.push(c.args?.[1] || c.cmd); } }) } });
+  process.env.AGENT_TOKEN_EXPECT = tokenFor("local");
+  if (process.env.AGENT_TOKEN && process.env.AGENT_TOKEN !== tokenFor("local")) throw new Error(`start the agent with FIZZ_BR_TOKEN=${tokenFor("local")}`);
+  cookie = "";
+  res = await call({ action: "open", url: `${SITE}/index.html` });
+  j = await res.json();
+  assert.equal(res.status, 200, JSON.stringify(j));
+  assert.equal(j.engine, "sandbox");
+  assert.equal(j.page.title, "Test Shop");
+  const tab = j.tabs.find((t) => t.active);
+  assert.match(tab.stream, /\/stream\?token=[0-9a-f]{40}&target=/, "live stream link");
+  assert.match(tab.input, /\/input\?token=/, "input link");
+  assert.equal(ran.length, 0, "a running agent isn't restarted");
+  j = await (await call({ action: "live" })).json();
+  assert.ok(j.pages.length >= 1 && j.pages[0].stream);
+  const st2 = await (await call({ action: "type", id: j.pages.length && 2, text: "shoes", enter: false })).json();
+  assert.ok(st2.text || st2.error);
+  console.log("sandbox engine OK");
+}
 console.log("All browser tests passed");

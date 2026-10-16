@@ -149,7 +149,7 @@
     },
     web: {
       search: (q, count = 8) => api(`/api/web/search?${new URLSearchParams({ q, count })}`, { auth: true }),
-      read: (url, max) => api(`/api/web/read?${new URLSearchParams({ url, ...(max ? { max } : {}) })}`, { auth: true }),
+      read: (url, max, opts = {}) => api(`/api/web/read?${new URLSearchParams({ url, ...(max ? { max } : {}), ...(opts.raw ? { raw: "1" } : {}) })}`, { auth: true }),
       frame: (url) => api(`/api/web/frame?${new URLSearchParams({ url })}`, { auth: true }),
     },
     sandbox: (body, signal) => api("/api/sandbox", { body, auth: true, signal }),

@@ -44,7 +44,7 @@ export const releaseSession = (sessionId) => bb(`/sessions/${sessionId}`, { meth
 /** Live view links for each tab, to show in FIZZ DEV (the user can click and type in them). */
 export async function liveViews(sessionId) {
   const d = await bb(`/sessions/${sessionId}/debug`);
-  return { main: d.debuggerFullscreenUrl, pages: (d.pages || []).map((p) => ({ id: p.id, url: p.url, title: p.title, live: p.debuggerFullscreenUrl })) };
+  return { main: d.debuggerFullscreenUrl, pages: (d.pages || []).map((p) => ({ id: p.id, url: redactUrl(p.url), title: p.title, live: p.debuggerFullscreenUrl })) };
 }
 
 // ---------- page scripts (run inside the page) ----------
@@ -84,15 +84,19 @@ function clearField(id) {
   return true;
 }
 
+/** Hides secrets that some forms put in links (?password=…, #access_token=…) before the AI sees them. */
+export function redactUrl(u) {
+  return String(u || "").replace(/([?&#;](?:[\w-]*(?:pass(?:word)?|pwd|passwd|secret|token|otp|code|key|auth|session|sig(?:nature)?)[\w-]*|p))=([^&#]*)/gi, (m, k, v) => (v ? `${k}=[hidden]` : m));
+}
 /** What the AI gets back after every action. */
 export function describe(p) {
-  const lines = [`Page: ${p.title || "(no title)"} — ${p.url}`];
+  const lines = [`Page: ${p.title || "(no title)"} — ${redactUrl(p.url)}`];
   if (p.captcha) lines.push("⚠ This page shows a CAPTCHA / bot check. Don't try to solve it: hand over to the user with action=\"handoff\".");
   lines.push(`Scrolled ${p.scroll.y}px of ${p.scroll.height}px (window ${p.scroll.view}px).`);
   lines.push("", "Elements (use the number with click / type / select):");
   for (const e of p.elements) {
     const kind = e.tag === "a" ? "link" : e.tag === "input" ? `input${e.type ? `:${e.type}` : ""}` : e.role || e.tag;
-    lines.push(`[${e.id}] ${kind} "${e.label}"${e.href ? ` → ${e.href}` : ""}${e.value ? ` (value: "${e.value}")` : ""}${e.checked ? " (checked)" : ""}${e.inView ? "" : " (off screen)"}`);
+    lines.push(`[${e.id}] ${kind} "${e.label}"${e.href ? ` → ${redactUrl(e.href)}` : ""}${e.value ? ` (value: "${e.value}")` : ""}${e.checked ? " (checked)" : ""}${e.inView ? "" : " (off screen)"}`);
   }
   lines.push("", "Text:", p.text + (p.more ? "\n[More text below — scroll down to read it.]" : ""));
   return lines.join("\n");
@@ -140,6 +144,21 @@ export async function act(state, a) {
     let tab = await attach(cdp, state.active);
     const max = Math.min(20000, Number(a.max) || 7000);
     let note = "";
+    // The page lays out for the size of the Browser panel the user sees it in.
+    const fit = async (t) => {
+      const v = a.viewport;
+      if (!v || !(v.w >= 320 && v.w <= 2560 && v.h >= 320 && v.h <= 2000)) return;
+      // Resize the window itself: unlike an emulation override it stays after this connection closes.
+      try {
+        const { windowId } = await cdp.send("Browser.getWindowForTarget", { targetId: t.targetId });
+        const want = { w: Math.round(v.w), h: Math.round(v.h) };
+        await cdp.send("Browser.setWindowBounds", { windowId, bounds: { width: want.w, height: want.h } });
+        // The window includes some browser chrome: correct once so the page itself gets the panel's size.
+        const got = await t.evaluate(() => ({ w: innerWidth, h: innerHeight })).catch(() => null);
+        if (got && (got.w !== want.w || got.h !== want.h)) await cdp.send("Browser.setWindowBounds", { windowId, bounds: { width: want.w + (want.w - got.w), height: want.h + (want.h - got.h) } });
+      } catch {}
+    };
+    await fit(tab);
     switch (a.action) {
       case "open": {
         let url = String(a.url || "").trim();
@@ -148,6 +167,7 @@ export async function act(state, a) {
           const { targetId } = await cdp.send("Target.createTarget", { url });
           state.active = targetId;
           tab = await attach(cdp, targetId);
+          await fit(tab);
         } else await tab.send("Page.navigate", { url });
         await settle(tab);
         break;
@@ -160,7 +180,7 @@ export async function act(state, a) {
         await sleep(900);
         const now = await pages(cdp);
         const opened = now.find((t) => !before.has(t.targetId));
-        if (opened) { state.active = opened.targetId; tab = await attach(cdp, opened.targetId); note = "The click opened a new tab; you're on it now."; }
+        if (opened) { state.active = opened.targetId; tab = await attach(cdp, opened.targetId); await fit(tab); note = "The click opened a new tab; you're on it now."; }
         await settle(tab, 8000);
         break;
       }
@@ -204,6 +224,7 @@ export async function act(state, a) {
         await cdp.send("Target.activateTarget", { targetId: t.targetId });
         state.active = t.targetId;
         tab = await attach(cdp, t.targetId);
+        await fit(tab);
         break;
       }
       case "close": {
@@ -216,7 +237,7 @@ export async function act(state, a) {
         }
         break;
       }
-      case "read": case "screenshot": case "tabs": break;
+      case "read": case "screenshot": case "tabs": case "viewport": break;
       default: throw Object.assign(new Error(`Unknown browser action "${a.action}".`), { status: 400 });
     }
     const page = await tab.evaluate(readPage, max);
@@ -225,7 +246,8 @@ export async function act(state, a) {
       const shot = await tab.send("Page.captureScreenshot", { format: "jpeg", quality: 60 });
       out.screenshot = `data:image/jpeg;base64,${shot.data}`;
     }
-    out.tabs = (await pages(cdp)).map((t) => ({ id: t.targetId, title: t.title, url: t.url, active: t.targetId === state.active }));
+    out.tabs = (await pages(cdp)).map((t) => ({ id: t.targetId, title: t.title, url: redactUrl(t.url), active: t.targetId === state.active }));
+    out.page.url = redactUrl(out.page.url);
     return out;
   } finally {
     cdp.close();

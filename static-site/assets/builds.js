@@ -131,9 +131,9 @@
       : failed
         ? b.conclusion === "not_started" ? "GitHub didn't start the workflow. Check that Actions are enabled for the repository." : (b.jobs || []).filter((j) => j.conclusion === "failure").map((j) => `${esc(j.name)} failed${j.failedStep ? ` at “${esc(j.failedStep)}”` : ""}`).join(" · ") || "The build failed."
         : `${b.name} ${b.version}`;
-    const arts = ok ? (b.artifacts || []).filter((a) => !a.expired).map((a) => `<button type="button" class="btn btn-sm" data-build-dl="${esc(b.id)}:${a.id}">⬇ ${esc(ARTIFACT_LABEL[a.name] || a.name)} <small>${F.blobs.human(a.size)}</small></button>`).join("") : "";
+    const arts = ok ? (b.artifacts || []).filter((a) => !a.expired).map((a) => `<button type="button" class="btn btn-sm" data-build-dl="${esc(b.id)}:${a.id}">${F.icon("download")}${esc(ARTIFACT_LABEL[a.name] || a.name)} <small>${F.blobs.human(a.size)}</small></button>`).join("") : "";
     return `<div class="build-card ${ok ? "ok" : failed ? "fail" : "run"}">
-      <div class="build-top"><span class="build-ic">${b.target === "android" ? "🤖" : "🖥"}</span><div class="build-txt"><b>${esc(T.label[0].toUpperCase() + T.label.slice(1))} — ${state}</b><span>${detail}</span></div>${b.status !== "completed" ? '<span class="st run"></span>' : ""}</div>
+      <div class="build-top"><span class="build-ic">${F.icon(b.target === "android" ? "phone" : "monitor")}</span><div class="build-txt"><b>${esc(T.label[0].toUpperCase() + T.label.slice(1))} — ${state}</b><span>${detail}</span></div>${b.status !== "completed" ? '<span class="st run"></span>' : ""}</div>
       ${b.error ? `<p class="muted-sm" style="color:var(--danger)">${esc(b.error)}</p>` : ""}
       <div class="build-actions">${arts}${failed && b.conclusion !== "not_started" ? `<button type="button" class="btn btn-sm" data-build-fix="${esc(b.id)}">Ask Fizz Code to fix it</button>` : ""}${b.url ? `<a class="btn btn-outline btn-sm" href="${esc(b.url)}" target="_blank" rel="noopener">View on GitHub</a>` : ""}</div>
       ${ok && b.target === "android" ? '<p class="muted-sm">The download is a ZIP. Install <b>app-debug.apk</b> on an Android phone; upload the <b>.aab</b> to Google Play.</p>' : ""}
@@ -164,7 +164,7 @@
   });
 
   F.agentTools.register("build", {
-    icon: "⚙", feedback: true,
+    icon: "box", feedback: true,
     label: (t) => `Build ${t.attrs.target === "desktop" ? "a desktop app (Windows, macOS, Linux)" : "an Android app (APK + AAB)"}${t.attrs.name ? ` — ${t.attrs.name}` : ""}`,
     summary: (k) => `started ${k} app build${k === 1 ? "" : "s"}`,
     prompt: '<fizz-build target="android|desktop" name="App name" id="com.company.app" version="1.0.0"/> turns the project into a real app, built by GitHub Actions in the user\'s repository: Android → an APK (installs on phones) and an AAB (for Google Play), desktop → Windows .exe, macOS .dmg and Linux .AppImage. The project must have index.html (or package.json with a build script). Make it mobile-friendly first (viewport meta, touch-sized buttons), and make app icons if there are none (icons/icon-512.png). The user approves before it pushes; the build takes several minutes and the user downloads the files from the card in the chat.',

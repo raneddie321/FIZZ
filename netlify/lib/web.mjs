@@ -77,10 +77,11 @@ export function htmlToText(html, base) {
   return { title, text };
 }
 
-export async function read(rawUrl, { maxChars = 20000 } = {}) {
+/** A page's readable text — or with raw, the response body as it is (for curl/wget). */
+export async function read(rawUrl, { maxChars = 20000, raw = false } = {}) {
   let u;
   try { u = new URL(String(rawUrl)); } catch { throw Object.assign(new Error("That isn't a valid link."), { status: 400 }); }
-  if (env("BROWSERBASE_API_KEY")) {
+  if (env("BROWSERBASE_API_KEY") && !raw) {
     await assertPublic(u);
     const d = await json(`${BB}/fetch`, { method: "POST", headers: { "X-BB-API-Key": env("BROWSERBASE_API_KEY"), "Content-Type": "application/json" }, body: JSON.stringify({ url: u.href, format: "markdown", allowRedirects: true }) }, "Read");
     const content = typeof d.content === "string" ? d.content : JSON.stringify(d.content);
@@ -96,7 +97,7 @@ export async function read(rawUrl, { maxChars = 20000 } = {}) {
     const chunks = [];
     while (reader) { const { done, value } = await reader.read(); if (done) break; size += value.length; chunks.push(value); if (size > 2_000_000) { reader.cancel(); break; } }
     const body = new TextDecoder().decode(Buffer.concat(chunks.map((c) => Buffer.from(c))));
-    const out = /html|xml/.test(type) ? htmlToText(body, u.href) : { title: "", text: body };
+    const out = /html|xml/.test(type) && !raw ? htmlToText(body, u.href) : { title: "", text: body };
     return { url: u.href, status: res.status, title: out.title, text: out.text.slice(0, maxChars), truncated: out.text.length > maxChars };
   }
   throw Object.assign(new Error("Too many redirects."), { status: 400 });

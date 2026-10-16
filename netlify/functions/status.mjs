@@ -1,3 +1,4 @@
+import { sandboxBrowserEnabled } from "../lib/sandbox-browser.mjs";
 import { env, getCookie, json, secretConfigured, unseal } from "../lib/util.mjs";
 import { PROVIDERS } from "../lib/providers.mjs";
 import { aiBackend } from "../lib/ai-chat-core.mjs";
@@ -21,7 +22,7 @@ export default async (req) => {
     // RanEddie ID (Clerk): the publishable key is public by design; `account` means settings sync works.
     raneddieId: { publishableKey: publishableKey(), account: clerkConfigured() },
     // Fizz Code tools: which ones this deployment can offer.
-    tools: { search: searchProvider(), browser: Boolean(env("BROWSERBASE_API_KEY")), sandbox: env("FIZZ_SANDBOX") === "on" && Boolean(env("VERCEL")), sync: kvConfigured() && clerkConfigured() },
+    tools: { search: searchProvider(), browser: Boolean(env("BROWSERBASE_API_KEY")) || sandboxBrowserEnabled(), browserEngine: env("BROWSERBASE_API_KEY") ? "browserbase" : sandboxBrowserEnabled() ? "sandbox" : null, sandbox: env("FIZZ_SANDBOX") === "on" && Boolean(env("VERCEL")), sync: kvConfigured() && clerkConfigured() },
     google: { configured: Boolean(env("GOOGLE_CLIENT_ID")), clientId: env("GOOGLE_CLIENT_ID") ?? null },
   });
 };

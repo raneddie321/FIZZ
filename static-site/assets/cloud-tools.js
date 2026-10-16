@@ -7,7 +7,7 @@
   const host = (u) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return u; } };
 
   F.agentTools.register("search", {
-    icon: "⌕", feedback: true,
+    icon: "search", feedback: true,
     label: (t) => `Searched “${(t.body || t.attrs.q || "").slice(0, 100)}”`,
     summary: (k) => `searched the web ${k === 1 ? "once" : `${k} times`}`,
     prompt: "<fizz-search>query</fizz-search> searches the web and shows you the top results (title, link, snippet). Use it for anything current or that you aren't sure about: docs, versions, prices, news. Then read the best pages with <fizz-fetch>.",
@@ -26,7 +26,7 @@
   });
 
   F.agentTools.register("fetch", {
-    icon: "↧", feedback: true,
+    icon: "globe", feedback: true,
     label: (t) => `Read ${host(t.attrs.url || t.body)}`,
     summary: (k) => `read ${k} web page${k === 1 ? "" : "s"}`,
     prompt: '<fizz-fetch url="https://…"/> reads a web page (or a JSON/text URL) and gives you its text, with links. Use it after <fizz-search>, for documentation, or for a link the user gave you.',
@@ -58,8 +58,18 @@
     return changed;
   }
 
+  /** Runs a command in the cloud sandbox for the terminal: { text, exitCode, changed, url }. */
+  async function sandbox(cmd, { project, write, background = false, isStopped = () => false }) {
+    let r = await F.conn.sandbox({ action: "run", projectId: project.id, cmd, background, files: textFiles(project.files) });
+    const started = Date.now();
+    while (r.running && !background && !isStopped() && Date.now() - started < 10 * 60_000) r = await F.conn.sandbox({ action: "wait", projectId: project.id, cmdId: r.cmdId });
+    const changed = await bringBack(r.files, { project: () => project, writeFile: (p, c) => write(p, c) });
+    return { text: String(r.text || ""), exitCode: r.running && !background ? 124 : r.exitCode, changed, url: r.url };
+  }
+  F.cloudTools = { sandbox };
+
   F.agentTools.register("sandbox", {
-    icon: "▣", feedback: true,
+    icon: "box", feedback: true,
     label: (t) => `${t.attrs.background === "true" ? "Started" : "Ran"} in the cloud: ${t.body.split("\n")[0].slice(0, 110)}`,
     summary: (k) => `ran ${k} cloud command${k === 1 ? "" : "s"}`,
     prompt: '<fizz-sandbox>command</fizz-sandbox> runs a bash command in your own Linux computer in the cloud (Node 22, npm, git, Python 3, internet access). The project\'s text files are copied in first, and files the command creates or changes come back into the project (node_modules stays there between commands). Use it without asking for npm install, npm test, npm run build, real Node/Python packages, git and anything the browser terminal can\'t do. For a server, listen on 0.0.0.0 port 3000 and add background="true": it keeps running and you get a public link.',

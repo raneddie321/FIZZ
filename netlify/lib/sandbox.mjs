@@ -7,7 +7,7 @@ import { env } from "./util.mjs";
 let mod = null;
 /** Tests replace the SDK with a fake. */
 export function setSandboxModule(m) { mod = m; }
-async function sdk() {
+export async function sdk() {
   if (mod) return mod;
   const name = "@vercel/sandbox";
   mod = await import(name);

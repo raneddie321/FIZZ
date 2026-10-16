@@ -16,7 +16,7 @@ export default async (req, context) => {
     if (!(await bump(`${today()}/web-${action}/${who.userId}`, limits[action]))) return error(429, `You've reached today's limit for ${action === "search" ? "web searches" : "reading pages"}. Try again tomorrow.`, "quota");
     const body = req.method === "POST" ? await readJson(req, 10_000) : Object.fromEntries(new URL(req.url).searchParams);
     if (action === "search") return json(await search(body.q || body.query, Number(body.count) || 8));
-    if (action === "read") return json(await read(body.url, { maxChars: Math.min(40000, Number(body.max) || 20000) }));
+    if (action === "read") return json(await read(body.url, { maxChars: Math.min(body.raw === "1" || body.raw === true ? 2_000_000 : 40000, Number(body.max) || 20000), raw: body.raw === "1" || body.raw === true }));
     if (action === "frame") return json(await frameable(body.url));
   } catch (e) {
     if (!e.status) console.error("[web]", e);

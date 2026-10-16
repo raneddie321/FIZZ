@@ -7,27 +7,30 @@
   const { esc } = F;
 
   const BUILTIN = [
-    { id: "web-design", icon: "◆", name: "Polished web design", description: "Modern, responsive pages with clear typography, spacing and color.", match: "landing|website|web ?site|homepage|portfolio|דף נחיתה|אתר",
+    { id: "web-design", icon: "layout", name: "Polished web design", description: "Modern, responsive pages with clear typography, spacing and color.", match: "landing|website|web ?site|homepage|portfolio|דף נחיתה|אתר",
       instructions: "Design like a senior product designer. Use a clear type scale (one display face, one text face, system fonts are fine), an 8px spacing grid, generous whitespace and at most two accent colors. Make every layout responsive from 360px to wide desktop with CSS grid/flex and no horizontal scroll. Use CSS custom properties for colors and support prefers-color-scheme dark. Give buttons and links visible hover and focus states. Avoid stock-template clichés (purple gradients, emoji bullets, lorem ipsum); write real, specific copy." },
-    { id: "game", icon: "▲", name: "Browser games", description: "Smooth canvas games with keyboard and touch controls.", match: "game|snake|pong|tetris|platformer|shooter|puzzle|arcade|משחק",
+    { id: "game", icon: "gamepad", name: "Browser games", description: "Smooth canvas games with keyboard and touch controls.", match: "game|snake|pong|tetris|platformer|shooter|puzzle|arcade|משחק",
       instructions: "Build games on a <canvas> with a requestAnimationFrame loop that uses delta time, so speed is the same on every screen. Scale the canvas for devicePixelRatio and resize with the window. Support keyboard (arrows + WASD) and touch (swipe or on-screen buttons). Include a start screen, pause (P / Esc), game over with restart, score and a high score saved in localStorage. Keep state in one object and separate update() from draw(). Add small juice: easing, particles or screen shake, but keep 60fps." },
-    { id: "dashboard", icon: "▦", name: "Dashboards & data", description: "Stat cards, charts and tables that read well.", match: "dashboard|admin|analytics|chart|graph|table|report|kpi|דשבורד",
+    { id: "dashboard", icon: "chart", name: "Dashboards & data", description: "Stat cards, charts and tables that read well.", match: "dashboard|admin|analytics|chart|graph|table|report|kpi|דשבורד",
       instructions: "Lay dashboards out as a KPI row, then charts, then a table. Draw charts with inline SVG (no libraries unless asked): labelled axes, readable ticks, one highlight color, tooltips on hover. Format numbers with Intl.NumberFormat. Tables get sticky headers, sorting and an empty state. Use realistic sample data in a separate data.js so it is easy to replace." },
-    { id: "rtl", icon: "א", name: "Hebrew & RTL", description: "Right-to-left layouts and Hebrew typography.", match: "hebrew|rtl|עברית|[\\u0590-\\u05FF]",
+    { id: "rtl", icon: "globe", name: "Hebrew & RTL", description: "Right-to-left layouts and Hebrew typography.", match: "hebrew|rtl|עברית|[\\u0590-\\u05FF]",
       instructions: "For Hebrew content set <html lang=\"he\" dir=\"rtl\">. Use CSS logical properties (margin-inline-start, padding-inline, inset-inline-end, text-align: start) instead of left/right. Mirror directional icons (arrows, chevrons). Use a Hebrew-friendly font stack such as \"Heebo\", \"Rubik\", \"Assistant\", Arial, sans-serif. Keep numbers, code and URLs left-to-right with dir=\"ltr\" or <bdi>. Write the UI copy in natural Hebrew." },
-    { id: "a11y", icon: "◎", name: "Accessibility", description: "Semantic HTML, keyboard use, labels and contrast.", match: "accessib|a11y|screen ?reader|keyboard|נגישות",
+    { id: "a11y", icon: "eye", name: "Accessibility", description: "Semantic HTML, keyboard use, labels and contrast.", match: "accessib|a11y|screen ?reader|keyboard|נגישות",
       instructions: "Use semantic elements (header, nav, main, button, label). Every input has a visible label, every image meaningful alt text (or alt=\"\" if decorative). Everything works with the keyboard in a logical order with a visible :focus-visible ring. Text contrast at least 4.5:1. Respect prefers-reduced-motion. Use aria-live for status messages and never rely on color alone." },
-    { id: "debug", icon: "✱", name: "Debugging", description: "Find the root cause and make the smallest fix.", match: "bug|error|fix|broken|crash|doesn'?t work|not working|exception|באג|שגיאה|לא עובד",
+    { id: "debug", icon: "wrench", name: "Debugging", description: "Find the root cause and make the smallest fix.", match: "bug|error|fix|broken|crash|doesn'?t work|not working|exception|באג|שגיאה|לא עובד",
       instructions: "Debug methodically: restate the symptom, find the root cause in the current files before writing code, then make the smallest change that fixes it. Do not rewrite unrelated code. Explain the cause in one or two sentences. When the bug is in plain JavaScript logic, add a small check script and run it with <fizz-run>node check.js</fizz-run>." },
-    { id: "tests", icon: "✓", name: "Tests", description: "Small Node test scripts you can run in the terminal.", match: "\\btests?\\b|unit test|assert|בדיקות",
+    { id: "tests", icon: "test", name: "Tests", description: "Small Node test scripts you can run in the terminal.", match: "\\btests?\\b|unit test|assert|בדיקות",
       instructions: "Write tests as plain Node scripts (tests/*.test.js) using only node:assert, no frameworks. Keep the logic under test in its own module so it can be imported without the DOM. Cover the happy path, edge cases and one failure case. Run each test file with <fizz-run>node tests/name.test.js</fizz-run> and print a clear pass summary." },
-    { id: "refactor", icon: "≋", name: "Clean refactor", description: "Tidy code without changing what it does.", match: "refactor|clean ?up|reorgani[sz]e|simplify|tidy|ארגון|לסדר את הקוד",
+    { id: "refactor", icon: "layers", name: "Clean refactor", description: "Tidy code without changing what it does.", match: "refactor|clean ?up|reorgani[sz]e|simplify|tidy|ארגון|לסדר את הקוד",
       instructions: "Refactor without changing behavior. Split large files by responsibility, remove dead code and duplication, give things clear names, and keep the public structure (file names, ids used by HTML) stable unless asked. List what moved where in your summary." },
-    { id: "seo", icon: "↗", name: "SEO & sharing", description: "Titles, meta tags and link previews.", match: "\\bseo\\b|meta tags?|open ?graph|google|share preview|search engine",
+    { id: "seo", icon: "search", name: "SEO & sharing", description: "Titles, meta tags and link previews.", match: "\\bseo\\b|meta tags?|open ?graph|google|share preview|search engine",
       instructions: "Give each page a unique <title> (under 60 chars) and meta description (under 155), one <h1>, logical heading order, Open Graph and Twitter card tags, a canonical link, descriptive link text and lazy-loaded images with width/height. Add a robots.txt and a sitemap.xml listing the pages." },
-    { id: "pwa", icon: "⬇", name: "Installable app (PWA)", description: "Manifest, icons and offline support.", match: "\\bpwa\\b|offline|installable|install the app|home screen|service worker",
+    { id: "pwa", icon: "download", name: "Installable app (PWA)", description: "Manifest, icons and offline support.", match: "\\bpwa\\b|offline|installable|install the app|home screen|service worker",
       instructions: "Make the site installable: add manifest.webmanifest (name, short_name, start_url, display standalone, theme and background colors, icons as SVG or data URLs) linked from index.html, and a service-worker.js that caches the app shell (cache-first for static files, network-first for HTML) with a versioned cache name. Register it only when 'serviceWorker' in navigator. Note that service workers need the deployed HTTPS site; the preview won't register them." },
   ];
+  /** A skill's icon as SVG (older custom skills stored a symbol; they get the default). */
+  const glyph = (s) => F.icon(/^[a-z]+$/.test(s?.icon || "") ? s.icon : "spark", "i");
+
 
   const lib = (data) => (data.skillLib ||= { custom: [], disabled: [] });
   function all(data) {
@@ -91,7 +94,7 @@
           const words = f.keywords.value.split(",").map((w) => w.trim()).filter(Boolean);
           const match = words.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
           const l = lib(data);
-          const rec = { id: s.id || `custom-${F.uid().slice(0, 8)}`, icon: "✦", name, description: f.description.value.trim(), instructions, match, keywordsText: words.join(", ") };
+          const rec = { id: s.id || `custom-${F.uid().slice(0, 8)}`, icon: "spark", name, description: f.description.value.trim(), instructions, match, keywordsText: words.join(", ") };
           const i = l.custom.findIndex((x) => x.id === rec.id);
           if (i >= 0) l.custom[i] = rec; else l.custom.push(rec);
           save(); onChange?.(); editing = null; draw();
@@ -102,7 +105,7 @@
       const list = all(data);
       d.innerHTML = `<div class="dlg-body"><h2>Skills</h2>
         <p class="desc">Skills teach Fizz Code how you like things done. Turn one on in the composer, or let it apply automatically when your message matches.</p>
-        <div class="skill-list">${list.map((s) => `<div class="skill-row ${s.enabled ? "" : "off"}"><span class="skill-ic">${esc(s.icon || "✦")}</span>
+        <div class="skill-list">${list.map((s) => `<div class="skill-row ${s.enabled ? "" : "off"}"><span class="skill-ic">${glyph(s)}</span>
           <div class="skill-body"><b>${esc(s.name)}</b><small>${esc(s.description || "")}</small><small class="muted-sm">${s.builtin ? "Built-in" : "Your skill"}${s.match ? " · automatic" : ""}</small></div>
           ${s.builtin ? "" : `<button type="button" class="btn btn-ghost btn-sm" data-edit="${s.id}">Edit</button><button type="button" class="btn btn-ghost btn-sm" data-del="${s.id}">Delete</button>`}
           <label class="switch" title="${s.enabled ? "Enabled" : "Disabled"}"><input type="checkbox" data-toggle="${s.id}" ${s.enabled ? "checked" : ""} /><span></span></label></div>`).join("")}</div>
@@ -129,5 +132,5 @@
     if (!d.open) d.showModal();
   }
 
-  F.skills = { BUILTIN, all, byId, forMessage, promptSection, manage, matches };
+  F.skills = { glyph, BUILTIN, all, byId, forMessage, promptSection, manage, matches };
 })();
