@@ -32,6 +32,7 @@
 <script src="assets/connections.js"></script>
 <script src="assets/settings.js"></script>
 <script src="assets/terminal.js"></script>
+<script src="assets/agent-tools.js"></script>
 <script src="assets/skills.js"></script>
 </head>
 <body class="apps">
@@ -126,8 +127,9 @@
             <button type="button" class="icon-btn" id="attach" aria-haspopup="menu" aria-label="Add files and skills" title="Add files and skills"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
             <input type="file" id="file" multiple hidden />
             <div class="mode" role="radiogroup" aria-label="Mode">
-              <button type="button" role="radio" data-mode="build">Build</button><button type="button" role="radio" data-mode="ask">Ask</button>
+              <button type="button" role="radio" data-mode="build" title="Fizz Code builds and runs things">Build</button><button type="button" role="radio" data-mode="plan" title="Plan first; build after you approve">Plan</button><button type="button" role="radio" data-mode="ask" title="Questions only, no file changes">Ask</button>
             </div>
+            <button type="button" class="ctx-ring" id="ctx"><span></span></button>
             <button type="button" class="model-btn" id="model-btn"></button>
             <button type="button" class="icon-btn mic" id="mic" aria-label="Dictate" title="Dictate"><svg class="i" viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
             <button type="submit" class="send" id="send" aria-label="Send"><svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
