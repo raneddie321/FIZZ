@@ -1190,6 +1190,21 @@
     const tag = `<script type="importmap">${JSON.stringify(merged).replace(/</g, "\\u003c")}<\/script>`;
     return /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (m) => m + tag) : tag + html;
   }
+  // The preview runs sandboxed (no same-origin), where localStorage throws. Apps get a stand-in that works the
+  // same way and is saved per project, so data an app stores survives a reload of the preview.
+  const STORE_KEY = () => `fizz.pv.${state.projectId}`;
+  function storageShim() {
+    let seed = {};
+    try { seed = JSON.parse(localStorage.getItem(STORE_KEY()) || "{}"); } catch {}
+    const json = JSON.stringify(seed).replace(/</g, "\\u003c");
+    return `<script>(function(){var H=Object.prototype.hasOwnProperty;function mk(init,persist){var d=init||{};function save(){if(persist)try{parent.postMessage({fizz:"storage",data:d},"*")}catch(e){}}var api={getItem:function(k){k=String(k);return H.call(d,k)?d[k]:null},setItem:function(k,v){d[String(k)]=String(v);save()},removeItem:function(k){delete d[String(k)];save()},clear:function(){for(var k in d)delete d[k];save()},key:function(i){var ks=Object.keys(d);return i>=0&&i<ks.length?ks[i]:null}};Object.defineProperty(api,"length",{get:function(){return Object.keys(d).length},configurable:true});return new Proxy(api,{get:function(t,p){if(p in t)return t[p];return typeof p==="string"&&H.call(d,p)?d[p]:undefined},set:function(t,p,v){if(p in t)return true;d[String(p)]=String(v);save();return true},deleteProperty:function(t,p){if(H.call(d,p)){delete d[p];save()}return true},has:function(t,p){return p in t||H.call(d,p)},ownKeys:function(){return Object.keys(d)},getOwnPropertyDescriptor:function(t,p){return H.call(d,p)?{value:d[p],writable:true,enumerable:true,configurable:true}:undefined}})}function works(n){try{var s=window[n];s.setItem("__fizz","1");s.removeItem("__fizz");return true}catch(e){return false}}if(!works("localStorage"))Object.defineProperty(window,"localStorage",{value:mk(${json},true),configurable:true});if(!works("sessionStorage"))Object.defineProperty(window,"sessionStorage",{value:mk({},false),configurable:true})})();<\/script>`;
+  }
+  function saveShimStorage(data) {
+    try {
+      const text = JSON.stringify(data || {});
+      if (text.length < 2_000_000) localStorage.setItem(STORE_KEY(), text);
+    } catch {}
+  }
   // fetch("data/items.json") inside the preview answers from the project's files.
   const MIME = { json: "application/json", txt: "text/plain", csv: "text/csv", md: "text/markdown", svg: "image/svg+xml", html: "text/html", xml: "application/xml", js: "text/javascript", css: "text/css" };
   function fetchShim(files, entry) {
@@ -1203,7 +1218,7 @@
     if (!Object.keys(text).length && !Object.keys(bin).length) return "";
     const dir = entry.includes("/") ? entry.slice(0, entry.lastIndexOf("/") + 1) : "";
     const json = (o) => JSON.stringify(o).replace(/</g, "\\u003c").replace(/\u2028|\u2029/g, (c) => (c === "\u2028" ? "\\u2028" : "\\u2029"));
-    return `<script>(function(){var T=${json(text)},B=${json(bin)},M=${json(MIME)},D=${json(dir)},of=window.fetch;function path(u){try{var x=new URL(u,"https://fizz.invalid/"+D);return x.host==="fizz.invalid"?decodeURIComponent(x.pathname.slice(1)):null}catch(e){return null}}window.fetch=function(i,o){var u=typeof i==="string"?i:i instanceof URL?i.href:null;if(u!==null&&!/^[a-z][a-z0-9+.-]*:|^\\/\\//i.test(u)){var p=path(u),h=Object.prototype.hasOwnProperty;if(p!==null&&h.call(B,p))return of(B[p]);if(p!==null&&h.call(T,p))return Promise.resolve(new Response(T[p],{status:200,headers:{"content-type":M[(p.split(".").pop()||"").toLowerCase()]||"text/plain"}}));if(p!==null)return Promise.resolve(new Response("Not found: "+p,{status:404,statusText:"Not Found"}))}return of.apply(this,arguments)}})();<\/script>`;
+    return `<script>(function(){var T=${json(text)},B=${json(bin)},M=${json(MIME)},D=${json(dir)},of=window.fetch;function path(u){try{var x=new URL(u,"https://fizz.invalid/"+D);return x.host==="fizz.invalid"?decodeURIComponent(x.pathname.slice(1)):null}catch(e){return null}}var BASE=new URL(".",document.baseURI).href;window.fetch=function(i,o){var u=typeof i==="string"?i:i instanceof URL?i.href:typeof Request!=="undefined"&&i instanceof Request&&i.method==="GET"?i.url:null;if(u!==null&&u.indexOf(BASE)===0&&!/^(about|blob|data):/.test(BASE))u=u.slice(BASE.length);if(u!==null&&!/^[a-z][a-z0-9+.-]*:|^\\/\\//i.test(u)){var p=path(u),h=Object.prototype.hasOwnProperty;if(p!==null&&h.call(B,p))return of(B[p]);if(p!==null&&h.call(T,p))return Promise.resolve(new Response(T[p],{status:200,headers:{"content-type":M[(p.split(".").pop()||"").toLowerCase()]||"text/plain"}}));if(p!==null)return Promise.resolve(new Response("Not found: "+p,{status:404,statusText:"Not Found"}))}return of.apply(this,arguments)}})();<\/script>`;
   }
   function resolvePath(base, href) {
     const parts = base.split("/").slice(0, -1);
@@ -1223,7 +1238,7 @@
     html = html.replace(/(\s(?:src|href|poster)=["'])([^"'#?]+)(["'])/gi, (m, a, ref, b) => (/^(https?:|data:|mailto:|tel:|javascript:|\/\/)/i.test(ref) || /\.html?$/i.test(ref) ? m : a + asset(ref) + b));
     html = html.replace(/url\((["']?)([^"')]+)\1\)/gi, (m, q, ref) => (/^(https?:|data:|#)/i.test(ref) ? m : `url(${q}${asset(ref)}${q})`));
     html = moduleGraph(files, html, entry);
-    const shim = fetchShim(files, entry);
+    const shim = storageShim() + fetchShim(files, entry);
     if (shim) html = /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (m) => m + shim) : shim + html;
     if (bridge) html = /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (m) => m + BRIDGE) : BRIDGE + html;
     return { entry, html };
@@ -1244,6 +1259,7 @@
   }
   window.addEventListener("message", (e) => {
     if (e.source !== $("#preview").contentWindow || !e.data?.fizz) return;
+    if (e.data.fizz === "storage") saveShimStorage(e.data.data);
     if (e.data.fizz === "console") { state.logs.push({ level: e.data.level, text: String(e.data.text).replaceAll(VIRTUAL, "").slice(0, 4000) }); renderConsole(); }
     if (e.data.fizz === "selected") {
       state.selection = { selector: String(e.data.selector).slice(0, 300), label: String(e.data.label).slice(0, 90), html: String(e.data.html).slice(0, 1500) };
@@ -1319,7 +1335,26 @@
     return false;
   }
   /** Files for GitHub and Vercel: text as is, binary files as { base64 }. */
-  const filesForUpload = async () => Object.fromEntries(await Promise.all(Object.entries(project().files).map(async ([k, v]) => [k, isBinary(v) ? { base64: await F.blobs.base64(v) } : v])));
+  /**
+   * Files that may leave the browser for GitHub or Vercel: never .env files (keys Fizz Code saved for the user), and
+   * nothing the project's .gitignore lists.
+   */
+  function publishable(files) {
+    const rules = String(isBinary(files[".gitignore"]) ? "" : files[".gitignore"] || "").split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("#") && !l.startsWith("!"))
+      .map((l) => {
+        const dir = l.endsWith("/");
+        const body = l.replace(/^\//, "").replace(/\/$/, "");
+        const re = body.split("**").map((part) => part.split("*").map((x) => x.replace(/[.+?^$()[\]{}|\\]/g, "\\$&")).join("[^/]*")).join(".*");
+        const anchored = l.startsWith("/") || body.includes("/");
+        return new RegExp(`${anchored ? "^" : "(^|/)"}${re}${dir ? "/" : "(/|$)"}`);
+      });
+    const secret = (p) => /(^|\/)\.env(\.(?!example$|sample$|template$)[^/]*)?$/.test(p) || /(^|\/)(node_modules|\.DS_Store)(\/|$)/.test(p);
+    return Object.keys(files).filter((p) => !secret(p) && !rules.some((r) => r.test(p)));
+  }
+  const filesForUpload = async () => {
+    const files = project().files;
+    return Object.fromEntries(await Promise.all(publishable(files).map(async (k) => [k, isBinary(files[k]) ? { base64: await F.blobs.base64(files[k]) } : files[k]])));
+  };
 
   /** Pushes the project. With { ask: false } (app builds) a linked repository is pushed without the commit dialog. Returns { sha, owner, repo, branch } or nothing. */
   async function githubPush(message = "Update from FIZZ DEV", { ask = true } = {}) {
@@ -1346,7 +1381,8 @@
       p.git = { ...target, branch: v.branch, lastSha: r.sha, at: Date.now() };
       save();
       renderHeader();
-      F.toast(`Pushed ${r.files} files to ${target.owner}/${target.repo}`);
+      const kept = Object.keys(p.files).length - publishable(p.files).length;
+      F.toast(`Pushed ${r.files} files to ${target.owner}/${target.repo}${kept ? ` · ${kept} private or ignored file${kept === 1 ? "" : "s"} (.env, .gitignore) stayed in FIZZ DEV` : ""}`);
       return { sha: r.sha, owner: target.owner, repo: target.repo, branch: v.branch };
     } catch (e) {
       if (e.code === "needs_workflow_scope" && (await dialog({ title: "Connect GitHub again", desc: e.message, ok: "Reconnect GitHub" }))) F.conn.connect("github");
