@@ -13,7 +13,8 @@ export async function sdk() {
   mod = await import(name);
   return mod;
 }
-export const sandboxEnabled = () => env("FIZZ_SANDBOX") === "on";
+// On by default on Vercel (Vercel Sandbox needs no key there); FIZZ_SANDBOX=off turns it off.
+export const sandboxEnabled = () => env("FIZZ_SANDBOX") === "on" || (env("FIZZ_SANDBOX") !== "off" && Boolean(env("VERCEL")));
 const APP = "/vercel/sandbox/app";
 const PORT = 3000;
 

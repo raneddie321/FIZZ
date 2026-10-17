@@ -394,3 +394,6 @@ dialog.dlg::backdrop { background: rgba(20, 19, 18, .45); }
 .pal-foot kbd, .disclaimer kbd { font: 10.5px var(--mono); padding: 1px 5px; border: 1px solid var(--border); border-radius: 4px; background: var(--card); margin-right: 3px; }
 svg.dots3 { stroke-width: 3; }
 .dlg-body:focus { outline: none; }
+
+.vtoken { display: flex; gap: 6px; margin: 6px 0 2px; }
+.vtoken .input { flex: 1; min-width: 0; height: 32px; font-size: 13px; }

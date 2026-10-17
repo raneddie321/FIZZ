@@ -1,4 +1,5 @@
 import { sandboxBrowserEnabled } from "../lib/sandbox-browser.mjs";
+import { sandboxEnabled } from "../lib/sandbox.mjs";
 import { env, getCookie, json, secretConfigured, unseal } from "../lib/util.mjs";
 import { PROVIDERS } from "../lib/providers.mjs";
 import { aiBackend } from "../lib/ai-chat-core.mjs";
@@ -12,7 +13,8 @@ export default async (req) => {
   const connections = {};
   for (const [id, p] of Object.entries(PROVIDERS)) {
     const session = secret ? unseal(getCookie(req, p.cookie)) : null;
-    connections[id] = { configured: secret && p.configured(), connected: Boolean(session), account: session?.label ?? null, scopes: session?.scopes ?? [] };
+    // GitHub and Vercel can always connect with a personal token; `oauth` says whether the sign-in button is set up.
+    connections[id] = { configured: secret, oauth: secret && p.configured(), connected: Boolean(session), account: session?.label ?? null, scopes: session?.scopes ?? [] };
   }
   return json({
     server: true,
@@ -22,7 +24,7 @@ export default async (req) => {
     // RanEddie ID (Clerk): the publishable key is public by design; `account` means settings sync works.
     raneddieId: { publishableKey: publishableKey(), account: clerkConfigured() },
     // Fizz Code tools: which ones this deployment can offer.
-    tools: { search: searchProvider(), browser: Boolean(env("BROWSERBASE_API_KEY")) || sandboxBrowserEnabled(), browserEngine: env("BROWSERBASE_API_KEY") ? "browserbase" : sandboxBrowserEnabled() ? "sandbox" : null, sandbox: env("FIZZ_SANDBOX") === "on" && Boolean(env("VERCEL")), sync: kvConfigured() && clerkConfigured() },
+    tools: { search: searchProvider(), browser: Boolean(env("BROWSERBASE_API_KEY")) || sandboxBrowserEnabled(), browserEngine: env("BROWSERBASE_API_KEY") ? "browserbase" : sandboxBrowserEnabled() ? "sandbox" : null, sandbox: sandboxEnabled() && Boolean(env("VERCEL")), sync: kvConfigured() && clerkConfigured() },
     google: { configured: Boolean(env("GOOGLE_CLIENT_ID")), clientId: env("GOOGLE_CLIENT_ID") ?? null },
   });
 };

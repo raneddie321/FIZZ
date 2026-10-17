@@ -38,15 +38,15 @@ Never put secrets in code or in chat. Set them only in Netlify or Vercel (Vercel
 | `FIZZ_DEFAULT_MODEL` | optional | OpenRouter model ID, default `z-ai/glm-4.6` (check openrouter.ai/models) |
 | `FIZZ_FALLBACK_MODELS` | optional | Comma-separated backup models tried when the main one is busy |
 | `FIZZ_DAILY_LIMIT` | optional | Free messages per visitor per day, default `50` |
-| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | GitHub | github.com → Settings → Developer settings → **OAuth Apps** |
-| `VERCEL_CLIENT_ID`, `VERCEL_CLIENT_SECRET` | Vercel | vercel.com → Team settings → **Sign in with Vercel / Apps** |
+| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | GitHub sign-in button (optional) | github.com → Settings → Developer settings → **OAuth Apps**. Without them users connect with a personal token (scopes `repo` + `workflow`) in Settings → Connections. |
+| `VERCEL_CLIENT_ID`, `VERCEL_CLIENT_SECRET` | Vercel sign-in button (optional) | vercel.com → Team settings → **Sign in with Vercel / Apps**. Users can always connect with a Vercel token (vercel.com/account/settings/tokens) instead — the most reliable way to deploy. |
 | `GOOGLE_CLIENT_ID` | Google Workspace | console.cloud.google.com → APIs & Services → **Credentials → OAuth client (Web)** |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | RanEddie ID sign-in (optional for users) | Same value as the RanEddie ID project (Clerk → API keys). Public by design. |
 | `CLERK_SECRET_KEY` | Saving FIZZ settings to the RanEddie ID | Same value as the RanEddie ID project. Secret. |
 | `KV_REST_API_URL`, `KV_REST_API_TOKEN` | Cloud sync, reliable daily limits, saved browser logins | Vercel → **Storage → Upstash Redis** → connect to the project (sets both). |
 | `BROWSERBASE_API_KEY` | optional: Browserbase as the cloud browser (instead of FIZZ's own) and full web search | browserbase.com → Settings → API keys. Secret. Browser time is billed by Browserbase. |
 | `BROWSERBASE_PROJECT_ID` | optional | Only if your Browserbase account has several projects. |
-| `FIZZ_SANDBOX` | **Turns on the cloud features — Vercel only**: Fizz Code's Linux sandbox (npm, git, Python, servers), real bash in the terminal for npm/git/any program, and FIZZ's own **cloud browser** (Chromium in the user's sandbox: any site, live screen, Fizz Code clicks/types/signs up with you) | Set to `on`. Uses Vercel Sandbox (billed by Vercel); no key needed on Vercel. The browser installs itself the first time (about a minute). `FIZZ_BROWSER=off` turns only the browser off. |
+| `FIZZ_SANDBOX` | **On by default on Vercel** (`off` turns it off). The cloud features: Fizz Code's Linux sandbox (npm, git, Python, servers), real bash in the terminal for npm/git/any program, and FIZZ's own **cloud browser** (Chromium in the user's sandbox: any site, live screen, Fizz Code clicks/types/signs up with you) | Nothing to set on Vercel. Uses Vercel Sandbox (billed by Vercel); no key needed on Vercel. The browser installs itself the first time (about a minute). `FIZZ_BROWSER=off` turns only the browser off. |
 | `BRAVE_SEARCH_API_KEY` or `TAVILY_API_KEY` | optional web search without Browserbase | api.search.brave.com or tavily.com. Without any search key, search uses Wikipedia. |
 | `FIZZ_SEARCH_LIMIT`, `FIZZ_READ_LIMIT`, `FIZZ_BROWSER_LIMIT`, `FIZZ_SANDBOX_LIMIT` | optional | Daily limits per user (defaults 200, 400, 600, 60). |
 | `FIZZ_BROWSER_MINUTES` | optional | How long a cloud browser session can stay open, default `30`. |
@@ -133,6 +133,10 @@ Any FIZZ answer that contains code has **Build in FIZZ DEV**, which hands the an
     (.AppImage) (Electron). A live card in the chat shows progress and the downloads. If a build fails,
     FIZZ reads the failed job's log on GitHub and Fizz Code fixes the project (its code or the build files)
     and builds again by itself, up to 6 attempts (Settings → Tools → *Fix failed app builds automatically*).
+  - `<fizz-collect>`: for anything the user gets from a website (an API key, a token, a code), on any site and
+    with or without the cloud browser — a card opens the right page, shows the steps, and saves what the user pastes
+    straight into the project (`.env`, a config `.js` or `.json`). Values in `.env` are never shown to the AI and
+    never pushed to GitHub or deployed.
   - `<fizz-screenshot>`, `<fizz-export>` (PDF from HTML), `<fizz-attach>` (file cards), `<fizz-ask>`, `<fizz-plan>`.
 - **Terminal**: the prompt is `fizzdev/<user>/<project>`; a bash-like shell (pipes, `&&`, `||`, `;`, redirects, `$VARS`,
   globs) with ~60 built-in commands on the project files (grep, sed, awk, find, jq, curl, zip…), Node and Python

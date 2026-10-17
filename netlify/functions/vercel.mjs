@@ -52,7 +52,7 @@ export default async (req, context) => {
     return error(404, "Unknown action.");
   } catch (e) {
     if (e.status === 401) return error(401, "Your Vercel connection expired. Connect Vercel again.", "not_connected");
-    if (e.status === 403) return error(403, "Vercel refused this action. In your Vercel app's Permissions, allow deployments and reconnect.", "forbidden");
+    if (e.status === 403) return error(403, session.kind === "token" ? "Vercel refused this action. Make a token with access to your account (Scope: your personal account or team) and connect again." : "Vercel refused this action — the sign-in doesn't allow deployments. Disconnect Vercel and connect with a token instead (Settings → Connections).", "forbidden");
     return error(e.status && e.status < 500 ? e.status : 502, e.message, "vercel_error");
   }
 };

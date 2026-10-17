@@ -215,4 +215,31 @@ assert.equal(j.ai.model, "gemini-3.8-flash");
   globalThis.fetch = realFetch;
 }
 
+// token connections (no OAuth app needed): validated with the provider, then sealed in the cookie
+{
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    const auth = init?.headers?.Authorization || "";
+    if (String(url) === "https://api.vercel.com/v2/user") return auth === "Bearer vtok_good_1234567890abcd" ? Response.json({ user: { email: "me@example.com" } }) : new Response("{}", { status: 403 });
+    if (String(url) === "https://api.github.com/user") return auth.includes("ghp_goodgoodgoodgoodgood1234") ? Response.json({ login: "octo" }, { headers: { "x-oauth-scopes": "repo, workflow" } }) : auth.includes("ghp_noscopenoscopenoscope12") ? Response.json({ login: "octo" }, { headers: { "x-oauth-scopes": "read:user" } }) : new Response("{}", { status: 401 });
+    return realFetch(url, init);
+  };
+  const post = (provider, token, origin = O) => oauth(new Request(`${O}/api/oauth/${provider}/token`, { method: "POST", headers: { origin, "content-type": "application/json" }, body: JSON.stringify({ token }) }), { params: { provider, action: "token" } });
+  r = await post("vercel", "vtok_good_1234567890abcd");
+  assert.equal(r.status, 200);
+  const vc = decodeURIComponent(/fizz_vc=([^;]+)/.exec(r.headers.get("set-cookie"))[1]);
+  assert.equal(unseal(vc).label, "me@example.com");
+  assert.equal(unseal(vc).kind, "token");
+  assert.equal((await post("vercel", "vtok_bad_1234567890abcdef")).status, 401);
+  assert.equal((await post("vercel", "x")).status, 400);
+  assert.equal((await post("vercel", "vtok_good_1234567890abcd", "https://evil.example")).status, 403);
+  r = await post("github", "ghp_goodgoodgoodgoodgood1234");
+  assert.equal(r.status, 200);
+  assert.equal(unseal(decodeURIComponent(/fizz_gh=([^;]+)/.exec(r.headers.get("set-cookie"))[1])).label, "@octo");
+  r = await post("github", "ghp_noscopenoscopenoscope12");
+  assert.equal(r.status, 400);
+  assert.match((await r.json()).error.message, /repo.*workflow/);
+  assert.equal((await post("github", "ghp_wrongwrongwrongwrong123")).status, 401);
+  globalThis.fetch = realFetch;
+}
 console.log("All Netlify and Vercel function tests passed");

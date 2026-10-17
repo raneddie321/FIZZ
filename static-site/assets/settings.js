@@ -82,6 +82,13 @@
       state = !s.configured ? "Not available yet" : s.connected ? `Connected · ${esc(s.account || "")}` : "Not connected";
       action = !s.configured ? "" : s.connected ? `<button type="button" class="btn btn-outline btn-sm" data-disconnect="${c.id}">Disconnect</button>` : `<button type="button" class="btn btn-sm" data-connect="${c.id}">Connect</button>`;
       if (s.connected && s.scopes?.length) state += ` <span class="mono muted-sm">(${esc(s.scopes.join(", "))})</span>`;
+      if ((c.id === "vercel" || c.id === "github") && s.configured && !s.connected) {
+        const help = c.id === "github" ? `<a href="https://github.com/settings/tokens/new?scopes=repo,workflow&description=FIZZ%20DEV" target="_blank" rel="noopener">Create a GitHub token</a> with <b>repo</b> and <b>workflow</b> ticked` : `Create one at <a href="https://vercel.com/account/settings/tokens" target="_blank" rel="noopener">vercel.com/account/settings/tokens</a>`;
+        action = s.oauth ? `<button type="button" class="btn btn-outline btn-sm" data-connect="${c.id}">Sign in</button>` : "";
+        return `<div class="conn">${c.icon}<div class="conn-body"><b>${c.name}</b><small>${c.desc}</small><small class="conn-state">${state}</small>
+          <div class="vtoken"><input class="input mono" type="password" data-token="${c.id}" placeholder="Paste a ${c.name} token" autocomplete="off" spellcheck="false" /><button type="button" class="btn btn-sm" data-token-save="${c.id}">Connect</button></div>
+          <small>${help} — kept encrypted.</small></div>${action}</div>`;
+      }
     }
     return `<div class="conn">${c.icon}<div class="conn-body"><b>${c.name}</b><small>${c.desc}</small><small class="conn-state">${state}</small></div>${action}</div>`;
   }
@@ -101,8 +108,8 @@
 
   const TOOLS = [
     { k: "search", name: "Web search & reading pages", on: (st) => Boolean(st.tools), state: (st) => (st.tools?.search === "wikipedia" ? "On — Wikipedia only" : st.tools?.search ? `On — ${st.tools.search}` : "Off"), hint: "For results from the whole web, the site owner adds BROWSERBASE_API_KEY, BRAVE_SEARCH_API_KEY or TAVILY_API_KEY." },
-    { k: "browser", name: "Cloud browser", on: (st) => Boolean(st.tools?.browser), hint: "Lets Fizz Code open any site, click, type and sign in with you. The site owner adds BROWSERBASE_API_KEY." },
-    { k: "sandbox", name: "Cloud sandbox", on: (st) => Boolean(st.tools?.sandbox), hint: "Fizz Code's own Linux computer (npm, git, Python). The site owner sets FIZZ_SANDBOX=on on Vercel." },
+    { k: "browser", name: "Cloud browser", on: (st) => Boolean(st.tools?.browser), hint: "Lets Fizz Code open any site, click, type and sign in with you. On by default on Vercel (Vercel Sandbox); FIZZ_SANDBOX=off turns it off. Without it, Fizz Code opens the site for you and you paste what it needs." },
+    { k: "sandbox", name: "Cloud sandbox", on: (st) => Boolean(st.tools?.sandbox), hint: "Fizz Code's own Linux computer (npm, git, Python). On by default on Vercel; FIZZ_SANDBOX=off turns it off." },
     { k: "builds", name: "Android & desktop apps", on: (st) => Boolean(st.connections?.github?.connected), state: (st) => (st.connections?.github?.connected ? "On — builds run in your GitHub" : st.connections?.github?.configured ? "Connect GitHub to turn on" : "Off"), hint: "APK, AAB, .exe, .dmg and AppImage, built by GitHub Actions in your repository." },
     { k: "sync", name: "Cloud sync", on: (st) => Boolean(st.tools?.sync), hint: "Needs RanEddie ID and Upstash Redis on the server." },
   ];
@@ -198,6 +205,12 @@
           d.querySelector("#gemini-models").innerHTML = models.map((m) => `<option value="${esc(m)}"></option>`).join("");
           out.textContent = `Key works — ${models.length} models available.`;
         } catch (err) { out.textContent = `That key didn't work: ${err.message}`; }
+      }
+      if (t.dataset.tokenSave) {
+        const v = d.querySelector(`[data-token="${t.dataset.tokenSave}"]`)?.value.trim();
+        if (!v) { F.toast("Paste the token first."); return; }
+        t.disabled = true;
+        try { const r = await F.conn.connectToken(t.dataset.tokenSave, v); F.toast(`Connected${r.account ? ` · ${r.account}` : ""}`); renderConnections(d); } catch (err) { F.toast(err.message); t.disabled = false; }
       }
       if (t.dataset.connect) {
         try { await F.conn.connect(t.dataset.connect); renderConnections(d); } catch (err) { F.toast(err.message); }

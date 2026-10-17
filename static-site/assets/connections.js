@@ -159,7 +159,9 @@
       put: (item) => api("/api/sync", { method: "PUT", body: item, auth: true }),
       remove: (id) => api(`/api/sync?id=${encodeURIComponent(id)}`, { method: "DELETE", auth: true }),
     },
+    connectToken: async (provider, token) => { const r = await api(`/api/oauth/${provider}/token`, { body: { token } }); await F.serverStatus(true); return r; },
     vercel: {
+      connectToken: async (token) => { const r = await api("/api/oauth/vercel/token", { body: { token } }); await F.serverStatus(true); return r; },
       deploy: (name, files, production) => api("/api/vercel/deploy", { body: { name, files, production } }),
       deployment: (id) => api(`/api/vercel/deployment?id=${encodeURIComponent(id)}`),
     },

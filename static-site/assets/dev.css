@@ -405,6 +405,12 @@
 .br-handoff > div { display: grid; flex: 1; min-width: 0; font-size: 13px; }
 .br-handoff > div span { color: var(--muted); }
 .br-handoff .hb-ic { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; background: var(--card); color: var(--warning); flex: none; }
+.collect { flex-basis: 100%; display: grid; gap: 10px; padding: 4px 0 2px; }
+.collect-open { justify-self: start; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+.collect-open .i { width: 14px; height: 14px; }
+.collect ol { margin: 0; padding-inline-start: 20px; font-size: 13.5px; line-height: 1.6; }
+.collect ol a { overflow-wrap: anywhere; }
+.collect .field { margin: 0; }
 .stage-bar.handoff { background: color-mix(in srgb, var(--warning) 12%, transparent); }
 
 /* template gallery */

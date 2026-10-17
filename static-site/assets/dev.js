@@ -257,7 +257,7 @@
       const def = T()[t.type] || {};
       let body = "";
       if (open) {
-        if (waiting) { const w = def.waiting?.(t) || {}; body = `<div class="stage-bar${w.handoff ? " handoff" : ""}"><span class="muted-sm">${esc(w.text || "Fizz Code wants to do this.")}</span><button class="btn btn-sm" data-approve="${m.id}:${idx}">${esc(w.ok || "Allow")}</button><button class="btn btn-outline btn-sm" data-deny="${m.id}:${idx}">${esc(w.cancel || "Don't allow")}</button></div>`; }
+        if (waiting) { const w = def.waiting?.(t) || {}; body = `<div class="stage-bar${w.handoff ? " handoff" : ""}"><span class="muted-sm">${esc(w.text || "Fizz Code wants to do this.")}</span>${w.html || ""}<button class="btn btn-sm" data-approve="${m.id}:${idx}">${esc(w.ok || "Allow")}</button><button class="btn btn-outline btn-sm" data-deny="${m.id}:${idx}">${esc(w.cancel || "Don't allow")}</button></div>`; }
         else if (t.result) body = (t.result.html || outputHtml(t.result.text)) + (t.result.images || []).map((src) => `<img class="tool-img" src="${esc(src)}" alt="" />`).join("");
         else body = outputHtml(t.progress || t.body);
       }
@@ -319,6 +319,8 @@
     const sc = $("#scroll");
     const atBottom = sc.scrollHeight - sc.scrollTop - sc.clientHeight < 140;
     const lastAssistant = [...c.messages].reverse().find((x) => x.role === "assistant");
+    // Keep what the user is typing into a waiting card (a pasted key) across re-renders.
+    const drafts = [...th.querySelectorAll("[data-collect]")].map((el) => [el.closest(".stage-bar")?.querySelector("[data-approve]")?.dataset.approve, el.value, el === document.activeElement]);
     th.innerHTML = c.messages.map((m, i) => {
       const t = new Date(m.at || Date.now()).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
       // Tool results going back to Fizz Code are part of one continuous turn: they're already shown in each step.
@@ -362,6 +364,10 @@
         ? `<div class="verify-note ${m.verified.ok ? "ok" : "warn"}">${F.icon(m.verified.ok ? "check" : "alert")}<span>${m.verified.ok ? `Checked ${m.verified.files} changed file${m.verified.files === 1 ? "" : "s"} — no errors found` : `${m.verified.count} problem${m.verified.count === 1 ? "" : "s"} still open`}</span>${m.verified.list ? `<ul>${m.verified.list.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}</div>` : "";
       return `<div class="a-msg">${html}${thinking}${body}${cards}${askHtml}${check}${actions}</div>`;
     }).join("");
+    for (const [key, value, focused] of drafts) {
+      const el = key && th.querySelector(`[data-approve="${CSS.escape(key)}"]`)?.closest(".stage-bar")?.querySelector("[data-collect]");
+      if (el) { el.value = value; if (focused) el.focus(); }
+    }
     if (atBottom || state.controller) sc.scrollTop = sc.scrollHeight;
     F.docs.hydrate(th, project().files);
     if (ui.tab === "activity") renderActivity();
@@ -434,6 +440,17 @@
     });
     return `PROJECT MAP (${paths.length} files):\n${rows.join("\n")}${paths.length > 400 ? `\n  …and ${paths.length - 400} more` : ""}`;
   }
+  const SECRET_FILE = /(^|\/)\.env(\.(?!example$|sample$|template$)[^/]*)?$/;
+  const maskEnv = (text) => String(text).split("\n").map((l) => (/^\s*(export\s+)?[A-Za-z_][\w.]*\s*=/.test(l) ? l.replace(/=.*$/, "=•••• (set — the value is hidden from you)") : l)).join("\n");
+  /** Hides the values from the project's .env files wherever they'd reach the AI (e.g. `cat .env` output). */
+  function scrubSecrets(text) {
+    const files = project().files;
+    const values = Object.keys(files).filter((f) => SECRET_FILE.test(f) && typeof files[f] === "string" && !isBinary(files[f]))
+      .flatMap((f) => files[f].split("\n").map((l) => /^\s*(?:export\s+)?[A-Za-z_][\w.]*\s*=\s*(.*)$/.exec(l)?.[1]?.trim().replace(/^(["'])(.*)\1$/, "$2")).filter((v) => v && v.length >= 6));
+    let out = text;
+    for (const v of values) out = out.split(v).join("••••");
+    return out;
+  }
   function systemPrompt(skills = [], { mentions = [], selection = null, text = "" } = {}) {
     const p = project();
     let budget = 160_000;
@@ -441,6 +458,8 @@
     const ctx = order.map((path) => {
       const content = p.files[path];
       if (isBinary(content)) return `<fizz-file path="${path}" binary="true">[binary file, ${F.blobs?.describe?.(content) || "not shown"}]</fizz-file>`;
+      // Secrets in .env never go to the AI: it sees the names, not the values.
+      if (SECRET_FILE.test(path)) return `<fizz-file path="${path}" secret="true">\n${maskEnv(content)}\n</fizz-file>`;
       const chunk = content.slice(0, Math.max(mentions.includes(path) ? 60_000 : 0, budget));
       budget -= chunk.length;
       return `<fizz-file path="${path}">\n${chunk}${chunk.length < content.length ? "\n[truncated]" : ""}\n</fizz-file>`;
@@ -576,7 +595,7 @@
     }
     if (!cut && !results.length && !editErrors.length) return (await selfCheck(reply)) ? undefined : finishLoop(reply, "done");
     if (reply.step >= MAX_STEPS()) { reply.loopStopped = true; save(); renderThread(); return finishLoop(reply, "limit"); }
-    const parts = results.map((t) => `<tool-result tool="${t.type}" request="${esc(toolLabel(t)).slice(0, 200)}" ok="${t.status === "done"}">\n${String(t.result?.text || "").slice(0, 12_000)}\n</tool-result>`);
+    const parts = results.map((t) => `<tool-result tool="${t.type}" request="${esc(toolLabel(t)).slice(0, 200)}" ok="${t.status === "done"}">\n${scrubSecrets(String(t.result?.text || "").slice(0, 12_000))}\n</tool-result>`);
     for (const [path, err] of editErrors) parts.push(`<tool-result tool="edit" request="${esc(path)}" ok="false">\n${err}\nThe file was not changed. Send the edit again with SEARCH text copied exactly from the current file, or rewrite the whole file with <fizz-file>.\n</tool-result>`);
     const images = results.filter((t) => t.result?.sendImages !== false).flatMap((t) => (t.result?.images || []).slice(0, 2)).slice(0, 3).map((src, k) => ({ type: "image", name: `screenshot-${k + 1}.jpg`, mime: src.slice(5, src.indexOf(";")), data: src.split(",")[1] }));
     let tail = "Continue the task from here. Fix anything that failed. If everything works, finish with the updated <fizz-plan> and a short summary, without tool tags.";
@@ -1284,7 +1303,7 @@
     f.innerHTML = `<h2>${esc(title)}</h2>${desc ? `<p class="desc">${desc}</p>` : ""}${fields.map((x) => {
       if (x.type === "select") return `<label class="field"><span>${esc(x.label)}</span><select class="select" name="${x.name}">${x.options.map((o) => `<option value="${esc(o.value)}" ${o.value === x.value ? "selected" : ""}>${esc(o.label)}</option>`).join("")}</select></label>`;
       if (x.type === "checkbox") return `<label class="check"><input type="checkbox" name="${x.name}" ${x.value ? "checked" : ""}/> ${esc(x.label)}</label>`;
-      return `<label class="field"><span>${esc(x.label)}</span><input class="input ${x.mono ? "mono" : ""}" name="${x.name}" value="${esc(x.value || "")}" placeholder="${esc(x.placeholder || "")}" ${x.required ? "required" : ""} autocomplete="off" /></label>`;
+      return `<label class="field"><span>${esc(x.label)}</span><input class="input ${x.mono ? "mono" : ""}" type="${x.type === "password" ? "password" : "text"}" name="${x.name}" value="${esc(x.value || "")}" placeholder="${esc(x.placeholder || "")}" ${x.required ? "required" : ""} autocomplete="off" /></label>`;
     }).join("")}${extra}<div class="dlg-actions"><button class="btn btn-outline" value="cancel" formnovalidate>Cancel</button><button class="btn ${danger ? "btn-danger" : ""}" value="ok">${esc(ok)}</button></div>`;
     d.returnValue = "";
     d.showModal();
@@ -1318,6 +1337,33 @@
   }
 
   // ---------- connections ----------
+  const TOKEN_HELP = {
+    vercel: { label: "Vercel token", url: "https://vercel.com/account/settings/tokens", how: "Create a token (any name, scope: your account), copy it and paste it here. FIZZ keeps it encrypted and uses it only to deploy your projects." },
+    github: { label: "GitHub token", url: "https://github.com/settings/tokens/new?scopes=repo,workflow&description=FIZZ%20DEV", how: "Create a token with the <b>repo</b> and <b>workflow</b> boxes ticked (they're pre-selected by this link), press Generate, copy it and paste it here. FIZZ keeps it encrypted and uses it only for your repositories and app builds." },
+  };
+  /** GitHub and Vercel: a personal token always works; the provider's sign-in is offered too when the site has it. */
+  async function connectWithToken(provider, label, st) {
+    const h = TOKEN_HELP[provider];
+    for (;;) {
+      const v = await dialog({
+        title: `Connect ${label}`,
+        desc: `Open <a href="${h.url}" target="_blank" rel="noopener">${h.url.replace(/^https:\/\//, "").split("?")[0]}</a>. ${h.how}`,
+        fields: [{ name: "token", label: h.label, type: "password", required: true, mono: true }],
+        ok: "Connect",
+        extra: st.connections?.[provider]?.oauth ? `<p class="muted-sm" style="margin:4px 0 0">Or <a href="#" data-oauth="${provider}">sign in with ${label}</a> instead.</p>` : "",
+      });
+      if (!v) return false;
+      try {
+        const r = await F.conn.connectToken(provider, v.token);
+        F.toast(`${label} connected${r.account ? ` · ${r.account}` : ""}`);
+        renderHeader();
+        return true;
+      } catch (e) {
+        F.toast(e.message);
+      }
+    }
+  }
+  document.addEventListener("click", (e) => { const o = e.target.closest("[data-oauth]"); if (o) { e.preventDefault(); $("#prompt-dlg").close(); F.conn.connect(o.dataset.oauth); } });
   async function needConnection(provider, label) {
     const st = await F.conn.status();
     const configured = provider === "google" ? st.google?.configured : st.connections?.[provider]?.configured;
@@ -1330,6 +1376,7 @@
     if (provider === "google") {
       try { await F.conn.connect("google"); F.toast("Google connected"); return true; } catch (e) { F.toast(e.message); return false; }
     }
+    if (TOKEN_HELP[provider]) return connectWithToken(provider, label, st);
     const ok = await dialog({ title: `Connect ${label}`, desc: `You'll be sent to ${label} to approve access, then brought back here.`, ok: `Continue to ${label}` });
     if (ok) F.conn.connect(provider);
     return false;
@@ -1385,7 +1432,7 @@
       F.toast(`Pushed ${r.files} files to ${target.owner}/${target.repo}${kept ? ` · ${kept} private or ignored file${kept === 1 ? "" : "s"} (.env, .gitignore) stayed in FIZZ DEV` : ""}`);
       return { sha: r.sha, owner: target.owner, repo: target.repo, branch: v.branch };
     } catch (e) {
-      if (e.code === "needs_workflow_scope" && (await dialog({ title: "Connect GitHub again", desc: e.message, ok: "Reconnect GitHub" }))) F.conn.connect("github");
+      if (e.code === "needs_workflow_scope" && (await dialog({ title: "Connect GitHub again", desc: e.message, ok: "Reconnect GitHub" }))) { await F.conn.disconnect("github").catch(() => {}); await needConnection("github", "GitHub"); }
       else F.toast(e.message);
       if (!ask) throw e;
     }
@@ -1660,6 +1707,11 @@
       const visible = (m.tools || []).filter((x) => !["ask", "push", "attach", "memory"].includes(x.type));
       const tool = visible[+v.split(":")[1]];
       if (tool) {
+        const field = t.closest(".stage-bar")?.querySelector("[data-collect]");
+        if (field && t.dataset.approve) {
+          if (!field.value.trim()) { F.toast("Paste it first."); field.focus(); return; }
+          T()[tool.type]?.provide?.(tool, field.value);
+        }
         tool.status = t.dataset.approve ? "approved" : "denied";
         if (t.dataset.deny) tool.result = { ok: false, text: "The user didn't allow this." };
         save();
