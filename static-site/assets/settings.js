@@ -108,7 +108,7 @@
 
   const TOOLS = [
     { k: "search", name: "Web search & reading pages", on: (st) => Boolean(st.tools), state: (st) => (st.tools?.search === "wikipedia" ? "On — Wikipedia only" : st.tools?.search ? `On — ${st.tools.search}` : "Off"), hint: "For results from the whole web, the site owner adds BROWSERBASE_API_KEY, BRAVE_SEARCH_API_KEY or TAVILY_API_KEY." },
-    { k: "browser", name: "Cloud browser", on: (st) => Boolean(st.tools?.browser), hint: "Lets Fizz Code open any site, click, type and sign in with you. On by default on Vercel (Vercel Sandbox); FIZZ_SANDBOX=off turns it off. Without it, Fizz Code opens the site for you and you paste what it needs." },
+    { k: "browser", name: "Cloud browser", on: (st) => Boolean(st.tools?.browser), state: (st) => (st.tools?.browser ? `On — ${st.tools.browserEngine === "browserbase" ? "Browserbase" : "Vercel Sandbox"}. Press Test it to check.` : "Off"), hint: "Lets Fizz Code open any site, click, type and sign in with you. On by default on Vercel (Vercel Sandbox); FIZZ_SANDBOX=off turns it off. Without it, Fizz Code opens the site for you and you paste what it needs." },
     { k: "sandbox", name: "Cloud sandbox", on: (st) => Boolean(st.tools?.sandbox), hint: "Fizz Code's own Linux computer (npm, git, Python). On by default on Vercel; FIZZ_SANDBOX=off turns it off." },
     { k: "builds", name: "Android & desktop apps", on: (st) => Boolean(st.connections?.github?.connected), state: (st) => (st.connections?.github?.connected ? "On — builds run in your GitHub" : st.connections?.github?.configured ? "Connect GitHub to turn on" : "Off"), hint: "APK, AAB, .exe, .dmg and AppImage, built by GitHub Actions in your repository." },
     { k: "sync", name: "Cloud sync", on: (st) => Boolean(st.tools?.sync), hint: "Needs RanEddie ID and Upstash Redis on the server." },
@@ -117,7 +117,8 @@
     const st = await F.serverStatus().catch(() => ({}));
     d.querySelector("[data-tools]").innerHTML = TOOLS.map((t) => {
       const on = t.on(st);
-      return `<div class="conn"><span class="tool-dot ${on ? "on" : ""}" aria-hidden="true"></span><div class="conn-body"><b>${t.name}</b><small>${esc(t.hint)}</small><small class="conn-state">${esc(t.state ? t.state(st) : on ? "On" : "Off")}</small></div></div>`;
+      const test = t.k === "browser" && on ? `<button type="button" class="btn btn-outline btn-sm" data-test-browser>Test it</button>` : "";
+      return `<div class="conn"><span class="tool-dot ${on ? "on" : ""}" aria-hidden="true"></span><div class="conn-body"><b>${t.name}</b><small>${esc(t.hint)}</small><small class="conn-state" ${t.k === "browser" ? "data-browser-state" : ""}>${esc(t.state ? t.state(st) : on ? "On" : "Off")}</small></div>${test}</div>`;
     }).join("");
     d.querySelector("[name=cloudSync]").closest("label").classList.toggle("hidden", !st.tools?.sync);
   }
@@ -205,6 +206,20 @@
           d.querySelector("#gemini-models").innerHTML = models.map((m) => `<option value="${esc(m)}"></option>`).join("");
           out.textContent = `Key works — ${models.length} models available.`;
         } catch (err) { out.textContent = `That key didn't work: ${err.message}`; }
+      }
+      if (t.hasAttribute("data-test-browser")) {
+        // Opens a page in the real cloud browser and reports exactly what happened.
+        const out = d.querySelector("[data-browser-state]");
+        t.disabled = true;
+        const started = Date.now();
+        const tick = setInterval(() => { out.textContent = `Starting the cloud browser… ${Math.round((Date.now() - started) / 1000)}s (the first time takes about a minute)`; }, 1000);
+        try {
+          let r = await F.conn.api("/api/browser", { body: { action: "open", url: "https://example.com" }, auth: true });
+          while (r.starting && Date.now() - started < 4 * 60_000) { await new Promise((ok) => setTimeout(ok, 4000)); r = await F.conn.api("/api/browser", { body: { action: "open", url: "https://example.com" }, auth: true }); }
+          out.textContent = r.starting ? "Still starting after 4 minutes — try again in a minute." : `Works — opened “${r.page?.title || r.page?.url}” in ${Math.round((Date.now() - started) / 1000)}s (${r.engine}).`;
+        } catch (err) {
+          out.textContent = `Didn't work: ${err.message}${err.status ? ` (${err.status})` : ""}`;
+        } finally { clearInterval(tick); t.disabled = false; }
       }
       if (t.dataset.tokenSave) {
         const v = d.querySelector(`[data-token="${t.dataset.tokenSave}"]`)?.value.trim();

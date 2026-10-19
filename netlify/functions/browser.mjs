@@ -15,7 +15,16 @@ async function sandboxEngine(req, uid, body, headers) {
   if (st && st.uid !== uid) st = null;
   st ||= { uid, active: null };
   if (action === "release") return json({ released: true });
-  const b = await ensureBrowser(uid, { waitMs: action === "live" ? 8000 : 35000 });
+  let b;
+  try { b = await ensureBrowser(uid, { waitMs: action === "live" ? 8000 : 35000 }); }
+  catch (e) {
+    console.error("[browser:sandbox]", e);
+    const m = String(e.message || e);
+    const hint = /oidc|token|unauthori[sz]ed|401|403|forbidden/i.test(m) ? " Vercel didn't let this project start a sandbox: check that Vercel Sandbox is available on the account (vercel.com → the project → Sandbox) and redeploy."
+      : /quota|limit|exceed|402|payment/i.test(m) ? " The Vercel Sandbox limit for this account has been reached for now."
+      : "";
+    throw Object.assign(new Error(`The cloud browser couldn't start: ${m.slice(0, 300)}.${hint}`), { status: 502, code: "sandbox_failed" });
+  }
   if (b.starting) return json({ starting: true, text: "The cloud browser is starting (the first time takes about a minute)." });
   if (action === "live") return json({ pages: await sandboxTabs(b.base, b.token), active: st.active, engine: "sandbox" });
   const out = await act({ connectUrl: cdpUrl(b.base, b.token), active: st.active }, body);
