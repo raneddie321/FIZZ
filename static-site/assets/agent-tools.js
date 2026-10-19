@@ -21,7 +21,7 @@
   const TOOL_RE = /<fizz-([a-z]+)\b((?:\s+[a-zA-Z][\w-]*\s*=\s*"[^"]*")*)\s*(\/>|>([\s\S]*?)(<\/fizz-\1>|$))/g;
   const ATTR_RE = /([a-zA-Z][\w-]*)\s*=\s*"([^"]*)"/g;
   const unescape = (s) => s.replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
-  const KNOWN = new Set(["run", "sandbox", "search", "fetch", "browser", "screenshot", "export", "attach", "ask", "build", "push", "memory", "collect"]);
+  const KNOWN = new Set(["run", "sandbox", "search", "fetch", "browser", "screenshot", "export", "attach", "ask", "build", "push", "memory", "collect", "google"]);
 
   /** Pulls tool tags out of the prose. Unclosed tags (still streaming) are hidden but not returned. */
   function parse(prose) {

@@ -1713,6 +1713,8 @@
           T()[tool.type]?.provide?.(tool, field.value);
         }
         tool.status = t.dataset.approve ? "approved" : "denied";
+        // One approval can cover the reply's other steps waiting for the same thing (e.g. "Connect Google").
+        if (t.dataset.approve) for (const x of m.tools || []) if (x !== tool && x.status === "waiting" && T()[x.type]?.approveTogether?.(tool, x)) x.status = "approved";
         if (t.dataset.deny) tool.result = { ok: false, text: "The user didn't allow this." };
         save();
         renderThread();

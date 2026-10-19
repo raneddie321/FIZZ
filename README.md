@@ -40,7 +40,7 @@ Never put secrets in code or in chat. Set them only in Netlify or Vercel (Vercel
 | `FIZZ_DAILY_LIMIT` | optional | Free messages per visitor per day, default `50` |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | GitHub sign-in button (optional) | github.com → Settings → Developer settings → **OAuth Apps**. Without them users connect with a personal token (scopes `repo` + `workflow`) in Settings → Connections. |
 | `VERCEL_CLIENT_ID`, `VERCEL_CLIENT_SECRET` | Vercel sign-in button (optional) | vercel.com → Team settings → **Sign in with Vercel / Apps**. Users can always connect with a Vercel token (vercel.com/account/settings/tokens) instead — the most reliable way to deploy. |
-| `GOOGLE_CLIENT_ID` | Google Workspace | console.cloud.google.com → APIs & Services → **Credentials → OAuth client (Web)** |
+| `GOOGLE_CLIENT_ID` | Google Workspace (Gmail, Calendar, Docs, Sheets, Slides, Drive, Tasks, Contacts) | console.cloud.google.com: turn on the Gmail, Calendar, Docs, Sheets, Slides, Drive, Tasks and People APIs; Google Auth Platform → External, add test users; Clients → **Web application** with your site as an Authorized JavaScript origin. No client secret needed. |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | RanEddie ID sign-in (optional for users) | Same value as the RanEddie ID project (Clerk → API keys). Public by design. |
 | `CLERK_SECRET_KEY` | Saving FIZZ settings to the RanEddie ID | Same value as the RanEddie ID project. Secret. |
 | `KV_REST_API_URL`, `KV_REST_API_TOKEN` | Cloud sync, reliable daily limits, saved browser logins | Vercel → **Storage → Upstash Redis** → connect to the project (sets both). |
@@ -133,6 +133,9 @@ Any FIZZ answer that contains code has **Build in FIZZ DEV**, which hands the an
     (.AppImage) (Electron). A live card in the chat shows progress and the downloads. If a build fails,
     FIZZ reads the failed job's log on GitHub and Fizz Code fixes the project (its code or the build files)
     and builds again by itself, up to 6 attempts (Settings → Tools → *Fix failed app builds automatically*).
+  - `<fizz-google>`: the user's Google Workspace — search and read Gmail, write drafts and send (send waits for
+    the user's OK), Calendar events (invites wait for OK), create/read/edit Docs (from Markdown), Sheets (CSV),
+    Slides, search/read/upload Drive files, Tasks and Contacts. Runs in the browser with the user's own Google sign-in.
   - `<fizz-collect>`: for anything the user gets from a website (an API key, a token, a code), on any site and
     with or without the cloud browser — a card opens the right page, shows the steps, and saves what the user pastes
     straight into the project (`.env`, a config `.js` or `.json`). Values in `.env` are never shown to the AI and

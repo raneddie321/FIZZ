@@ -31,7 +31,8 @@
   }
 
   // ---------- Google (token lives only in this tab, ~1 hour) ----------
-  const GSCOPES = "https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file";
+  // Every Google Workspace app Fizz Code can use. Google's consent screen lets the user untick any of them.
+  const GSCOPES = ["drive", "gmail.modify", "documents", "spreadsheets", "presentations", "calendar", "tasks", "contacts.readonly"].map((s) => `https://www.googleapis.com/auth/${s}`).join(" ");
   let gToken = null;
   try {
     const saved = JSON.parse(sessionStorage.getItem("fizz.google") || "null");
@@ -60,7 +61,7 @@
         scope: GSCOPES,
         callback: async (resp) => {
           if (resp.error) return reject(new Error(resp.error_description || "Google sign-in was cancelled."));
-          gToken = { t: resp.access_token, exp: Date.now() + (Number(resp.expires_in) || 3600) * 1000 - 60_000, label: "Google account" };
+          gToken = { t: resp.access_token, exp: Date.now() + (Number(resp.expires_in) || 3600) * 1000 - 60_000, label: "Google account", scopes: String(resp.scope || "").split(" ").filter(Boolean) };
           try {
             const about = await gfetch("https://www.googleapis.com/drive/v3/about?fields=user(displayName,emailAddress)");
             gToken.label = about.user?.emailAddress || about.user?.displayName || gToken.label;
@@ -77,6 +78,12 @@
   async function gfetch(url, init = {}) {
     if (!gToken || gToken.exp < Date.now()) throw Object.assign(new Error("Connect Google first."), { code: "not_connected" });
     const res = await fetch(url, { ...init, headers: { Authorization: `Bearer ${gToken.t}`, ...(init.headers || {}) } });
+    if (res.status === 403) {
+      const j = await res.clone().json().catch(() => null);
+      const msg = j?.error?.message || "";
+      if (/insufficient|scope/i.test(msg)) { gToken = null; sessionStorage.removeItem("fizz.google"); throw Object.assign(new Error("Google didn't give FIZZ access to this app (it was unticked when connecting). Connect Google again and leave it ticked."), { code: "not_connected" }); }
+      if (/has not been used|is disabled|not enabled/i.test(msg)) throw Object.assign(new Error(`This Google API isn't turned on for the site's Google Cloud project yet. The site owner turns it on in console.cloud.google.com → APIs & Services → Library. (${msg.slice(0, 220)})`), { code: "api_disabled" });
+    }
     if (res.status === 401) { gToken = null; sessionStorage.removeItem("fizz.google"); throw Object.assign(new Error("Your Google connection expired. Connect again."), { code: "not_connected" }); }
     if (!res.ok) {
       const j = await res.json().catch(() => null);
@@ -88,6 +95,11 @@
   const DRIVE = "https://www.googleapis.com/drive/v3/files";
   const google_ = {
     connected: () => Boolean(gToken && gToken.exp > Date.now()),
+    /** Authorised fetch to any Google API (JSON in, JSON or text out). */
+    fetch: (url, init) => gfetch(url, init),
+    token: () => (gToken && gToken.exp > Date.now() ? gToken.t : null),
+    has: (scope) => Boolean(gToken?.scopes?.some((s) => s.endsWith(`/${scope}`))),
+    preload: () => loadGis().catch(() => {}),
     account: () => gToken?.label ?? null,
     connect: googleConnect,
     disconnect() {
