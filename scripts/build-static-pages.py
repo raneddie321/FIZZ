@@ -207,7 +207,7 @@ legal("privacy.html", "Privacy Policy", [
   ("Limited Use", "FIZZ's use and transfer of information received from Google APIs adheres to the Google API Services User Data Policy, including the Limited Use requirements."),
   ("3. Support messages", "Messages sent through the contact form are delivered to RANEDDIE's support team."),
   ("4. Your rights", "You can export your data or delete your account at any time from Settings."),
-  ("5. Contact", "Questions about privacy or your data: use the contact page (contact.html).")])
+  ("5. Contact", "Questions about privacy or your data: use the contact page (contact.html) or email raneddie321@gmail.com.")])
 
 # ---------------- auth ----------------
 pw = lambda name, ac, extra="": f'<div class="pw-wrap"><input class="input" name="{name}" type="password" autocomplete="{ac}" required {extra} /><button type="button" class="pw-toggle" aria-label="Show password">Show</button></div>'
