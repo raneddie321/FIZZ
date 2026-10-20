@@ -16,7 +16,8 @@ async function sandboxEngine(req, uid, body, headers) {
   st ||= { uid, active: null };
   if (action === "release") return json({ released: true });
   let b;
-  try { b = await ensureBrowser(uid, { waitMs: action === "live" ? 8000 : 35000 }); }
+  // Short waits: each request returns well inside the function's time limit, and the page keeps asking while it starts.
+  try { b = await ensureBrowser(uid, { waitMs: action === "live" ? 5000 : 12000 }); }
   catch (e) {
     console.error("[browser:sandbox]", e);
     const m = String(e.message || e);

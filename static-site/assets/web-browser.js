@@ -93,13 +93,24 @@
     body = { ...body, viewport: viewport() || undefined };
     if (t) { t.kind = "cloud"; t.busy = true; t.title = t.title === "New tab" ? hostName(body.url || "") || "Cloud browser" : t.title; render(); }
     try {
-      let r = await F.conn.api("/api/browser", { body, auth: true });
-      // FIZZ's own cloud browser installs itself the first time (about a minute).
+      // FIZZ's own cloud browser installs itself the first time (about a minute). While it starts, a request can
+      // come back "starting", time out or drop — keep asking for up to 4 minutes instead of failing.
       const until = Date.now() + 4 * 60_000;
+      const ask = async () => {
+        try { return await F.conn.api("/api/browser", { body, auth: true }); }
+        catch (e) {
+          const transient = !e.status || [502, 503, 504].includes(e.status) && !/limit|turned on|not allowed/i.test(e.message);
+          if (transient && Date.now() < until && e.code !== "sandbox_failed") return { starting: true, retry: e.message };
+          throw e;
+        }
+      };
+      let r = await ask();
+      let tries = 0;
       while (r.starting && Date.now() < until) {
         starting = true; render();
-        await new Promise((ok) => setTimeout(ok, 4000));
-        r = await F.conn.api("/api/browser", { body, auth: true });
+        await new Promise((ok) => setTimeout(ok, r.retry ? 5000 : 3000));
+        r = await ask();
+        if (r.retry && ++tries > 30) break;
       }
       starting = false;
       if (r.starting) throw new Error("The cloud browser is taking too long to start. Try again in a minute.");
