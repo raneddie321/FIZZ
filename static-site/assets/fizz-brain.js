@@ -514,9 +514,12 @@ to action → Footer (links, contact, social, legal, copyright). Choose the sect
   function compose({ text = "", history = "", files = {}, mode = "build", max = 6 } = {}) {
     const paths = Object.keys(files);
     const hay = `${text}\n${history}`;
+    const doMode = mode === "do";
+    // Do mode (the personal agent) has its own core and topics; the coding topics are for the other modes.
+    const pool = TOPICS.filter((t) => (doMode ? t.for === "do" : t.for !== "do"));
     const webProject = !paths.length || paths.some((p) => /\.(html?|css|m?js|jsx|tsx)$/i.test(p));
-    const always = mode === "ask" ? [] : TOPICS.filter((t) => t.always === "build" && (webProject || (t.match && t.match.test(hay))));
-    const scored = TOPICS.filter((t) => !always.includes(t) && t.match).map((t) => {
+    const always = mode === "ask" || doMode ? [] : pool.filter((t) => t.always === "build" && (webProject || (t.match && t.match.test(hay))));
+    const scored = pool.filter((t) => !always.includes(t) && t.match).map((t) => {
       let score = 0;
       if (t.match.test(text)) score += 3;
       if (t.match.test(history)) score += 1;
@@ -524,9 +527,10 @@ to action → Footer (links, contact, social, legal, copyright). Choose the sect
       return { t, score: score ? score + (t.weight || 0) : 0 };
     }).filter((x) => x.score > 0).sort((a, b) => b.score - a.score);
     // A web project with nothing more specific still gets the web guidance.
-    if (!scored.length && webProject && /build|make|create|site|page|app|צור|תבנה|תעשה|בנה/i.test(hay)) scored.push({ t: TOPICS[0], score: 1 });
+    if (!doMode && !scored.length && webProject && /build|make|create|site|page|app|צור|תבנה|תעשה|בנה/i.test(hay)) scored.push({ t: TOPICS[0], score: 1 });
     const picked = [...always, ...scored.slice(0, max).map((x) => x.t)];
-    return { text: [CORE.trim(), ...picked.map((t) => `# ${t.title}\n${t.text.trim()}`)].join("\n\n"), topics: picked.map((t) => t.id) };
+    const core = doMode && F.brain.ASSISTANT ? F.brain.ASSISTANT : CORE;
+    return { text: [core.trim(), ...picked.map((t) => `# ${t.title}\n${t.text.trim()}`)].join("\n\n"), topics: picked.map((t) => t.id) };
   }
   const allText = () => [CORE, ...TOPICS.map((t) => `# ${t.title}\n${t.text}`)].join("\n");
 

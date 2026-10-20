@@ -397,3 +397,5 @@ svg.dots3 { stroke-width: 3; }
 
 .vtoken { display: flex; gap: 6px; margin: 6px 0 2px; }
 .vtoken .input { flex: 1; min-width: 0; height: 32px; font-size: 13px; }
+.conn-group { margin: 18px 0 2px; font-size: 14px; }
+.app-ic { width: 28px; height: 28px; flex: none; border-radius: 8px; display: grid; place-items: center; background: var(--surface-2); font-weight: 700; font-size: 13px; color: var(--fg); }

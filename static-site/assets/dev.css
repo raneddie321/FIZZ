@@ -33,7 +33,7 @@
 /* messages */
 .u-msg { background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; white-space: pre-wrap; word-break: break-word; font-size: 14.5px; line-height: 1.6; }
 .u-msg .meta { display: flex; gap: 8px; margin-top: 6px; font-size: 12px; color: var(--muted); }
-.a-msg { display: grid; gap: 10px; }
+.a-msg { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; min-width: 0; }
 .steps { display: grid; gap: 4px; }
 .step { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--card); }
 .step-head { display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 12px; border: 0; background: none; text-align: left; font-family: var(--mono); font-size: 12.5px; }
@@ -225,7 +225,8 @@
 .act-line, .act-head { display: inline-flex; align-items: center; gap: 10px; max-width: 100%; font-size: 14.5px; color: var(--muted); }
 .act-line b { color: var(--fg); font-weight: 500; }
 .act-line small { color: var(--muted); }
-.act-head { border: 0; background: none; padding: 2px 0; text-align: left; cursor: pointer; }
+.act-head { border: 0; background: none; padding: 2px 0; text-align: left; cursor: pointer; max-width: 100%; min-width: 0; }
+.act-head > span { min-width: 0; }
 .act-head:hover { color: var(--fg); }
 .act-head > span:not(.st):not(.act-ic):not(.act-warn) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .act-head .chev { width: 14px; height: 14px; transition: transform .15s; opacity: .7; }
@@ -487,3 +488,12 @@
 .verify-note ul { flex-basis: 100%; margin: 2px 0 0; padding-left: 22px; font-family: var(--mono); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
 .build-try { display: block; font-size: 12px; color: var(--muted); font-weight: 400; }
 .build-try:empty { display: none; }
+
+.proj-chats a { display: flex; align-items: center; gap: 6px; }
+.chat-st { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--muted); }
+.chat-st.running { background: var(--primary); animation: chat-pulse 1.2s ease-in-out infinite; }
+.chat-st.waiting { background: var(--warning); }
+.chat-st.failed { background: var(--danger); }
+@keyframes chat-pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .chat-st.running { animation: none; } }
+.proj-chats a .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -27,6 +27,7 @@
         <label class="field"><span>Theme</span><select class="select" name="theme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
         <label class="field"><span>Response style</span><select class="select" name="style"><option value="balanced">Balanced</option><option value="concise">Concise</option><option value="detailed">Detailed</option></select></label>
         <label class="field"><span>Custom instructions</span><textarea class="textarea" name="instructions" maxlength="2000" rows="3" placeholder="Anything FIZZ should know about you or how to respond"></textarea></label>
+        <label class="field"><span>What Fizz remembers about you</span><textarea class="textarea" name="memory" maxlength="12000" rows="4" placeholder="One fact per line. Fizz adds things here when you tell it to remember them; edit or delete freely."></textarea><small class="muted-sm">Kept in this browser. Never put passwords or card numbers here.</small></label>
       </div>
       <div data-pane="ai" class="form">
         <div class="provider-list" role="radiogroup" aria-label="AI provider">
@@ -57,6 +58,7 @@
         <div class="conn-list" data-tools></div>
         <label class="check"><input type="checkbox" name="cloudSync" /><span>Sync chats and projects to my RanEddie ID<small>Use them on every device. Images and PDFs stay in the browser that made them.</small></span></label>
         <label class="check"><input type="checkbox" name="autoFixBuilds" /><span>Fix failed app builds automatically<small>When an APK, AAB or desktop build fails, Fizz Code reads the log on GitHub, fixes the project and builds again (up to 6 attempts). Keep FIZZ DEV open while it works.</small></span></label>
+        <div class="conn" data-tg-row><div class="conn-body"><b>Telegram updates</b><small>Get a Telegram message when Fizz finishes a task or needs you. Connect your Telegram bot (Connections → Apps), send it any message, then press Link.</small><small class="conn-state" data-tg-state></small></div><button type="button" class="btn btn-outline btn-sm" data-tg-link>Link</button></div>
         <label class="check"><input type="checkbox" name="autoVerify" /><span>Check Fizz Code's work automatically<small>When it finishes, FIZZ DEV checks the files it wrote (syntax, imports, links, errors in the preview) and has it fix what it finds.</small></span></label>
         <label class="field"><span>Steps per task</span><input class="input" type="number" name="agentSteps" min="5" max="40" step="1" /><small class="muted-sm">How many rounds Fizz Code may work on its own before it asks you to keep going (5–40).</small></label>
         <label class="check"><input type="checkbox" name="reviewChanges" /><span>Review file changes before they're applied</span></label>
@@ -127,7 +129,9 @@
     const box = d.querySelector("[data-conn-list]");
     box.innerHTML = `<p class="muted-sm">Checking connections…</p>`;
     const st = await F.serverStatus(true);
-    box.innerHTML = (st.server ? "" : `<div class="alert alert-info"><div><strong>Connections need the FIZZ server</strong><p>Deploy this site from GitHub to Netlify (with the environment variables from the README) to enable GitHub, Vercel and Google.</p></div></div>`) + CONN.map((c) => connCard(c, st)).join("");
+    const apps = (st.apps || []).map((a) => `<div class="conn"><span class="app-ic" aria-hidden="true">${esc(a.name.slice(0, 1))}</span><div class="conn-body"><b>${esc(a.name)}</b><small>${esc(a.desc)}</small><small class="conn-state">${a.connected ? `Connected · ${esc(a.account || "")}` : "Not connected"}</small>
+      ${a.connected ? "" : `<div class="vtoken"><input class="input mono" type="password" data-app-token="${a.id}" placeholder="Paste your ${esc(a.name)} token" autocomplete="off" spellcheck="false" /><button type="button" class="btn btn-sm" data-app-save="${a.id}">Connect</button></div><small><a href="${esc(a.help)}" target="_blank" rel="noopener">Get a token</a> — ${esc(a.how)}</small>`}</div>${a.connected ? `<button type="button" class="btn btn-outline btn-sm" data-app-off="${a.id}">Disconnect</button>` : ""}</div>`).join("");
+    box.innerHTML = (st.server ? "" : `<div class="alert alert-info"><div><strong>Connections need the FIZZ server</strong><p>Deploy this site from GitHub to Netlify (with the environment variables from the README) to enable GitHub, Vercel and Google.</p></div></div>`) + CONN.map((c) => connCard(c, st)).join("") + (apps ? `<h3 class="conn-group">Apps Fizz can use</h3><p class="muted-sm">Connect an app with your own token. Fizz creates and edits things there when you ask; sending, posting and deleting always wait for your OK.</p>${apps}` : "");
   }
 
   /**
@@ -141,6 +145,7 @@
     f.theme.value = F.theme.get();
     f.style.value = s.style;
     f.instructions.value = s.instructions;
+    f.memory.value = (s.memory || []).join("\n");
     f.querySelectorAll("[name=provider]").forEach((r) => (r.checked = r.value === s.provider));
     f.openrouterKey.value = s.openrouterKey;
     f.openrouterModel.value = s.openrouterModel;
@@ -162,7 +167,7 @@
       d.querySelectorAll(".dlg-tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === t));
       d.querySelectorAll("[data-pane]").forEach((p) => p.classList.toggle("hidden", p.dataset.pane !== t));
       if (t === "connections") renderConnections(d);
-      if (t === "tools") renderTools(d);
+      if (t === "tools") { renderTools(d); const tg = d.querySelector("[data-tg-state]"); if (tg) tg.textContent = ctx.data.settings.telegramChat ? "Linked" : "Not linked"; }
     };
     f.cloudSync.checked = s.cloudSync !== false;
     f.reviewChanges.checked = Boolean(s.reviewChanges);
@@ -221,6 +226,28 @@
           out.textContent = `Didn't work: ${err.message}${err.status ? ` (${err.status})` : ""}`;
         } finally { clearInterval(tick); t.disabled = false; }
       }
+      if (t.hasAttribute("data-tg-link")) {
+        const out = d.querySelector("[data-tg-state]");
+        try {
+          const r = await F.conn.apps.call("telegram", { method: "GET", path: "/getUpdates", query: { limit: 20 } });
+          const msg = (r.data?.result || []).map((u) => u.message || u.edited_message).filter(Boolean).at(-1);
+          if (!msg) { out.textContent = "No message found — send your bot a message in Telegram, then press Link again."; return; }
+          ctx.data.settings.telegramChat = String(msg.chat.id);
+          ctx.data.settings.telegramNotify = true;
+          ctx.save();
+          await F.conn.apps.call("telegram", { method: "POST", path: "/sendMessage", body: { chat_id: msg.chat.id, text: "FIZZ DEV is linked. You'll get a message here when Fizz finishes a task or needs you." } });
+          out.textContent = `Linked to ${msg.chat.first_name || msg.chat.title || "your chat"} — a test message was sent.`;
+        } catch (err) { out.textContent = `Couldn't link: ${err.message}`; }
+      }
+      if (t.dataset.appSave) {
+        const v = d.querySelector(`[data-app-token="${t.dataset.appSave}"]`)?.value.trim();
+        if (!v) { F.toast("Paste the token first."); return; }
+        t.disabled = true;
+        try { const r = await F.conn.apps.connect(t.dataset.appSave, v); F.toast(`Connected${r.account ? ` · ${r.account}` : ""}`); renderConnections(d); } catch (err) { F.toast(err.message); t.disabled = false; }
+      }
+      if (t.dataset.appOff) {
+        try { await F.conn.apps.disconnect(t.dataset.appOff); F.toast("Disconnected"); renderConnections(d); } catch (err) { F.toast(err.message); }
+      }
       if (t.dataset.tokenSave) {
         const v = d.querySelector(`[data-token="${t.dataset.tokenSave}"]`)?.value.trim();
         if (!v) { F.toast("Paste the token first."); return; }
@@ -252,6 +279,7 @@
         model: f.model.value,
         style: f.style.value,
         instructions: f.instructions.value.trim(),
+        memory: f.memory.value.split("\n").map((x) => x.trim()).filter(Boolean).slice(0, 60),
         cloudSync: f.cloudSync.checked,
         reviewChanges: f.reviewChanges.checked,
         autoFixBuilds: f.autoFixBuilds.checked,

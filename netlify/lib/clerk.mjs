@@ -71,7 +71,7 @@ const FIELDS = {
   provider: (v) => ["fizz", "openrouter", "anthropic", "gemini"].includes(v),
   model: (v) => typeof v === "string" && /^[\w.:/-]{1,60}$/.test(v),
   orModel: (v) => typeof v === "string" && /^[\w.:/-]{1,80}$/.test(v),
-  devMode: (v) => ["build", "ask"].includes(v),
+  devMode: (v) => ["build", "plan", "ask", "do"].includes(v),
   at: (v) => Number.isInteger(v) && v > 0,
 };
 export function cleanFizz(input) {

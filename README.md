@@ -100,6 +100,16 @@ Any FIZZ answer that contains code has **Build in FIZZ DEV**, which hands the an
 - **Agent chat**: a live task list, one activity line per reply (click to see each diff, command and result),
   Build / Plan / Ask modes, questions with answer buttons, review-before-apply, restore to any reply,
   `@file` mentions, project memory (`FIZZ.md`), slash commands and **Skills** (`assets/skills.js`).
+- **Do mode — a personal agent**: next to Build / Plan / Ask, *Do* has Fizz get things done for you instead of
+  writing code — sign-ups and API keys in the cloud browser, Gmail, Calendar, Docs, Drive, YouTube uploads, and the
+  apps you connected — with its own handbook (`assets/brain-assistant.js`). Sending, posting, publishing, deleting
+  and buying always wait for your OK. Each chat shows whether it's working, waiting for you or stopped.
+- **Memory**: `<fizz-remember>` saves lasting facts and preferences (never passwords or keys); Settings → General
+  lists and edits them, and every mode sees them.
+- **Apps connected with a token** (Settings → Connections → Apps): Notion, Trello, Linear, Airtable, Figma, Netlify,
+  Cloudflare, Discord, Telegram, Slack and Supabase. The token is checked once and sealed in an HttpOnly cookie;
+  `<fizz-api>` calls go through `/api/connector`, which only talks to that app's API and never returns the token.
+- **Telegram updates** (Settings → Tools): a message when Fizz finishes or needs you.
 - **Fizz Code's handbook** (`assets/fizz-brain.js` + `brain-design.js`, `brain-code.js`, `brain-platforms.js`):
   a long engineering guide — how to plan, structure a project into many focused files, write complete code,
   verify, debug and report — plus deep sections on design, components, JavaScript, games, data, servers,
@@ -133,6 +143,8 @@ Any FIZZ answer that contains code has **Build in FIZZ DEV**, which hands the an
     (.AppImage) (Electron). A live card in the chat shows progress and the downloads. If a build fails,
     FIZZ reads the failed job's log on GitHub and Fizz Code fixes the project (its code or the build files)
     and builds again by itself, up to 6 attempts (Settings → Tools → *Fix failed app builds automatically*).
+  - `<fizz-google>` also does YouTube: list your videos, upload a project or Drive video (private by default; needs
+    the YouTube Data API v3 turned on), and edit titles, descriptions, tags and privacy.
   - `<fizz-google>`: the user's Google Workspace — search and read Gmail, write drafts and send (send waits for
     the user's OK), Calendar events (invites wait for OK), create/read/edit Docs (from Markdown), Sheets (CSV),
     Slides, search/read/upload Drive files, Tasks and Contacts. Runs in the browser with the user's own Google sign-in.

@@ -32,7 +32,7 @@
 
   // ---------- Google (token lives only in this tab, ~1 hour) ----------
   // Every Google Workspace app Fizz Code can use. Google's consent screen lets the user untick any of them.
-  const GSCOPES = ["drive", "gmail.modify", "documents", "spreadsheets", "presentations", "calendar", "tasks", "contacts.readonly"].map((s) => `https://www.googleapis.com/auth/${s}`).join(" ");
+  const GSCOPES = ["drive", "gmail.modify", "documents", "spreadsheets", "presentations", "calendar", "tasks", "contacts.readonly", "youtube"].map((s) => `https://www.googleapis.com/auth/${s}`).join(" ");
   let gToken = null;
   try {
     const saved = JSON.parse(sessionStorage.getItem("fizz.google") || "null");
@@ -170,6 +170,11 @@
       get: (id) => api(`/api/sync?id=${encodeURIComponent(id)}`, { auth: true }),
       put: (item) => api("/api/sync", { method: "PUT", body: item, auth: true }),
       remove: (id) => api(`/api/sync?id=${encodeURIComponent(id)}`, { method: "DELETE", auth: true }),
+    },
+    apps: {
+      connect: async (id, token) => { const r = await api(`/api/connector/${id}/token`, { body: { token } }); await F.serverStatus(true); return r; },
+      disconnect: async (id) => { await api(`/api/connector/${id}/disconnect`, { body: {} }); await F.serverStatus(true); },
+      call: (id, req) => api(`/api/connector/${id}/call`, { body: req }),
     },
     connectToken: async (provider, token) => { const r = await api(`/api/oauth/${provider}/token`, { body: { token } }); await F.serverStatus(true); return r; },
     vercel: {

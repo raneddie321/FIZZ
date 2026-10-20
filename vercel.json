@@ -28,6 +28,10 @@
       "dest": "/api/oauth/[provider]/[action].mjs?provider=$1&action=$2"
     },
     {
+      "src": "/api/connector/([^/]+)/([^/]+)",
+      "dest": "/api/connector/[service]/[action].mjs?service=$1&action=$2"
+    },
+    {
       "src": "/api/github/([^/]+)",
       "dest": "/api/github/[action].mjs?action=$1"
     },

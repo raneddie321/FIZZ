@@ -242,4 +242,44 @@ assert.equal(j.ai.model, "gemini-3.8-flash");
   assert.equal((await post("github", "ghp_wrongwrongwrongwrong123")).status, 401);
   globalThis.fetch = realFetch;
 }
+// connectors: token checked with the service, sealed; calls only go to that service, token never returned
+{
+  const connector = (await import("../../netlify/functions/connector.mjs")).default;
+  const realFetch = globalThis.fetch;
+  const seen = [];
+  globalThis.fetch = async (url, init) => {
+    const u = String(url); seen.push(u);
+    if (u === "https://api.notion.com/v1/users/me") return init.headers.Authorization === "Bearer secret_goodgoodgood" ? Response.json({ bot: { workspace_name: "Eddie WS" } }) : new Response("{}", { status: 401 });
+    if (u.startsWith("https://api.notion.com/v1/search")) return Response.json({ results: [{ id: "p1" }], echo: init.headers.Authorization });
+    if (u.startsWith("https://api.telegram.org/botTG:tok_abcdefgh/getMe")) return Response.json({ ok: true, result: { username: "fizzbot" } });
+    if (u.startsWith("https://api.telegram.org/botTG:tok_abcdefgh/sendMessage")) return Response.json({ ok: true, url: u });
+    return realFetch(url, init);
+  };
+  const call = (service, action, body, cookie, origin = O) => connector(new Request(`${O}/api/connector/${service}/${action}`, { method: "POST", headers: { origin, "content-type": "application/json", ...(cookie ? { cookie } : {}) }, body: JSON.stringify(body || {}) }), { params: { service, action } });
+  r = await call("notion", "token", { token: "secret_goodgoodgood" });
+  assert.equal(r.status, 200);
+  const nc = /fizz_cx_notion=([^;]+)/.exec(r.headers.get("set-cookie"))[1];
+  assert.equal(unseal(decodeURIComponent(nc)).label, "Eddie WS");
+  assert.equal((await call("notion", "token", { token: "secret_badbadbadbad" })).status, 401);
+  r = await call("notion", "call", { method: "POST", path: "/search", body: { query: "x" } }, `fizz_cx_notion=${nc}`);
+  j = await r.json();
+  assert.equal(j.status, 200);
+  assert.ok(!JSON.stringify(j).includes("secret_goodgoodgood"), "token never comes back");
+  assert.equal((await call("notion", "call", { path: "https://evil.example/x" }, `fizz_cx_notion=${nc}`)).status, 400);
+  assert.equal((await call("notion", "call", { path: "/../../x" }, `fizz_cx_notion=${nc}`)).status, 400);
+  assert.equal((await call("notion", "call", { path: "/search" })).status, 401, "not connected");
+  assert.equal((await call("notion", "call", { path: "/search" }, `fizz_cx_notion=${nc}`, "https://evil.example")).status, 403);
+  assert.equal((await call("nope", "call", {})).status, 404);
+  r = await call("telegram", "token", { token: "TG:tok_abcdefgh" });
+  const tc = /fizz_cx_telegram=([^;]+)/.exec(r.headers.get("set-cookie"))[1];
+  r = await call("telegram", "call", { method: "POST", path: "/sendMessage", body: { chat_id: 1, text: "hi" } }, `fizz_cx_telegram=${tc}`);
+  const txt = await r.text();
+  assert.ok(!txt.includes("tok_abcdefgh") && txt.includes("••••"), "telegram token in echoed URLs is redacted");
+  r = await status(new Request(`${O}/api/status`, { headers: { cookie: `fizz_cx_notion=${nc}` } }));
+  j = await r.json();
+  assert.equal(j.apps.find((a) => a.id === "notion").connected, true);
+  assert.equal(j.apps.find((a) => a.id === "slack").connected, false);
+  assert.ok(!JSON.stringify(j).includes("secret_goodgoodgood"));
+  globalThis.fetch = realFetch;
+}
 console.log("All Netlify and Vercel function tests passed");
