@@ -407,7 +407,7 @@
     unavailable: "There's no cloud browser on this site right now, but you can still do web tasks with the user: never say you can't. For anything they must get from a website (sign up somewhere, an API key, a token, a code), use <fizz-collect>: it opens the right page for them, shows your short steps, and saves what they paste straight into the project. Read pages and docs with <fizz-fetch> to find the exact URLs (sign-up page, the API-key settings page).",
     needsApproval: (t) => t.attrs.action === "handoff" || (t.attrs.action === "click" && SENSITIVE.test(lastLabel(t.attrs.id))) || (t.attrs.action === "type" && t.attrs.enter === "true" && SENSITIVE.test(lastLabel(t.attrs.id))),
     waiting: (t) => (t.attrs.action === "handoff"
-      ? { handoff: true, text: `Your turn: ${t.attrs.reason || "do this step yourself in the browser"}. Use the browser in the Browser tab, then press Continue.`, ok: "Continue", cancel: "Cancel" }
+      ? { handoff: true, text: `Your turn: ${t.attrs.reason || "do this step yourself in the browser"}. Do it in the browser, then press Continue.`, html: `<button type="button" class="btn btn-outline btn-sm" data-act="preview">Open the browser</button>`, ok: "Continue", cancel: "Cancel" }
       : { text: `Fizz Code wants to click “${lastLabel(t.attrs.id)}”. This may buy, send, post or delete something. Allow it?`, ok: "Allow", cancel: "Don't allow" }),
     onWait(t, ctx, key) {
       if (t.attrs.action !== "handoff") return;
@@ -429,10 +429,15 @@
       const ct = tabs.find((x) => x.kind === "cloud" && x.id === active);
       if (ct?.target && !a.tab) a.tab = ct.target;
       if (a.action === "screenshot") a.shot = true;
-      if (!tabs.some((x) => x.kind === "cloud")) { ctx.showTab("browser"); render(); }
+      // Always bring the browser on screen, so the user sees what Fizz is doing.
+      if (!$(".pane-browser.on") || !tabs.some((x) => x.kind === "cloud")) { ctx.showTab("browser"); render(); }
+      // Show what's happening while it works (the first start of the cloud browser takes about a minute).
+      const t0 = Date.now();
+      const tick = setInterval(() => { const sec = Math.round((Date.now() - t0) / 1000); t.progress = starting ? `Starting the cloud browser — the first time takes about a minute… ${sec}s` : `Working… ${sec}s`; ctx.rerender?.(); }, 1000);
       let r;
       try { r = await cloud(a, null); }
       catch (e) { throw new Error(`${e.message || e}\nIf the browser keeps failing, switch to <fizz-collect>: open the page for the user and let them paste what you need.`); }
+      finally { clearInterval(tick); t.progress = ""; }
       lastTabs = r.tabs || [];
       const cur = tabs.find((x) => x.kind === "cloud" && x.target === lastTabs.find((y) => y.active)?.id);
       if (cur) active = cur.id;
@@ -510,7 +515,15 @@
     },
   });
 
+  /** Starts the cloud browser in the background (Do mode), so the first real step doesn't wait for the install. */
+  let warmed = 0;
+  function warmUp() {
+    if (!cloudOn() || Date.now() - warmed < 10 * 60_000) return;
+    warmed = Date.now();
+    F.conn.api("/api/browser", { body: { action: "live" }, auth: true }).catch(() => {});
+  }
   F.web = {
+    warmUp,
     init(h) { host = h; render(); },
     isWeb, go, newTab, render, select,
     reload: () => nav(0), back: () => nav(-1), forward: () => nav(1),

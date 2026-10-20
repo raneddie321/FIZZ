@@ -294,7 +294,7 @@
     if (!created && !edited && !staged.length && doneTools.length && doneTools.length <= 3 && doneTools.length === tools.length) label = doneTools.map((x) => toolLabel(x)).join(" · ");
     label = label && label[0].toUpperCase() + label.slice(1);
     if (writing) label = `Writing ${writing.path}…`;
-    else if (running) label = `${toolLabel(running)}…`;
+    else if (running) label = running.progress ? `${toolLabel(running).replace(/^Opened /, "Opening ")} — ${running.progress}` : `${toolLabel(running)}…`;
     else if (!label && tools.length) { const w = tools.find((x) => x.status === "waiting") || tools[0]; label = toolLabel(w); }
     const key = `${m.id}:activity`;
     const open = state.expanded.has(key) || waiting;
@@ -1665,7 +1665,8 @@
     if (b) { $("#input").value = b.dataset.slash; $("#slash").classList.add("hidden"); send(); }
   });
   $("#input").addEventListener("click", () => renderSlash());
-  $$(".mode button").forEach((b) => b.addEventListener("click", () => { state.mode = b.dataset.mode; data.settings.devMode = state.mode; save(); renderComposer(); }));
+  $$(".mode button").forEach((b) => b.addEventListener("click", () => { state.mode = b.dataset.mode; data.settings.devMode = state.mode; save(); renderComposer(); if (state.mode === "do") F.web?.warmUp?.(); }));
+  if (state.mode === "do") setTimeout(() => F.web?.warmUp?.(), 3000);
   $("#model-btn").addEventListener("click", () => openSettings("ai"));
   function openMemory() {
     const p = project();
