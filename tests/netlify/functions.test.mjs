@@ -282,4 +282,150 @@ assert.equal(j.ai.model, "gemini-3.8-flash");
   assert.ok(!JSON.stringify(j).includes("secret_goodgoodgood"));
   globalThis.fetch = realFetch;
 }
+// MCP servers: the handshake, the sealed cookie, tool calls, redaction, SSRF and both transports
+{
+  const mcpFn = (await import("../../netlify/functions/mcp.mjs")).default;
+  const vMcp = await import("../../api/mcp/[action].mjs");
+  delete process.env.CLERK_SECRET_KEY; // no RanEddie ID → requireUser is the single-user "local"
+  const realFetch = globalThis.fetch;
+  const AUTH = "Bearer secret-mcp-token-abc123";
+  const seen = [];
+  let sseCtl = null;
+  const enc = (m) => new TextEncoder().encode(`data: ${JSON.stringify(m)}\n\n`);
+  globalThis.fetch = async (url, init = {}) => {
+    const u = String(url);
+    seen.push(`${init.method || "GET"} ${u}`);
+    const body = init.body ? JSON.parse(init.body) : null;
+    const jsonRes = (msg, extra = {}) => new Response(JSON.stringify(msg), { headers: { "content-type": "application/json", ...extra } });
+    if (u === "https://203.0.113.10/mcp") {
+      // Streamable HTTP: every message is a POST; the session id ties them together.
+      if (body?.method === "initialize") return jsonRes({ jsonrpc: "2.0", id: body.id, result: { protocolVersion: "2025-06-18", serverInfo: { name: "Test MCP", version: "1" }, capabilities: { tools: {} } } }, { "mcp-session-id": "sess-1" });
+      if (body?.method === "notifications/initialized") return new Response(null, { status: 202 });
+      if (body?.method === "tools/list") {
+        assert.equal(init.headers["Mcp-Session-Id"], "sess-1", "session id is sent back");
+        assert.equal(init.headers.Authorization, AUTH, "the user's header is added by FIZZ's server");
+        return jsonRes({ jsonrpc: "2.0", id: body.id, result: { tools: [{ name: "lookup", description: "Looks things up", inputSchema: { type: "object", properties: { query: { type: "string" } }, required: ["query"] } }] } });
+      }
+      if (body?.method === "tools/call") {
+        // Answered as an SSE stream, like many real servers.
+        const msg = JSON.stringify({ jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: `found ${body.params.arguments.query} (token ${AUTH})` }] } });
+        return new Response(`data: ${msg}\n\n`, { headers: { "content-type": "text/event-stream" } });
+      }
+      if (init.method === "DELETE") return new Response(null, { status: 200 });
+    }
+    if (u === "https://203.0.113.99/sse") {
+      // Older transport: GET opens the stream and posts the endpoint; POSTs to it get 202.
+      if (init.method === "GET") {
+        const stream = new ReadableStream({ start(c) { sseCtl = c; c.enqueue(new TextEncoder().encode("event: endpoint\ndata: /messages\n\n")); } });
+        return new Response(stream, { headers: { "content-type": "text/event-stream" } });
+      }
+      return new Response("{}", { status: 404 });
+    }
+    if (u === "https://203.0.113.99/messages" && body) {
+      if (body.method === "initialize") { setTimeout(() => sseCtl.enqueue(enc({ jsonrpc: "2.0", id: body.id, result: { protocolVersion: "2024-11-05", serverInfo: { name: "Legacy MCP" } } })), 0); return new Response(null, { status: 202 }); }
+      if (body.method === "tools/list") { setTimeout(() => sseCtl.enqueue(enc({ jsonrpc: "2.0", id: body.id, result: { tools: [{ name: "old_tool", description: "From the older transport" }] } })), 0); return new Response(null, { status: 202 }); }
+      return new Response(null, { status: 202 });
+    }
+    return realFetch(url, init);
+  };
+  const post = (action, body, cookie, origin = O) => mcpFn(new Request(`${O}/api/mcp/${action}`, { method: "POST", headers: { origin, ...(body ? { "content-type": "application/json" } : {}), ...(cookie ? { cookie } : {}) }, body: body && JSON.stringify(body) }), { params: { action } });
+  const mcpCookieOf = (res) => {
+    const m = /fizz_mcp=([^;]+)/.exec(res.headers.get("set-cookie") || "");
+    return m ? `fizz_mcp=${m[1]}` : null;
+  };
+
+  j = await (await status(new Request(`${O}/api/status`))).json();
+  assert.equal(j.mcp.configured, true, "status reports MCP as available");
+
+  // connect: handshake + tools list, saved sealed; the header value never reaches the browser
+  r = await post("add", { url: "https://203.0.113.10/mcp", name: "My tracker", headers: { Authorization: AUTH } });
+  assert.equal(r.status, 200);
+  j = await r.json();
+  assert.equal(j.server.name, "My tracker", "the user's name wins");
+  assert.equal(j.server.toolCount, 1);
+  assert.equal(j.server.tools[0].name, "lookup");
+  assert.ok(j.server.tools[0].input.includes("query"), "input schema summarized for the model");
+  assert.ok(!JSON.stringify(j).includes("secret-mcp-token-abc123"), "the header value never comes back");
+  const setCookie = r.headers.get("set-cookie");
+  assert.ok(setCookie?.startsWith("fizz_mcp="), "kept in a sealed HttpOnly cookie");
+  assert.ok(/HttpOnly/.test(setCookie) && /Secure/.test(setCookie));
+  const sealed = /fizz_mcp=([^;]+)/.exec(setCookie)[1];
+  assert.ok(!sealed.includes("secret-mcp-token-abc123") && unseal(decodeURIComponent(sealed)).list[0].headers.Authorization === AUTH, "sealed — the page can't read the header");
+  let ck = `fizz_mcp=${sealed}`;
+
+  // list: public info only
+  r = await post("list", null, ck);
+  assert.equal(r.status, 200);
+  j = await r.json();
+  assert.equal(j.servers.length, 1);
+  assert.equal(j.servers[0].id, "my-tracker", "id is a slug of the chosen name");
+  assert.ok(!("headers" in j.servers[0]), "headers are never returned");
+  const id = j.servers[0].id;
+
+  // call: tools/call through the session, result text redacted
+  r = await post("call", { id, tool: "lookup", arguments: { query: "react" } }, ck);
+  assert.equal(r.status, 200);
+  j = await r.json();
+  assert.equal(j.ok, true);
+  assert.match(j.text, /found react/);
+  assert.ok(!j.text.includes("secret-mcp-token-abc123"), "header value redacted from tool results");
+  assert.ok(j.text.includes("••••"), "redaction marker present");
+  assert.ok(seen.some((s) => s === "DELETE https://203.0.113.10/mcp"), "the session is closed after the call");
+
+  // errors: unknown server/tool, malformed arguments
+  assert.equal((await post("call", { id: "nope", tool: "x" }, ck)).status, 404);
+  assert.equal((await post("call", { id, tool: "" }, ck)).status, 400);
+  assert.equal((await post("call", { id, tool: "lookup", arguments: "nope" }, ck)).status, 400);
+  assert.equal((await post("tools", { id: "nope" }, ck)).status, 404);
+  assert.equal((await post("remove", { id: "nope" }, ck)).status, 404);
+
+  // SSRF and header hygiene, all rejected before anything is saved or sent
+  assert.equal((await post("add", { url: "nonsense" }, ck)).status, 400);
+  assert.equal((await post("add", { url: "http://localhost/mcp" }, ck)).status, 400, "localhost blocked");
+  assert.equal((await post("add", { url: "http://192.168.1.5/mcp" }, ck)).status, 400, "private network blocked");
+  assert.equal((await post("add", { url: "http://169.254.169.254/mcp" }, ck)).status, 400, "cloud metadata blocked");
+  assert.equal((await post("add", { url: "https://203.0.113.10:8080/mcp" }, ck)).status, 400, "non-standard port blocked");
+  assert.equal((await post("add", { url: "ftp://203.0.113.10/mcp" }, ck)).status, 400, "only http(s)");
+  assert.equal((await post("add", { url: "https://203.0.113.10/mcp", headers: { "Content-Type": "x" } }, ck)).status, 400, "reserved header blocked");
+  assert.equal((await post("add", { url: "https://203.0.113.10/mcp", headers: { "X-Test": "a\nb" } }, ck)).status, 400, "line break in a header blocked");
+  assert.equal((await post("add", { url: "https://203.0.113.10/mcp", headers: { "Bad Header": "x" } }, ck)).status, 400, "invalid header name blocked");
+
+  // the older HTTP+SSE transport: POST initialize → 404, then GET stream + endpoint event
+  r = await post("add", { url: "https://203.0.113.99/sse" }, ck);
+  assert.equal(r.status, 200, "legacy SSE transport connects");
+  ck = mcpCookieOf(r);
+  j = await r.json();
+  assert.equal(j.server.name, "Legacy MCP", "name read from the handshake on the stream");
+  assert.equal(j.server.toolCount, 1);
+  assert.ok(seen.includes("GET https://203.0.113.99/sse"), "opened the stream");
+
+  // adding the same URL again updates the entry instead of duplicating it
+  r = await post("add", { url: "https://203.0.113.10/mcp", headers: { Authorization: AUTH } }, ck);
+  assert.equal(r.status, 200);
+  ck = mcpCookieOf(r);
+  r = await post("list", null, ck);
+  j = await r.json();
+  assert.equal(j.servers.length, 2, "still two servers after re-adding one");
+
+  // refresh the tool list
+  r = await post("tools", { id }, ck);
+  assert.equal(r.status, 200);
+  assert.equal((await r.json()).server.toolCount, 1);
+
+  // remove
+  r = await post("remove", { id }, ck);
+  assert.equal(r.status, 200);
+  r = await post("list", null, mcpCookieOf(r) || ck);
+  j = await r.json();
+  assert.equal(j.servers.length, 1);
+  assert.equal(j.servers[0].name, "Legacy MCP");
+
+  // guards: cross-site, unknown action, and the Vercel shim routing
+  assert.equal((await post("list", null, ck, "https://evil.example")).status, 403, "cross-site blocked");
+  assert.equal((await post("nope", {}, ck)).status, 404, "unknown action");
+  r = await vMcp.POST(new Request(`${O}/api/mcp/list`, { headers: { origin: O } }));
+  assert.equal(r.status, 200, "Vercel shim routes /api/mcp/list");
+  assert.ok(Array.isArray((await r.json()).servers));
+  globalThis.fetch = realFetch;
+}
 console.log("All Netlify and Vercel function tests passed");

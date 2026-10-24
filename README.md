@@ -49,6 +49,7 @@ Never put secrets in code or in chat. Set them only in Netlify or Vercel (Vercel
 | `FIZZ_SANDBOX` | **On by default on Vercel** (`off` turns it off). The cloud features: Fizz Code's Linux sandbox (npm, git, Python, servers), real bash in the terminal for npm/git/any program, and FIZZ's own **cloud browser** (Chromium in the user's sandbox: any site, live screen, Fizz Code clicks/types/signs up with you) | Nothing to set on Vercel. Uses Vercel Sandbox (billed by Vercel); no key needed on Vercel. The browser installs itself the first time (about a minute). `FIZZ_BROWSER=off` turns only the browser off. |
 | `BRAVE_SEARCH_API_KEY` or `TAVILY_API_KEY` | optional web search without Browserbase | api.search.brave.com or tavily.com. Without any search key, search uses Wikipedia. |
 | `FIZZ_SEARCH_LIMIT`, `FIZZ_READ_LIMIT`, `FIZZ_BROWSER_LIMIT`, `FIZZ_SANDBOX_LIMIT` | optional | Daily limits per user (defaults 200, 400, 600, 60). |
+| `FIZZ_MCP_LIMIT` | optional | Daily MCP tool calls per user, default `400`. |
 | `FIZZ_BROWSER_MINUTES` | optional | How long a cloud browser session can stay open, default `30`. |
 
 ### Provider settings (replace `YOUR-SITE` with your Netlify or Vercel domain, e.g. `fizzbrowser.vercel.app`)
@@ -68,6 +69,10 @@ Never put secrets in code or in chat. Set them only in Netlify or Vercel (Vercel
 
 - GitHub and Vercel tokens are kept in AES-256-GCM encrypted, HttpOnly cookies scoped to `/api` —
   page JavaScript can never read them. All POST endpoints reject cross-site requests.
+- MCP servers are stored the same way (Upstash when connected, otherwise the same sealed cookie) and every
+  hop — including redirects — is checked against private and internal addresses. The Authorization header a
+  user pastes never reaches the browser and is redacted from tool results. The first call to each server asks
+  for permission; calls that send, post or delete always ask.
 - If any credential was ever shared in chat or email, **rotate it** in the provider's dashboard.
 - The included FIZZ AI enforces a per-visitor daily quota (Upstash or Netlify Blobs) to protect your OpenRouter budget.
 - Web reading refuses private and internal addresses (also through redirects). Search, the cloud browser and the
@@ -95,6 +100,11 @@ The FIZZ / FIZZ DEV switch in the sidebar — or **Ctrl+.** — swaps between th
 with no reload: chats keep streaming, the editor and terminal keep their state, and Back/Forward work.
 Any FIZZ answer that contains code has **Build in FIZZ DEV**, which hands the answer over as an attachment.
 
+**FIZZ chat searches the web**: when the deployment has search (any of Browserbase, Brave, Tavily, or the
+built-in Wikipedia fallback), FIZZ looks up current facts mid-answer — it writes a search or a page read,
+gets the results back, and continues with sources cited. What you see stays a normal answer; the tool rounds
+aren't saved to the chat, and search results are treated as data, never as instructions.
+
 ## FIZZ DEV features
 
 - **Agent chat**: a live task list, one activity line per reply (click to see each diff, command and result),
@@ -109,6 +119,14 @@ Any FIZZ answer that contains code has **Build in FIZZ DEV**, which hands the an
 - **Apps connected with a token** (Settings → Connections → Apps): Notion, Trello, Linear, Airtable, Figma, Netlify,
   Cloudflare, Discord, Telegram, Slack and Supabase. The token is checked once and sealed in an HttpOnly cookie;
   `<fizz-api>` calls go through `/api/connector`, which only talks to that app's API and never returns the token.
+- **MCP servers** (Settings → Connections → MCP servers): add any [MCP](https://modelcontextprotocol.io) server by
+  its URL — data sources, browsers, GitHub, Notion, your own services — and Fizz Code gets its tools as
+  `<fizz-mcp>`. Both transports work (Streamable HTTP and the older HTTP+SSE). The handshake lists the tools;
+  the address and its Authorization header stay encrypted on the server (never in the browser, redacted from
+  results). The first call to a server asks for permission; sending, posting and deleting always ask
+  (Settings → Tools → *Ask before every MCP call* to ask always). Daily limit `FIZZ_MCP_LIMIT` (default 400 tool
+  calls per user). A local `npx …` server needs a public URL first (a tunnel or a hosted endpoint) — this
+  server can't reach your computer.
 - **Telegram updates** (Settings → Tools): a message when Fizz finishes or needs you.
 - **Fizz Code's handbook** (`assets/fizz-brain.js` + `brain-design.js`, `brain-code.js`, `brain-platforms.js`):
   a long engineering guide — how to plan, structure a project into many focused files, write complete code,
@@ -131,6 +149,8 @@ Any FIZZ answer that contains code has **Build in FIZZ DEV**, which hands the an
   - `<fizz-sandbox>`: its own Linux machine in the cloud (Vercel Sandbox) for `npm install`, tests, builds,
     `git` and servers with a public link. Runs without asking (unless *Ask before running* is on).
   - `<fizz-search>` / `<fizz-fetch>`: web search and reading pages.
+  - `<fizz-mcp server="…" tool="…">`: any MCP server the user connected (see **MCP servers** above) —
+    `action="tools"` lists what a server offers, `action="list"` every server.
   - `<fizz-browser>`: a real Chrome in the cloud — FIZZ's own (Chromium in the user's Vercel Sandbox,
     `netlify/lib/browser-agent.js`) or Browserbase — that the user watches and uses live in the Browser tab.
     Asked to do something on a website, it does it instead of explaining. It opens sites, clicks, types, scrolls and manages tabs. For logins it asks whether you

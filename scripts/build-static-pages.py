@@ -105,6 +105,7 @@ page("fizz.html", "FIZZ — AI assistant", "FIZZ, the everyday AI assistant by R
 <div class="cta-row"><a class="btn btn-lg" href="chat.html">Try FIZZ</a><a class="btn btn-lg btn-outline" href="pricing.html">View plans</a></div>
 {features([
   ("chat", "Natural conversations", "Responses stream in real time. Stop, regenerate, copy, or edit an earlier message and continue from there.", ""),
+  ("globe", "Searches the web", "Current facts, news and documentation — FIZZ looks them up mid-answer and cites its sources.", ""),
   ("pen", "Writing and editing", "Drafts, rewrites, tone changes, summaries and translations with clean formatting.", ""),
   ("brain", "Multi-step reasoning", "Works through complex questions step by step when a problem calls for it.", ""),
   ("code", "Programming help", "Explains code, finds bugs and writes snippets in clear code blocks.", ""),
@@ -132,6 +133,7 @@ page("fizz-dev.html", "FIZZ DEV — AI development workspace", "Describe it. FIZ
   ("git", "GitHub", "Import repositories and push your project as a commit.", "Connect"),
   ("terminal", "Vercel", "Deploy a project and get a live URL in one click.", "Connect"),
   ("file", "Google Workspace", "Import Google Docs, attach Drive files and export summaries to Docs.", "Connect"),
+  ("layers", "MCP servers", "Connect any MCP server by URL and Fizz Code gets its tools — data sources, GitHub, Notion, your own services.", ""),
   ("devices", "Built for every screen", "Three panels on desktop, drawers on tablets and a tab bar on phones.", ""),
   ("keyboard", "Keyboard first", "Slash commands, Ctrl+P to open files, Ctrl+` for the terminal.", ""),
 ])}</section>

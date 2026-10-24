@@ -55,7 +55,7 @@ export function privateAddress(ip) {
   const [a, b] = ip.split(".").map(Number);
   return a === 0 || a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || a >= 224;
 }
-async function assertPublic(u) {
+export async function assertPublic(u) {
   if (!/^https?:$/.test(u.protocol)) throw Object.assign(new Error("Only http and https links can be read."), { status: 400 });
   if (u.port && !["80", "443"].includes(u.port)) throw Object.assign(new Error("Only the standard web ports can be read."), { status: 400 });
   const host = u.hostname.replace(/^\[|\]$/g, "");

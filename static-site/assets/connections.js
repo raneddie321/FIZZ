@@ -176,6 +176,15 @@
       disconnect: async (id) => { await api(`/api/connector/${id}/disconnect`, { body: {} }); await F.serverStatus(true); },
       call: (id, req) => api(`/api/connector/${id}/call`, { body: req }),
     },
+    // MCP (Model Context Protocol) servers: the URL is saved on the server with its headers, so the
+    // browser only ever gets the server's name and its tool list.
+    mcp: {
+      list: () => api("/api/mcp/list", { auth: true }),
+      add: (url, name, auth) => api("/api/mcp/add", { body: { url, name, headers: auth ? { Authorization: auth } : {} }, auth: true }),
+      remove: (id) => api("/api/mcp/remove", { body: { id }, auth: true }),
+      refresh: (id) => api("/api/mcp/tools", { body: { id }, auth: true }),
+      call: (id, tool, arguments_) => api("/api/mcp/call", { body: { id, tool, arguments: arguments_ }, auth: true }),
+    },
     connectToken: async (provider, token) => { const r = await api(`/api/oauth/${provider}/token`, { body: { token } }); await F.serverStatus(true); return r; },
     vercel: {
       connectToken: async (token) => { const r = await api("/api/oauth/vercel/token", { body: { token } }); await F.serverStatus(true); return r; },

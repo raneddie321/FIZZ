@@ -32,6 +32,8 @@ export default async (req) => {
     raneddieId: { publishableKey: publishableKey(), account: clerkConfigured() },
     // Fizz Code tools: which ones this deployment can offer.
     tools: { search: searchProvider(), browser: Boolean(env("BROWSERBASE_API_KEY")) || sandboxBrowserEnabled(), browserEngine: env("BROWSERBASE_API_KEY") ? "browserbase" : sandboxBrowserEnabled() ? "sandbox" : null, sandbox: sandboxEnabled() && Boolean(env("VERCEL")), sync: kvConfigured() && clerkConfigured() },
+    // MCP (Model Context Protocol) servers: FIZZ keeps them in a sealed cookie, so it needs FIZZ_SECRET.
+    mcp: { configured: secret },
     google: { configured: Boolean(env("GOOGLE_CLIENT_ID")), clientId: env("GOOGLE_CLIENT_ID") ?? null },
   });
 };
