@@ -285,7 +285,9 @@ assert.equal(j.ai.model, "gemini-3.8-flash");
 // MCP servers: the handshake, the sealed cookie, tool calls, redaction, SSRF and both transports
 {
   const mcpFn = (await import("../../netlify/functions/mcp.mjs")).default;
-  const vMcp = await import("../../api/mcp/[action].mjs");
+  // On Vercel the Hobby plan caps a deployment at 12 functions, so /api/mcp/* shares the web function
+  // (vercel.json rewrites it as action=mcp-<action>).
+  const vWeb = await import("../../api/web/[action].mjs");
   delete process.env.CLERK_SECRET_KEY; // no RanEddie ID → requireUser is the single-user "local"
   const realFetch = globalThis.fetch;
   const AUTH = "Bearer secret-mcp-token-abc123";
@@ -420,11 +422,11 @@ assert.equal(j.ai.model, "gemini-3.8-flash");
   assert.equal(j.servers.length, 1);
   assert.equal(j.servers[0].name, "Legacy MCP");
 
-  // guards: cross-site, unknown action, and the Vercel shim routing
+  // guards: cross-site, unknown action, and the Vercel rewrite that shares the web function
   assert.equal((await post("list", null, ck, "https://evil.example")).status, 403, "cross-site blocked");
   assert.equal((await post("nope", {}, ck)).status, 404, "unknown action");
-  r = await vMcp.POST(new Request(`${O}/api/mcp/list`, { headers: { origin: O } }));
-  assert.equal(r.status, 200, "Vercel shim routes /api/mcp/list");
+  r = await vWeb.POST(new Request(`${O}/api/web/list?action=mcp-list`, { headers: { origin: O } }));
+  assert.equal(r.status, 200, "on Vercel, /api/mcp/* is served by the shared web function");
   assert.ok(Array.isArray((await r.json()).servers));
   globalThis.fetch = realFetch;
 }

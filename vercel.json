@@ -65,7 +65,7 @@
     },
     {
       "src": "/api/mcp/([^/]+)",
-      "dest": "/api/mcp/[action].mjs?action=$1"
+      "dest": "/api/web/[action].mjs?action=mcp-$1"
     },
     {
       "src": "/api/email-taken",
