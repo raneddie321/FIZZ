@@ -372,7 +372,7 @@
       const check = m.verifying
         ? `<div class="verify-note run"><span class="st run"></span><span>Checking the project…</span></div>`
         : m.verified && !m.verified.fixing
-        ? `<div class="verify-note ${m.verified.ok ? "ok" : "warn"}">${F.icon(m.verified.ok ? "check" : "alert")}<span>${m.verified.ok ? `Checked ${m.verified.files} changed file${m.verified.files === 1 ? "" : "s"} — no errors found` : `${m.verified.count} problem${m.verified.count === 1 ? "" : "s"} still open`}</span>${m.verified.list ? `<ul>${m.verified.list.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}</div>` : "";
+        ? `<div class="verify-note ${m.verified.ok ? "ok" : "warn"}">${F.icon(m.verified.ok ? "check" : "alert")}<span>${m.verified.ok ? `Checked ${m.verified.files} changed file${m.verified.files === 1 ? "" : "s"} — no errors found` : m.verified.count ? `${m.verified.count} problem${m.verified.count === 1 ? "" : "s"} still open` : "Verification incomplete — not all checks passed"}</span>${m.verified.list?.length ? `<ul>${m.verified.list.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}${m.verified.warnings?.length ? `<ul class="verify-warnings">${m.verified.warnings.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}${m.verified.skipped?.length ? `<p class="verify-skipped">Skipped checks: ${esc(m.verified.skipped.join(", "))}</p>` : ""}</div>` : "";
       return `<div class="a-msg">${html}${thinking}${body}${cards}${askHtml}${check}${actions}</div>`;
     }).join("");
     for (const [key, value, focused] of drafts) {
@@ -651,22 +651,38 @@
     reply.verifying = true;
     renderThread();
     let result;
-    try { result = await F.verify.check(project().files, { changed, preview: previewErrors }); }
-    catch { result = null; }
+    try {
+      result = await F.verify.check(project().files, { changed, preview: previewErrors });
+    } catch (e) {
+      result = { issues: [], warnings: [{ path: "", text: `Verification failed unexpectedly: ${String(e?.message || e).slice(0, 240)}` }], skipped: ["verification-engine-failed"] };
+    }
     reply.verifying = false;
-    if (!result || chat()?.messages.at(-1) !== reply) { renderThread(); return false; }
-    const { issues } = result;
-    if (issues.length && turn.verifies < MAX_VERIFIES && reply.step < MAX_STEPS() && !stopLoop) {
+    if (chat()?.messages.at(-1) !== reply) { renderThread(); return false; }
+    const issues = Array.isArray(result?.issues) ? result.issues : [];
+    const warnings = Array.isArray(result?.warnings) ? result.warnings : [];
+    const skipped = Array.isArray(result?.skipped) ? result.skipped : [];
+    const canFix = issues.length && turn.verifies < MAX_VERIFIES && reply.step < MAX_STEPS() && !stopLoop;
+    if (canFix) {
       turn.verifies++;
-      reply.verified = { ok: false, count: issues.length, fixing: true };
+      reply.verified = { ok: false, count: issues.length, fixing: true, warnings: warnings.length, skipped };
       const notice = `Checked the project and found ${issues.length} problem${issues.length === 1 ? "" : "s"} — Fizz Code is fixing ${issues.length === 1 ? "it" : "them"}`;
-      chat().messages.push({ id: F.uid(), role: "user", auto: true, notice, autoLabel: notice, content: `<tool-result tool="check" ok="false">\nFIZZ DEV checked the files you wrote and found these problems:\n${F.verify.format(issues)}\n</tool-result>\n\nFix every problem above at its root (use <fizz-edit> for small fixes), keep everything else as it is, and don't start new features. Then finish with the updated <fizz-plan> and a short summary.`, mode: "build", at: Date.now() });
+      chat().messages.push({
+        id: F.uid(), role: "user", auto: true, notice, autoLabel: notice,
+        content: `<tool-result tool="check" ok="false">\nFIZZ DEV checked the files you wrote and found these problems:\n${F.verify.format(issues)}${warnings.length ? `\n\nVerification warnings (these checks are incomplete):\n${F.verify.formatWarnings ? F.verify.formatWarnings(warnings) : warnings.map((w) => `- ${w.path ? w.path + " — " : ""}${w.text}`).join("\n")}` : ""}${skipped.length ? `\n\nChecks skipped: ${skipped.join(", ")}` : ""}\n</tool-result>\n\nFix every problem above at its root (use <fizz-edit> for small fixes), keep everything else as it is, and don't start new features. Then finish with the updated <fizz-plan> and a short summary.`,
+        mode: "build", at: Date.now()
+      });
       save();
       renderAll();
       generate({ step: reply.step + 1 });
       return true;
     }
-    reply.verified = issues.length ? { ok: false, count: issues.length, list: issues.slice(0, 8).map((x) => `${x.path}${x.line ? `:${x.line}` : ""} — ${x.text}`) } : { ok: true, files: changed.length };
+    reply.verified = {
+      ok: issues.length === 0 && warnings.length === 0 && skipped.length === 0,
+      files: changed.length,
+      ...(issues.length ? { count: issues.length, list: issues.slice(0, 8).map((x) => `${x.path}${x.line ? `:${x.line}` : ""} — ${x.text}`) } : {}),
+      ...(warnings.length ? { warnings: warnings.slice(0, 8).map((x) => `${x.path ? x.path + " — " : ""}${x.text}`) } : {}),
+      ...(skipped.length ? { skipped } : {})
+    };
     save();
     renderThread();
     return false;
