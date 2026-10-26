@@ -344,6 +344,9 @@
     active = id;
     render();
     if (id === "preview") host?.refreshPreview();
+    else if (tab(id)?.kind === "cloud") {
+      cloud({ action: "switch", tab: tab(id).target }, tab(id)).catch((e) => F.toast(e.message));
+    }
   }
   function close(id) {
     const i = tabs.findIndex((t) => t.id === id);
