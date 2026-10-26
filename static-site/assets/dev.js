@@ -372,7 +372,7 @@
       const check = m.verifying
         ? `<div class="verify-note run"><span class="st run"></span><span>Checking the project…</span></div>`
         : m.verified && !m.verified.fixing
-        ? `<div class="verify-note ${m.verified.ok ? "ok" : "warn"}">${F.icon(m.verified.ok ? "check" : "alert")}<span>${m.verified.ok ? `Checked ${m.verified.files} changed file${m.verified.files === 1 ? "" : "s"} — no errors found` : `${m.verified.count} problem${m.verified.count === 1 ? "" : "s"} still open`}</span>${m.verified.list ? `<ul>${m.verified.list.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}</div>` : "";
+        ? `<div class="verify-note ${m.verified.ok ? "ok" : "warn"}">${F.icon(m.verified.ok ? "check" : "alert")}<span>${m.verified.ok ? `Checked ${m.verified.files} changed file${m.verified.files === 1 ? "" : "s"} — no errors found` : m.verified.count ? `${m.verified.count} problem${m.verified.count === 1 ? "" : "s"} still open` : "Verification incomplete — not all checks passed"}</span>${m.verified.list?.length ? `<ul>${m.verified.list.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}${m.verified.warnings?.length ? `<ul class="verify-warnings">${m.verified.warnings.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}${m.verified.skipped?.length ? `<p class="verify-skipped">Skipped checks: ${esc(m.verified.skipped.join(", "))}</p>` : ""}</div>` : "";
       return `<div class="a-msg">${html}${thinking}${body}${cards}${askHtml}${check}${actions}</div>`;
     }).join("");
     for (const [key, value, focused] of drafts) {
