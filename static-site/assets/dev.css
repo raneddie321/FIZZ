@@ -497,3 +497,40 @@
 @keyframes chat-pulse { 50% { opacity: .35; } }
 @media (prefers-reduced-motion: reduce) { .chat-st.running { animation: none; } }
 .proj-chats a .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+
+/* Browser workspace: use the available app viewport, not a device mockup or side drawer. */
+.dev-app.browser-full .chat-side,
+.dev-app.browser-full .dev-main,
+.dev-app.browser-full .resizer,
+.dev-app.browser-full .tabbar { display: none !important; }
+.dev-app.browser-full .panel,
+.dev-app.browser-full.panel-open .panel {
+  display: flex !important;
+  position: fixed !important;
+  z-index: 80 !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  transform: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+.dev-app.browser-full .panel-tabs { display: none !important; }
+.dev-app.browser-full .pane-browser { display: flex !important; flex-direction: column; }
+.dev-app.browser-full .br-tabs { flex: none; min-height: 38px; }
+.dev-app.browser-full .browser-bar { flex: none; }
+.dev-app.browser-full .browser-bar .url { min-width: 0; height: 38px; font-size: 14px; }
+.dev-app.browser-full .browser-stage { flex: 1; min-height: 0; padding: 0; overflow: hidden; }
+.dev-app.browser-full #preview,
+.dev-app.browser-full .web-frame,
+.dev-app.browser-full #br-live,
+.dev-app.browser-full .br-screen { width: 100% !important; height: 100% !important; max-width: none !important; border: 0; border-radius: 0; }
+.dev-app.browser-full .console { flex: none; }
+.dev-app.browser-full .console-body { max-height: 110px; }
+.dev-app.browser-full .br-handoff { flex: none; }
+@media (max-width: 1100px) {
+  .dev-app.browser-full .panel { width: 100vw !important; }
+}
