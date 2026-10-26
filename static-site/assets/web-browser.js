@@ -65,22 +65,28 @@
     t.idx = t.history.length - 1;
   }
 
-  /** Opens text from the address bar: a link or a search. */
+  /** Opens text from the address bar: a link or a search. Prefer the real cloud browser for every website. */
   async function go(input, t = tab()) {
     if (!t || t.kind === "preview") { newTab(input); return; }
     const q = String(input || "").trim();
     if (!q) return;
     const url = toUrl(q);
     if (!url) { push(t, { kind: "search", q }); return show(t); }
-    if (t.kind === "cloud") return cloud({ action: "open", url, tab: t.target }, t);
+    // Keep all real websites in the same cloud Chromium session: this is the only path that supports sites
+    // with modern JavaScript, cookies, logins, navigation and FIZZ DEV's browser controls.
+    if (cloudOn() || t.kind === "cloud") {
+      return cloud({ action: "open", url, tab: t.kind === "cloud" ? t.target : undefined, newTab: t.kind !== "cloud" }, t)
+        .catch((e) => { F.toast(e.message); });
+    }
+    // A frame is only a best-effort fallback; many sites explicitly forbid embedding.
     const yt = youtube(url);
-    if (yt && yt !== "home") { push(t, { kind: "frame", url: yt, shown: url, title: "YouTube" }); return show(t); }
-    // With the cloud browser on, every site opens in a real browser (logins, apps, sites that block frames).
-    if (cloudOn()) return cloud({ action: "open", url, newTab: true }, t).catch((e) => F.toast(e.message));
     push(t, { kind: "loading", url });
     show(t);
-    if (yt !== "home" && (await canFrame(url))) { t.history[t.idx] = { kind: "frame", url }; return show(t); }
-    if (cloudOn()) { t.history.pop(); t.idx--; return cloud({ action: "open", url, newTab: true }, t); }
+    if (yt && yt !== "home") {
+      t.history[t.idx] = { kind: "frame", url: yt, shown: url, title: "YouTube" };
+      return show(t);
+    }
+    if (await canFrame(url)) { t.history[t.idx] = { kind: "frame", url }; return show(t); }
     t.history[t.idx] = { kind: "reader", url, youtubeHome: yt === "home" };
     show(t);
   }
