@@ -25,9 +25,11 @@
   // ---------- navigation ----------
   /** A link, or null when the text is a search. */
   function toUrl(q) {
-    q = q.trim();
+    q = String(q || "").trim();
+    if (!q) return null;
     if (/^https?:\/\/\S+$/i.test(q)) return q;
-    if (/^(localhost|[\w-]+(\.[\w-]+)+)(:\d+)?(\/\S*)?$/i.test(q) && !/\s/.test(q)) return `https://${q}`;
+    if (/^(localhost|127\.0\.0\.1|[\w-]+(\.[\w-]+)+)(:\d+)?(\/\S*)?$/i.test(q) && !/\s/.test(q)) return `https://${q}`;
+    if (/^[\w-]+(\/[\w./?&=#%-]*)?$/.test(q) && !/\s/.test(q) && q.includes(".")) return `https://${q}`;
     return null;
   }
   function youtube(url) {
@@ -71,12 +73,17 @@
     const q = String(input || "").trim();
     if (!q) return;
     const url = toUrl(q);
+    // The cloud browser is the default for external URLs. It supports sites that block iframes,
+    // client-side navigation, logins and sites with complex JavaScript.
+    if (cloudOn()) {
+      if (url) return cloud({ action: "open", url, tab: t.kind === "cloud" ? t.target : undefined, newTab: t.kind !== "cloud" }, t).catch((e) => F.toast(e.message));
+      if (t.kind === "cloud") return cloud({ action: "open", url: `https://www.google.com/search?q=${encodeURIComponent(q)}`, tab: t.target }, t).catch((e) => F.toast(e.message));
+      return cloud({ action: "open", url: `https://www.google.com/search?q=${encodeURIComponent(q)}`, newTab: true }, t).catch((e) => F.toast(e.message));
+    }
     if (!url) { push(t, { kind: "search", q }); return show(t); }
     if (t.kind === "cloud") return cloud({ action: "open", url, tab: t.target }, t);
     const yt = youtube(url);
-    if (yt && yt !== "home") { push(t, { kind: "frame", url: yt, shown: url, title: "YouTube" }); return show(t); }
-    // With the cloud browser on, every site opens in a real browser (logins, apps, sites that block frames).
-    if (cloudOn()) return cloud({ action: "open", url, newTab: true }, t).catch((e) => F.toast(e.message));
+    if (yt && yt !== "home") { push(t, { kind: "frame", url, shown: url, title: "YouTube" }); return show(t); }
     push(t, { kind: "loading", url });
     show(t);
     if (yt !== "home" && (await canFrame(url))) { t.history[t.idx] = { kind: "frame", url }; return show(t); }
@@ -118,7 +125,7 @@
       return r;
     } catch (e) {
       starting = false;
-      if (t) { t.busy = false; t.error = e.message; render(); }
+      if (t) { t.busy = false; t.error = e.message || "Browser could not start."; render(); }
       throw e;
     }
   }
@@ -540,9 +547,11 @@
     reload: () => nav(0), back: () => nav(-1), forward: () => nav(1),
     /** The address bar while the preview is showing: project pages stay in the preview, anything else opens a web tab. */
     fromPreview(value, files) {
-      const v = value.trim();
+      const v = String(value || "").trim();
       const path = v.replace(/^\/+/, "");
-      if (!v || v.startsWith("/") || files[path] !== undefined || files[`${path}/index.html`] !== undefined) return false;
+      // Keep explicit project-relative paths in Preview; external URLs/domains/searches go to Browser.
+      if (!v) return false;
+      if (v.startsWith("/") || files[path] !== undefined || files[`${path}/index.html`] !== undefined) return false;
       newTab(v);
       return true;
     },
