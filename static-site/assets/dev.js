@@ -1066,23 +1066,10 @@
   let term = null;
   function showTab(tab) {
     ui.tab = tab;
-    app.classList.toggle("browser-full", tab === "browser");
-    if (tab === "browser") {
-      app.dataset.view = "browser";
-      app.dataset.panel = "open";
-      ui.panel = "open";
-      app.classList.add("panel-open");
-      $(".tabbar button").forEach((b) => b.setAttribute("aria-current", String(b.dataset.goto === "browser")));
-    } else if (app.dataset.view === "browser") {
-      app.dataset.view = "chat";
-      app.classList.remove("panel-open");
-      $(".tabbar button").forEach((b) => b.setAttribute("aria-current", "false"));
-    }
     saveUi();
     $$(".panel-tabs [role=tab]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === tab)));
     $$(".pane").forEach((p) => p.classList.toggle("on", p.dataset.pane === tab));
-    if (tab === "browser") setView("browser");
-    else if (isPhone()) setView(tab);
+    if (isPhone()) setView(tab);
     else if (isNarrow()) app.classList.add("panel-open");
     else if (app.dataset.panel === "closed") { app.dataset.panel = "open"; ui.panel = "open"; saveUi(); }
     if (tab === "terminal") {
@@ -1110,18 +1097,9 @@
   }
   function setView(v) {
     app.dataset.view = v;
-    app.classList.toggle("browser-full", v === "browser");
-    if (v === "browser") {
-      app.dataset.panel = "open";
-      ui.panel = "open";
-      app.classList.add("panel-open");
-      saveUi();
-    } else {
-      app.classList.remove("panel-open");
-    }
     $$(".tabbar button").forEach((b) => b.setAttribute("aria-current", String(b.dataset.goto === v)));
     if (v !== "chat") {
-      $(".panel-tabs [role=tab]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === v)));
+      $$(".panel-tabs [role=tab]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === v)));
       $$(".pane").forEach((p) => p.classList.toggle("on", p.dataset.pane === v));
       if (v === "terminal") { ensureTerm(); setTimeout(() => term?.focus(), 30); }
       if (v === "code") { renderTree(); renderEditor(); setTimeout(() => cm?.refresh(), 30); }
@@ -1985,21 +1963,7 @@
   }
   $("#panel-btn").addEventListener("click", togglePanel);
   $("#panel-btn-mid").addEventListener("click", () => { app.classList.add("panel-open"); showTab(ui.tab); });
-  $("#panel-close").addEventListener("click", () => {
-    if (app.classList.contains("browser-full")) {
-      app.classList.remove("browser-full", "panel-open");
-      app.dataset.view = "chat";
-      app.dataset.panel = "open";
-      ui.panel = "open";
-      ui.tab = "code";
-      saveUi();
-      if (isPhone()) setView("code");
-      else showTab("code");
-      return;
-    }
-    if (isNarrow()) app.classList.remove("panel-open");
-    else togglePanel();
-  });
+  $("#panel-close").addEventListener("click", () => (isNarrow() ? app.classList.remove("panel-open") : togglePanel()));
   $$(".panel-tabs [role=tab]").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
   $("#activity").addEventListener("click", (e) => { const b = e.target.closest("[data-open-file]"); if (b) { showTab("code"); openFile(b.dataset.openFile); } });
   $$(".tabbar button").forEach((b) => b.addEventListener("click", () => (b.dataset.goto === "chat" ? setView("chat") : showTab(b.dataset.goto))));
@@ -2079,6 +2043,7 @@
     refreshPreview();
   });
   $("#br-url").addEventListener("focus", (e) => e.target.select());
+  $$("#br-devices button").forEach((b) => b.addEventListener("click", () => { $$("#br-devices button").forEach((x) => x.classList.toggle("on", x === b)); $("#preview").style.width = b.dataset.w; }));
   $("#br-open").addEventListener("click", () => F.web?.isWeb() ? F.web.openExternal() : window.open(URL.createObjectURL(new Blob([buildPreview(state.previewPath).html], { type: "text/html" })), "_blank", "noopener"));
   $("#console-toggle").addEventListener("click", (e) => {
     if (e.target.id === "console-clear") { state.logs = []; renderConsole(); return; }
@@ -2257,10 +2222,7 @@
     if (e.key === "?" && !mod && !/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || "") && !document.activeElement?.closest?.(".xterm, .CodeMirror, #br-screen")) { e.preventDefault(); shortcuts(); }
     if (mod && e.key === "`") { e.preventDefault(); ui.tab === "terminal" && app.dataset.panel !== "closed" && !isNarrow() ? togglePanel() : showTab("terminal"); }
   });
-  window.addEventListener("resize", () => {
-    if (app.classList.contains("browser-full")) { app.dataset.view = "browser"; app.classList.add("panel-open"); }
-    else if (!isPhone() && app.dataset.view !== "chat") app.dataset.view = "chat";
-  });
+  window.addEventListener("resize", () => { if (!isPhone() && app.dataset.view !== "chat") app.dataset.view = "chat"; });
 
   // ---------- boot ----------
   app.dataset.panel = ui.panel === "closed" ? "closed" : "open";
@@ -2268,7 +2230,7 @@
   renderAll();
   showTab(isPhone() ? ui.tab : ui.tab);
   if (isPhone()) setView("chat");
-  if (isNarrow() && ui.tab !== "browser") app.classList.remove("panel-open");
+  if (isNarrow()) app.classList.remove("panel-open");
 
   window.addEventListener("fizz:settings", () => { state.mode = data.settings.devMode || state.mode; renderAll(); });
   window.addEventListener("fizz:synced", () => { if (!project()) selectProject(data.projects[0].id); renderAll(); });
