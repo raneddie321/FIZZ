@@ -1081,7 +1081,8 @@
     saveUi();
     $$(".panel-tabs [role=tab]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === tab)));
     $$(".pane").forEach((p) => p.classList.toggle("on", p.dataset.pane === tab));
-    if (isPhone()) setView(tab);
+    if (tab === "browser") setView("browser");
+    else if (isPhone()) setView(tab);
     else if (isNarrow()) app.classList.add("panel-open");
     else if (app.dataset.panel === "closed") { app.dataset.panel = "open"; ui.panel = "open"; saveUi(); }
     if (tab === "terminal") {
@@ -1120,7 +1121,7 @@
     }
     $$(".tabbar button").forEach((b) => b.setAttribute("aria-current", String(b.dataset.goto === v)));
     if (v !== "chat") {
-      $$(".panel-tabs [role=tab]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === v)));
+      $(".panel-tabs [role=tab]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === v)));
       $$(".pane").forEach((p) => p.classList.toggle("on", p.dataset.pane === v));
       if (v === "terminal") { ensureTerm(); setTimeout(() => term?.focus(), 30); }
       if (v === "code") { renderTree(); renderEditor(); setTimeout(() => cm?.refresh(), 30); }
@@ -1988,9 +1989,12 @@
     if (app.classList.contains("browser-full")) {
       app.classList.remove("browser-full", "panel-open");
       app.dataset.view = "chat";
+      app.dataset.panel = "open";
+      ui.panel = "open";
       ui.tab = "code";
-      showTab("code");
+      saveUi();
       if (isPhone()) setView("code");
+      else showTab("code");
       return;
     }
     if (isNarrow()) app.classList.remove("panel-open");
