@@ -1068,9 +1068,15 @@
     ui.tab = tab;
     app.classList.toggle("browser-full", tab === "browser");
     if (tab === "browser") {
+      app.dataset.view = "browser";
       app.dataset.panel = "open";
       ui.panel = "open";
       app.classList.add("panel-open");
+      $(".tabbar button").forEach((b) => b.setAttribute("aria-current", String(b.dataset.goto === "browser")));
+    } else if (app.dataset.view === "browser") {
+      app.dataset.view = "chat";
+      app.classList.remove("panel-open");
+      $(".tabbar button").forEach((b) => b.setAttribute("aria-current", "false"));
     }
     saveUi();
     $$(".panel-tabs [role=tab]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === tab)));
@@ -1981,8 +1987,10 @@
   $("#panel-close").addEventListener("click", () => {
     if (app.classList.contains("browser-full")) {
       app.classList.remove("browser-full", "panel-open");
+      app.dataset.view = "chat";
       ui.tab = "code";
       showTab("code");
+      if (isPhone()) setView("code");
       return;
     }
     if (isNarrow()) app.classList.remove("panel-open");
