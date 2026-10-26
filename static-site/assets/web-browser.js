@@ -354,8 +354,11 @@
     active = id;
     render();
     if (id === "preview") host?.refreshPreview();
-    else if (tab(id)?.kind === "cloud") {
-      cloud({ action: "switch", tab: tab(id).target }, tab(id)).catch((e) => F.toast(e.message));
+    else {
+      const selected = tab(id);
+      if (selected?.kind === "cloud" && selected.target) {
+        cloud({ action: "switch", tab: selected.target }, selected).catch((e) => F.toast(e.message));
+      }
     }
   }
   function close(id) {
