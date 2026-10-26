@@ -65,20 +65,30 @@
     t.idx = t.history.length - 1;
   }
 
-  /** Opens text from the address bar: a link or a search. Prefer the real cloud browser for every website. */
+  /** Opens a URL in the actual cloud Chrome whenever available, instead of a reader pane. */
   async function go(input, t = tab()) {
     if (!t || t.kind === "preview") { newTab(input); return; }
     const q = String(input || "").trim();
     if (!q) return;
     const url = toUrl(q);
     if (!url) { push(t, { kind: "search", q }); return show(t); }
-    // All website navigation should use real cloud Chromium when configured, so normal site behavior
-    // (JavaScript, cookies, redirects and forms) works and FIZZ DEV can control the same tab.
+
+    // Prefer real Chromium for every website so cookies, JS, redirects and forms work and FIZZ DEV
+    // can use its normal browser controls. Keep the active cloud tab when navigating within it.
     if (cloudOn() || t.kind === "cloud") {
-      return cloud({ action: "open", url, tab: t.kind === "cloud" ? t.target : undefined, newTab: t.kind !== "cloud" }, t)
-        .catch((e) => { F.toast(e.message); });
+      const wasCloud = t.kind === "cloud";
+      try {
+        await cloud({ action: "open", url, ...(wasCloud && t.target ? { tab: t.target } : {}) }, t);
+      } catch (e) {
+        t.busy = false;
+        t.error = e.message || "Couldn't open this site in the cloud browser.";
+        render();
+        F.toast(t.error);
+      }
+      return;
     }
-    // Without cloud Chromium, frames are only a best-effort fallback: sites may block embedding.
+
+    // Fallback only when the cloud browser isn't configured: site owners can forbid embedding.
     const yt = youtube(url);
     push(t, { kind: "loading", url });
     show(t);
