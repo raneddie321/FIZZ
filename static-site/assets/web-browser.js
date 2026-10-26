@@ -72,13 +72,13 @@
     if (!q) return;
     const url = toUrl(q);
     if (!url) { push(t, { kind: "search", q }); return show(t); }
-    // Keep all real websites in the same cloud Chromium session: this is the only path that supports sites
-    // with modern JavaScript, cookies, logins, navigation and FIZZ DEV's browser controls.
+    // All website navigation should use real cloud Chromium when configured, so normal site behavior
+    // (JavaScript, cookies, redirects and forms) works and FIZZ DEV can control the same tab.
     if (cloudOn() || t.kind === "cloud") {
       return cloud({ action: "open", url, tab: t.kind === "cloud" ? t.target : undefined, newTab: t.kind !== "cloud" }, t)
         .catch((e) => { F.toast(e.message); });
     }
-    // A frame is only a best-effort fallback; many sites explicitly forbid embedding.
+    // Without cloud Chromium, frames are only a best-effort fallback: sites may block embedding.
     const yt = youtube(url);
     push(t, { kind: "loading", url });
     show(t);
