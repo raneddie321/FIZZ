@@ -239,6 +239,7 @@ export async function act(state, a) {
       }
       case "read": case "screenshot": case "tabs": case "viewport": break;
       case "switch": await cdp.send("Target.activateTarget", { targetId: state.active }); break;
+      case "switch": await cdp.send("Target.activateTarget", { targetId: state.active }); break;
       default: throw Object.assign(new Error(`Unknown browser action "${a.action}".`), { status: 400 });
     }
     const page = await tab.evaluate(readPage, max);
