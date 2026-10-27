@@ -406,6 +406,15 @@
     for (const m of replies) for (const k of m.skills || []) skills.set(k.id, { ...k, n: (skills.get(k.id)?.n || 0) + 1 });
     const sources = msgs.filter((m) => m.role === "user").flatMap((m) => m.attachments || []);
     const cmds = replies.flatMap((m) => m.tools || []).filter((x) => x.status === "done" || x.status === "failed");
+    const currentReply = [...replies].reverse().find((m) => m.pending) || null;
+    const currentParsed = currentReply ? parseAssistant(currentReply.content || "", { fences: currentReply.mode === "build" || !currentReply.mode }) : null;
+    const currentFiles = currentParsed ? [...currentParsed.files, ...currentParsed.edits] : [];
+    const currentTools = currentReply ? replyTools(currentReply, currentParsed) : [];
+    const activeLabel = currentFiles.length
+      ? "Writing " + currentFiles.at(-1).path + "…"
+      : currentTools.some((t) => t.status === "running")
+        ? "Running " + toolLabel(currentTools.find((t) => t.status === "running")) + "…"
+        : currentReply ? "Working · " + (String(currentParsed?.prose || "").split("\n").filter(Boolean).at(-1)?.slice(0, 110) || "Preparing next step") : "";
     const sec = (title, body) => `<section class="act-sec"><h3>${title}</h3>${body}</section>`;
     $("#activity").innerHTML = !msgs.length
       ? `<p class="act-empty">Progress, outputs and skills for this chat appear here.</p>`
