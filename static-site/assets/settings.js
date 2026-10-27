@@ -64,7 +64,8 @@
         </div>
         <div data-sub="zai" class="form">
           <label class="field"><span>Z.AI API key</span><input class="input" name="zaiKey" type="password" autocomplete="off" placeholder="…" /><small>Saved in this browser only. FIZZ sends it to Z.AI when you use this provider.</small></label>
-          <label class="field"><span>Model ID</span><input class="input mono" name="zaiModel" placeholder="glm-4.6" /><small>Global API endpoint: api.z.ai. Coding Plan users may need a different endpoint.</small></label>
+          <label class="field"><span>Base URL</span><input class="input mono" name="zaiBaseUrl" type="url" placeholder="https://api.z.ai/api/paas/v4" /><small>Global endpoint: api.z.ai/api/paas/v4. For Coding Plan use api.z.ai/api/coding/paas/v4.</small></label>
+          <label class="field"><span>Model ID</span><input class="input mono" name="zaiModel" placeholder="glm-4.6" /></label>
         </div>
         <div data-sub="requesty" class="form">
           <label class="field"><span>Requesty AI API key</span><input class="input" name="requestyKey" type="password" autocomplete="off" placeholder="…" /><small>Saved in this browser only. FIZZ sends it to Requesty AI when you use this provider.</small></label>
@@ -216,7 +217,7 @@
     f.geminiKey.value = s.geminiKey || "";
     f.geminiModel.value = s.geminiModel || "gemini-3.8-flash";
     f.apiKey.value = s.apiKey;
-    for (const name of ["groqKey","groqModel","zaiKey","zaiModel","requestyKey","requestyModel","deepseekKey","deepseekModel","cerebrasKey","cerebrasModel","togetherKey","togetherModel","customOpenAIKey","customOpenAIBaseUrl","customOpenAIModel"]) {
+    for (const name of ["groqKey","groqModel","zaiKey","zaiBaseUrl","zaiModel","requestyKey","requestyModel","deepseekKey","deepseekModel","cerebrasKey","cerebrasModel","togetherKey","togetherModel","customOpenAIKey","customOpenAIBaseUrl","customOpenAIModel"]) {
       if (f.elements.namedItem(name)) f.elements.namedItem(name).value = s[name] || "";
     }
     f.model.innerHTML = F.MODELS.map((m) => `<option value="${m.id}">${m.chat} — ${m.note}</option>`).join("");
@@ -381,6 +382,7 @@
         groqKey: f.groqKey.value.trim(),
         groqModel: f.groqModel.value.trim() || "llama-3.3-70b-versatile",
         zaiKey: f.zaiKey.value.trim(),
+        zaiBaseUrl: f.zaiBaseUrl.value.trim() || "https://api.z.ai/api/paas/v4",
         zaiModel: f.zaiModel.value.trim() || "glm-4.6",
         requestyKey: f.requestyKey.value.trim(),
         requestyModel: f.requestyModel.value.trim() || "openai/gpt-4o-mini",
