@@ -117,7 +117,7 @@
       provider: "fizz", apiKey: "", openrouterKey: "", openrouterModel: "z-ai/glm-4.6",
       geminiKey: "", geminiModel: "gemini-3.8-flash", instructions: "",
       groqKey: "", groqModel: "llama-3.3-70b-versatile",
-      zaiKey: "", zaiModel: "glm-4.6",
+      zaiKey: "", zaiBaseUrl: "https://api.z.ai/api/paas/v4", zaiModel: "glm-4.6",
       requestyKey: "", requestyModel: "openai/gpt-4o-mini",
       deepseekKey: "", deepseekModel: "deepseek-chat",
       cerebrasKey: "", cerebrasModel: "llama-3.3-70b",
@@ -279,7 +279,7 @@
     // settings and are sent only to the endpoint selected below; none are uploaded to FIZZ.
     const compatible = {
       groq: { key: settings.groqKey, model: settings.groqModel || "llama-3.3-70b-versatile", url: "https://api.groq.com/openai/v1/chat/completions" },
-      zai: { key: settings.zaiKey, model: settings.zaiModel || "glm-4.6", url: "https://api.z.ai/api/paas/v4/chat/completions" },
+      zai: { key: settings.zaiKey, model: settings.zaiModel || "glm-4.6", url: settings.zaiBaseUrl || "https://api.z.ai/api/paas/v4" },
       requesty: { key: settings.requestyKey, model: settings.requestyModel || "openai/gpt-4o-mini", url: "https://router.requesty.ai/v1/chat/completions", headers: { "HTTP-Referer": location.origin, "X-Title": "FIZZ" } },
       deepseek: { key: settings.deepseekKey, model: settings.deepseekModel || "deepseek-chat", url: "https://api.deepseek.com/v1/chat/completions" },
       cerebras: { key: settings.cerebrasKey, model: settings.cerebrasModel || "llama-3.3-70b", url: "https://api.cerebras.ai/v1/chat/completions" },
