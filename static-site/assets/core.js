@@ -113,7 +113,18 @@
   function loadData(user) {
     if (dataCache[user.id]) return dataCache[user.id];
     const d = (dataCache[user.id] = store.get(`fizz.data.${user.id}`, null) || {});
-    d.settings = Object.assign({ provider: "fizz", apiKey: "", openrouterKey: "", openrouterModel: "z-ai/glm-4.6", geminiKey: "", geminiModel: "gemini-3.8-flash", instructions: "", model: "claude-opus-5-5", style: "balanced" }, d.settings || {});
+    d.settings = Object.assign({
+      provider: "fizz", apiKey: "", openrouterKey: "", openrouterModel: "z-ai/glm-4.6",
+      geminiKey: "", geminiModel: "gemini-3.8-flash", instructions: "",
+      groqKey: "", groqModel: "llama-3.3-70b-versatile",
+      zaiKey: "", zaiModel: "glm-4.6",
+      requestyKey: "", requestyModel: "openai/gpt-4o-mini",
+      deepseekKey: "", deepseekModel: "deepseek-chat",
+      cerebrasKey: "", cerebrasModel: "llama-3.3-70b",
+      togetherKey: "", togetherModel: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+      customOpenAIKey: "", customOpenAIBaseUrl: "", customOpenAIModel: "",
+      model: "claude-opus-5-5", style: "balanced"
+    }, d.settings || {});
     d.conversations ||= [];
     d.projects ||= [];
     return d;
@@ -263,13 +274,42 @@
       if (!settings.openrouterKey) throw new Error("NO_KEY");
       return streamOpenAI("https://openrouter.ai/api/v1/chat/completions", { Authorization: `Bearer ${settings.openrouterKey}`, "X-Title": "FIZZ" }, { model: settings.openrouterModel || "z-ai/glm-4.6", stream: true, messages: [{ role: "system", content: system }, ...history.map(toOpenAI)] }, signal, onText);
     }
+
+    // OpenAI-compatible providers share the same streaming protocol. Keys stay in local
+    // settings and are sent only to the endpoint selected below; none are uploaded to FIZZ.
+    const compatible = {
+      groq: { key: settings.groqKey, model: settings.groqModel || "llama-3.3-70b-versatile", url: "https://api.groq.com/openai/v1/chat/completions" },
+      zai: { key: settings.zaiKey, model: settings.zaiModel || "glm-4.6", url: "https://api.z.ai/api/paas/v4/chat/completions" },
+      requesty: { key: settings.requestyKey, model: settings.requestyModel || "openai/gpt-4o-mini", url: "https://router.requesty.ai/v1/chat/completions", headers: { "HTTP-Referer": location.origin, "X-Title": "FIZZ" } },
+      deepseek: { key: settings.deepseekKey, model: settings.deepseekModel || "deepseek-chat", url: "https://api.deepseek.com/v1/chat/completions" },
+      cerebras: { key: settings.cerebrasKey, model: settings.cerebrasModel || "llama-3.3-70b", url: "https://api.cerebras.ai/v1/chat/completions" },
+      together: { key: settings.togetherKey, model: settings.togetherModel || "meta-llama/Llama-3.3-70B-Instruct-Turbo", url: "https://api.together.xyz/v1/chat/completions" },
+    };
+    if (settings.provider === "custom-openai") {
+      compatible["custom-openai"] = {
+        key: settings.customOpenAIKey,
+        model: settings.customOpenAIModel,
+        url: settings.customOpenAIBaseUrl,
+      };
+    }
+    const provider = compatible[settings.provider];
+    if (provider) {
+      if (!provider.key) throw new Error("NO_KEY");
+      if (!provider.model) throw new Error("Add the model ID in Settings → AI.");
+      let url = String(provider.url || "").trim().replace(/\/+$/, "");
+      if (!/^https:\/\//i.test(url)) throw new Error("Enter a valid HTTPS base URL in Settings → AI.");
+      if (!url.endsWith("/chat/completions")) url += "/chat/completions";
+      return streamOpenAI(url, { Authorization: `Bearer ${provider.key}`, ...(provider.headers || {}) }, { model: provider.model, stream: true, messages: [{ role: "system", content: system }, ...history.map(toOpenAI)] }, signal, onText);
+    }
     return streamOpenAI("/api/ai/chat", {}, { system, messages: history.map(toOpenAI) }, signal, onText);
   }
 
   function providerLabel(settings, product = "chat") {
+    const names = { groq: settings.groqModel, zai: settings.zaiModel, requesty: settings.requestyModel, deepseek: settings.deepseekModel, cerebras: settings.cerebrasModel, together: settings.togetherModel, "custom-openai": settings.customOpenAIModel };
     if (settings.provider === "openrouter") return settings.openrouterModel || "OpenRouter";
     if (settings.provider === "gemini") return settings.geminiModel || "Gemini";
     if (settings.provider === "anthropic") return (MODELS.find((m) => m.id === settings.model) || MODELS[0])[product];
+    if (names[settings.provider]) return names[settings.provider] || settings.provider;
     return product === "dev" ? "Fizz Code 1.0" : "FIZZ 1.0";
   }
 
