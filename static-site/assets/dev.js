@@ -427,7 +427,12 @@
     $("#send").innerHTML = busy ? '<svg class="i" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor"/></svg>' : '<svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg>';
     $("#send").setAttribute("aria-label", busy ? "Stop" : "Send");
     const s = data.settings;
-    const missing = (s.provider === "openrouter" && !s.openrouterKey) || (s.provider === "anthropic" && !s.apiKey) || (s.provider === "gemini" && !s.geminiKey);
+    const missing = ({
+      openrouter: !s.openrouterKey, anthropic: !s.apiKey, gemini: !s.geminiKey,
+      groq: !s.groqKey, zai: !s.zaiKey, requesty: !s.requestyKey,
+      deepseek: !s.deepseekKey, cerebras: !s.cerebrasKey, together: !s.togetherKey,
+      "custom-openai": !s.customOpenAIKey || !s.customOpenAIBaseUrl || !s.customOpenAIModel,
+    })[s.provider] === true;
     F.serverStatus().then((st) => {
       const noServer = s.provider === "fizz" && !st.ai?.configured;
       $("#notice").innerHTML = missing || noServer
@@ -798,7 +803,7 @@
   function visionModel() {
     const s = data.settings;
     if (s.provider === "anthropic" || s.provider === "gemini") return true;
-    const id = s.provider === "openrouter" ? s.openrouterModel : F.serverStatusCached?.()?.ai?.model || "";
+    const id = ({ openrouter: s.openrouterModel, groq: s.groqModel, zai: s.zaiModel, requesty: s.requestyModel, deepseek: s.deepseekModel, cerebras: s.cerebrasModel, together: s.togetherModel, "custom-openai": s.customOpenAIModel })[s.provider] || F.serverStatusCached?.()?.ai?.model || "";
     return /claude|gpt-4o|gpt-4\.1|gpt-5|gemini|vision|-vl|vl-|llava|pixtral|glm-4\.?5?v|qwen.*vl|grok-.*vision|llama-?4|mistral-(small|medium)-3/i.test(id || "");
   }
   // Memory: lasting facts about the user, shown to Fizz in every mode (Settings → General lists and edits them).

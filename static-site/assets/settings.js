@@ -35,6 +35,13 @@
           <label class="provider"><input type="radio" name="provider" value="openrouter" /><span><b>Your OpenRouter account</b><small>Hundreds of models (GLM, Qwen, DeepSeek, Llama, Claude, GPT…). Usage is billed to your OpenRouter account; free models available.</small></span></label>
           <label class="provider"><input type="radio" name="provider" value="gemini" /><span><b>Your Google AI Studio key</b><small>Gemini models with your own key from aistudio.google.com — there's a free tier.</small></span></label>
           <label class="provider"><input type="radio" name="provider" value="anthropic" /><span><b>Your Anthropic API key</b><small>Use Claude models directly with your own key.</small></span></label>
+          <label class="provider"><input type="radio" name="provider" value="groq" /><span><b>Groq</b><small>Fast inference for supported open models.</small></span></label>
+          <label class="provider"><input type="radio" name="provider" value="zai" /><span><b>Z.AI (GLM)</b><small>Connect your GLM API key.</small></span></label>
+          <label class="provider"><input type="radio" name="provider" value="requesty" /><span><b>Requesty AI</b><small>One API key for models across many providers.</small></span></label>
+          <label class="provider"><input type="radio" name="provider" value="deepseek" /><span><b>DeepSeek</b><small>Use DeepSeek models directly.</small></span></label>
+          <label class="provider"><input type="radio" name="provider" value="cerebras" /><span><b>Cerebras</b><small>Fast inference on supported models.</small></span></label>
+          <label class="provider"><input type="radio" name="provider" value="together" /><span><b>Together AI</b><small>Hosted open-source models.</small></span></label>
+          <label class="provider"><input type="radio" name="provider" value="custom-openai" /><span><b>Other OpenAI-compatible provider</b><small>Add a custom API key, base URL and model ID.</small></span></label>
         </div>
         <div data-sub="openrouter" class="form">
           <div class="row-inline"><button type="button" class="btn btn-sm" data-or-connect>Connect OpenRouter</button><span class="muted-sm" data-or-state></span></div>
@@ -50,6 +57,36 @@
         <div data-sub="anthropic" class="form">
           <label class="field"><span>Anthropic API key</span><input class="input" name="apiKey" type="password" autocomplete="off" placeholder="sk-ant-…" /><small>Stored only in this browser and sent only to api.anthropic.com.</small></label>
           <label class="field"><span>Model</span><select class="select" name="model"></select></label>
+        </div>
+        <div data-sub="groq" class="form">
+          <label class="field"><span>Groq API key</span><input class="input" name="groqKey" type="password" autocomplete="off" placeholder="gsk_…" /><small>Saved in this browser only. FIZZ sends it to Groq when you use this provider.</small></label>
+          <label class="field"><span>Model ID</span><input class="input mono" name="groqModel" placeholder="llama-3.3-70b-versatile" /><small>Use a model ID available in your Groq account.</small></label>
+        </div>
+        <div data-sub="zai" class="form">
+          <label class="field"><span>Z.AI API key</span><input class="input" name="zaiKey" type="password" autocomplete="off" placeholder="…" /><small>Saved in this browser only. FIZZ sends it to Z.AI when you use this provider.</small></label>
+          <label class="field"><span>Base URL</span><input class="input mono" name="zaiBaseUrl" type="url" placeholder="https://api.z.ai/api/paas/v4" /><small>Global endpoint: api.z.ai/api/paas/v4. For Coding Plan use api.z.ai/api/coding/paas/v4.</small></label>
+          <label class="field"><span>Model ID</span><input class="input mono" name="zaiModel" placeholder="glm-4.6" /></label>
+        </div>
+        <div data-sub="requesty" class="form">
+          <label class="field"><span>Requesty AI API key</span><input class="input" name="requestyKey" type="password" autocomplete="off" placeholder="…" /><small>Saved in this browser only. FIZZ sends it to Requesty AI when you use this provider.</small></label>
+          <label class="field"><span>Model ID</span><input class="input mono" name="requestyModel" placeholder="openai/gpt-4o-mini" /><small>Use a model ID available in Requesty's model catalog.</small></label>
+        </div>
+        <div data-sub="deepseek" class="form">
+          <label class="field"><span>DeepSeek API key</span><input class="input" name="deepseekKey" type="password" autocomplete="off" placeholder="sk-…" /><small>Saved in this browser only. FIZZ sends it to DeepSeek when you use this provider.</small></label>
+          <label class="field"><span>Model ID</span><input class="input mono" name="deepseekModel" placeholder="deepseek-chat" /><small>Use a model ID enabled for your account.</small></label>
+        </div>
+        <div data-sub="cerebras" class="form">
+          <label class="field"><span>Cerebras API key</span><input class="input" name="cerebrasKey" type="password" autocomplete="off" placeholder="csk-…" /><small>Saved in this browser only. FIZZ sends it to Cerebras when you use this provider.</small></label>
+          <label class="field"><span>Model ID</span><input class="input mono" name="cerebrasModel" placeholder="llama-3.3-70b" /><small>Use a model ID available in your Cerebras account.</small></label>
+        </div>
+        <div data-sub="together" class="form">
+          <label class="field"><span>Together AI API key</span><input class="input" name="togetherKey" type="password" autocomplete="off" placeholder="…" /><small>Saved in this browser only. FIZZ sends it to Together AI when you use this provider.</small></label>
+          <label class="field"><span>Model ID</span><input class="input mono" name="togetherModel" placeholder="meta-llama/Llama-3.3-70B-Instruct-Turbo" /><small>Use a model ID available in Together AI.</small></label>
+        </div>
+        <div data-sub="custom-openai" class="form">
+          <label class="field"><span>API key</span><input class="input" name="customOpenAIKey" type="password" autocomplete="off" placeholder="Your provider API key" /><small>Stored in this browser only.</small></label>
+          <label class="field"><span>Base URL</span><input class="input mono" name="customOpenAIBaseUrl" type="url" placeholder="https://api.example.com/v1" /><small>Use the provider's OpenAI-compatible base URL (not the full chat-completions URL).</small></label>
+          <label class="field"><span>Model ID</span><input class="input mono" name="customOpenAIModel" placeholder="provider/model-name" /></label>
         </div>
       </div>
       <div data-pane="connections" class="form"><div class="conn-list" data-conn-list></div>
@@ -180,6 +217,9 @@
     f.geminiKey.value = s.geminiKey || "";
     f.geminiModel.value = s.geminiModel || "gemini-3.8-flash";
     f.apiKey.value = s.apiKey;
+    for (const name of ["groqKey","groqModel","zaiKey","zaiBaseUrl","zaiModel","requestyKey","requestyModel","deepseekKey","deepseekModel","cerebrasKey","cerebrasModel","togetherKey","togetherModel","customOpenAIKey","customOpenAIBaseUrl","customOpenAIModel"]) {
+      if (f.elements.namedItem(name)) f.elements.namedItem(name).value = s[name] || "";
+    }
     f.model.innerHTML = F.MODELS.map((m) => `<option value="${m.id}">${m.chat} — ${m.note}</option>`).join("");
     f.model.value = s.model;
     f.name.closest("label").classList.toggle("hidden", !ctx.user.legacy);
@@ -339,6 +379,22 @@
         apiKey: f.apiKey.value.trim(),
         geminiKey: f.geminiKey.value.trim(),
         geminiModel: f.geminiModel.value.trim() || "gemini-3.8-flash",
+        groqKey: f.groqKey.value.trim(),
+        groqModel: f.groqModel.value.trim() || "llama-3.3-70b-versatile",
+        zaiKey: f.zaiKey.value.trim(),
+        zaiBaseUrl: f.zaiBaseUrl.value.trim() || "https://api.z.ai/api/paas/v4",
+        zaiModel: f.zaiModel.value.trim() || "glm-4.6",
+        requestyKey: f.requestyKey.value.trim(),
+        requestyModel: f.requestyModel.value.trim() || "openai/gpt-4o-mini",
+        deepseekKey: f.deepseekKey.value.trim(),
+        deepseekModel: f.deepseekModel.value.trim() || "deepseek-chat",
+        cerebrasKey: f.cerebrasKey.value.trim(),
+        cerebrasModel: f.cerebrasModel.value.trim() || "llama-3.3-70b",
+        togetherKey: f.togetherKey.value.trim(),
+        togetherModel: f.togetherModel.value.trim() || "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+        customOpenAIKey: f.customOpenAIKey.value.trim(),
+        customOpenAIBaseUrl: f.customOpenAIBaseUrl.value.trim(),
+        customOpenAIModel: f.customOpenAIModel.value.trim(),
         model: f.model.value,
         style: f.style.value,
         instructions: f.instructions.value.trim(),
