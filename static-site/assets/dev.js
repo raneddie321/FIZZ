@@ -266,18 +266,6 @@
       const match = line.match(/(?:[\w.-]+\/)*[\w.-]+\.(?:html|css|js|jsx|ts|tsx|json|md|py|yml|yaml|svg|sql)/i);
       return { text: line.replace(/^[-*\d.\s]+/, "").slice(0, 180), path: match?.[0] || null };
     })() : null;
-    // Turn ordinary progress narration into visible, non-executable activity hints.
-    // These hints never modify files or pretend a tool actually ran.
-    const progressHint = m.pending ? (() => {
-      const source = parsed.prose || "";
-      const lines = source.split("\n").map((x) => x.trim()).filter(Boolean);
-      const sentence = [...lines].reverse().find((x) => /\b(creat(?:e|ing)|writ(?:e|ing)|edit(?:ing)?|updat(?:e|ing)|install(?:ing)?|run(?:ning)?|execut(?:e|ing)|build(?:ing)?|test(?:ing)?)\b/i.test(x) && x.length < 220);
-      const pathMatch = sentence && sentence.match(/(?:[\w.-]+\/)*[\w.-]+\.(?:html|css|js|jsx|ts|tsx|json|md|py|yml|yaml|svg|sql)/i);
-      if (!sentence) return null;
-      const lower = sentence.toLowerCase();
-      const kind = /\b(run|running|execut|install|test|build)\b/.test(lower) ? "command" : "file";
-      return { text: sentence.replace(/^[-*\d.\s]+/, "").slice(0, 180), kind, path: pathMatch?.[0] || null };
-    })() : null;
     // Live cards (app builds) stay visible under the message, outside the collapsed steps.
     const toolCards = tools.map((t) => (t.result ? T()[t.type]?.card?.(t, m) || "" : "")).join("");
     tools.forEach((t, idx) => {
