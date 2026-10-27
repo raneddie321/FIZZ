@@ -103,14 +103,28 @@ export function describe(p) {
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-async function settle(tab, ms = 12000) {
+/**
+ * Wait briefly for meaningful page readiness, but never hold up navigation for slow
+ * third-party resources. Many pages keep loading ads, analytics, or streaming content
+ * long after they are usable.
+ */
+async function settle(tab, ms = 1800) {
   const start = Date.now();
+  let lastUrl = "";
+  let stable = 0;
   while (Date.now() - start < ms) {
-    const state = await tab.evaluate(() => document.readyState).catch(() => "loading");
-    if (state === "complete") break;
-    await sleep(300);
+    const state = await tab.evaluate(() => ({
+      ready: document.readyState,
+      url: location.href,
+      body: Boolean(document.body && (document.body.innerText || document.body.children.length)),
+    })).catch(() => ({ ready: "loading", url: "", body: false }));
+    if (state.url && state.url === lastUrl && state.body && state.ready !== "loading") {
+      stable++;
+      if (stable >= 2) break;
+    } else stable = 0;
+    lastUrl = state.url;
+    await sleep(120);
   }
-  await sleep(500);
 }
 const KEYS = { Enter: [13, "\r"], Tab: [9, ""], Escape: [27, ""], Backspace: [8, ""], ArrowDown: [40, ""], ArrowUp: [38, ""], ArrowLeft: [37, ""], ArrowRight: [39, ""], PageDown: [34, ""], PageUp: [33, ""], Space: [32, " "] };
 async function press(tab, key) {
@@ -181,7 +195,7 @@ export async function act(state, a) {
         const now = await pages(cdp);
         const opened = now.find((t) => !before.has(t.targetId));
         if (opened) { state.active = opened.targetId; tab = await attach(cdp, opened.targetId); await fit(tab); note = "The click opened a new tab; you're on it now."; }
-        await settle(tab, 8000);
+        await settle(tab, 1800);
         break;
       }
       case "type": {
@@ -209,7 +223,7 @@ export async function act(state, a) {
         await sleep(400);
         break;
       }
-      case "key": await press(tab, String(a.key || "Enter")); await settle(tab, 6000); break;
+      case "key": await press(tab, String(a.key || "Enter")); await settle(tab, 1800); break;
       case "scroll": {
         const dy = (a.direction === "up" ? -1 : 1) * Math.min(5000, Number(a.amount) || 650);
         await tab.send("Input.dispatchMouseEvent", { type: "mouseWheel", x: 640, y: 400, deltaX: 0, deltaY: dy });
