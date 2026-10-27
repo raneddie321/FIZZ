@@ -9,6 +9,7 @@ const find = (r, label) => r.page.elements.find((e) => e.label.toLowerCase().inc
 
 let r = await act(state, { action: "open", url: `${SITE}/index.html` });
 assert.equal(r.page.title, "Test Shop");
+assert.ok(Number.isFinite(r.page.scroll.height), "open returns page metadata promptly");
 assert.match(r.text, /\[\d+\] link "Log in" → http/);
 assert.match(r.text, /Welcome to Test Shop/);
 
