@@ -621,6 +621,22 @@
     const results = (reply.tools || []).filter((t) => (t.status === "done" || t.status === "failed") && F.agentTools.registry[t.type]?.feedback);
     const editErrors = Object.entries(reply.editErrors || {});
     if (asked || waiting || stopLoop) return finishLoop(reply, asked ? "question" : waiting ? "approval" : "stopped");
+    // A common failure mode is a model narrating that it will create a file, then ending
+    // without any executable file block or tool call. Retry once with an explicit instruction.
+    const parsedNow = parseAssistant(reply.content || "", { fences: reply.mode === "build" || !reply.mode });
+    const hasArtifacts = Boolean((reply.changes || []).length || parsedNow.files.some((x) => x.closed) || parsedNow.edits.length || parsedNow.tools.length);
+    const narratedIntent = /\b(?:i(?:'| a)m going to|i(?:'| a)ll|now i|let me|i will|creating|writing|going to create|going to write)\b/i.test(parsedNow.prose || "")
+      && /\b(?:file|index\.html|\.css|\.js|component|implement|create|write|run|execute)\b/i.test(parsedNow.prose || "");
+    if (reply.mode === "build" && !hasArtifacts && narratedIntent && !reply.emptyBuildRetry && reply.step < MAX_STEPS()) {
+      reply.emptyBuildRetry = true;
+      chat().messages.push({
+        id: F.uid(), role: "user", auto: true, autoLabel: "Asked Fizz Code to apply the work instead of narrating",
+        content: "Your previous response only described work but did not create a project file or run a tool. Do the work now. For each file, output a complete <fizz-file path=\"relative/path.ext\">...</fizz-file> block. Do not say what you are going to do; emit the actual file contents. If a command is required, use <fizz-run>command</fizz-run>. Keep it concise and create the requested files.",
+        mode: "build", at: Date.now()
+      });
+      save();
+      return generate({ step: reply.step + 1 });
+    }
     const cut = reply.cutOff && reply.mode === "build";
     if (cut && (turn.continues >= MAX_CONTINUES || reply.step >= MAX_STEPS())) {
       reply.content += "\n\n*The reply reached its maximum length — ask Fizz Code to continue.*";
