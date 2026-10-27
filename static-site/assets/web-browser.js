@@ -107,15 +107,15 @@
   const viewport = () => { const r = $("#br-stage")?.getBoundingClientRect(); return r && r.width > 300 ? { w: Math.round(r.width), h: Math.round(r.height) } : null; };
   async function cloud(body, t) {
     body = { ...body, viewport: viewport() || undefined };
-    if (t) { t.kind = "cloud"; t.busy = true; t.title = t.title === "New tab" ? hostName(body.url || "") || "Cloud browser" : t.title; render(); }
+    if (t) { t.kind = "cloud"; t.busy = true; t.error = ""; t.title = t.title === "New tab" ? hostName(body.url || "") || "Cloud browser" : t.title; render(); }
     try {
-      // FIZZ's own cloud browser installs itself the first time (about a minute). While it starts, a request can
-      // come back "starting", time out or drop — keep asking for up to 4 minutes instead of failing.
+      // Don't make navigation appear hung while the provider provisions a cold browser.
+      // Keep the user informed, retry transient startup failures, and stop after a bounded window.
       const until = Date.now() + 4 * 60_000;
       const ask = async () => {
         try { return await F.conn.api("/api/browser", { body, auth: true }); }
         catch (e) {
-          const transient = !e.status || [502, 503, 504].includes(e.status) && !/limit|turned on|not allowed/i.test(e.message);
+          const transient = !e.status || ([502, 503, 504].includes(e.status) && !/limit|turned on|not allowed/i.test(e.message));
           if (transient && Date.now() < until && e.code !== "sandbox_failed") return { starting: true, retry: e.message };
           throw e;
         }
@@ -124,17 +124,17 @@
       let tries = 0;
       while (r.starting && Date.now() < until) {
         starting = true; render();
-        await new Promise((ok) => setTimeout(ok, r.retry ? 5000 : 3000));
+        await new Promise((ok) => setTimeout(ok, r.retry ? 1800 : 1200));
         r = await ask();
-        if (r.retry && ++tries > 30) break;
+        if (r.retry && ++tries > 40) break;
       }
       starting = false;
-      if (r.starting) throw new Error("The cloud browser is taking too long to start. Try again in a minute.");
+      if (r.starting) throw new Error("The cloud browser is still starting. Try again shortly.");
       syncCloud(r, t);
       return r;
     } catch (e) {
       starting = false;
-      if (t) { t.busy = false; t.error = e.message; render(); }
+      if (t) { t.busy = false; t.error = e.message || "Couldn't open this website."; render(); }
       throw e;
     }
   }
