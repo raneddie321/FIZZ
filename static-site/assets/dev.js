@@ -307,7 +307,7 @@
     else if (!label && tools.length) { const w = tools.find((x) => x.status === "waiting") || tools[0]; label = toolLabel(w); }
     const key = `${m.id}:activity`;
     const open = state.expanded.has(key) || waiting;
-    const busy = m.pending || running;
+    const busy = m.pending || running || Boolean(progressHint);
     const activity = rows.length && label
       ? `<div class="activity"><button class="act-head" data-step="${key}" aria-expanded="${open}">${busy ? '<span class="st run"></span>' : `<span class="act-ic${failed ? " fail" : ""}">${F.icon(failed ? "alert" : actIcon(tools, m))}</span>`}<span>${esc(label)}</span>${failed && !busy ? '<span class="act-warn">needs attention</span>' : ""}${waiting ? '<span class="act-warn">waiting for you</span>' : ""}<svg class="i chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>${open ? `<div class="steps">${rows.join("")}</div>` : ""}</div>`
       : "";
