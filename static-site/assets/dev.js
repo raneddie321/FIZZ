@@ -308,7 +308,7 @@
     const key = `${m.id}:activity`;
     const open = state.expanded.has(key) || waiting;
     const busy = m.pending || running || Boolean(progressHint);
-    const activity = rows.length && label
+    const activity = (rows.length || progressHint) && label
       ? `<div class="activity"><button class="act-head" data-step="${key}" aria-expanded="${open}">${busy ? '<span class="st run"></span>' : `<span class="act-ic${failed ? " fail" : ""}">${F.icon(failed ? "alert" : actIcon(tools, m))}</span>`}<span>${esc(label)}</span>${failed && !busy ? '<span class="act-warn">needs attention</span>' : ""}${waiting ? '<span class="act-warn">waiting for you</span>' : ""}<svg class="i chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>${open ? `<div class="steps">${rows.join("")}</div>` : ""}</div>`
       : "";
     const skills = (m.skills || []).map((k) => `<div class="act-line"><span class="act-ic">${F.skills.glyph(k)}</span><span>Used the <b>${esc(k.name)}</b> skill${k.auto ? " <small>(automatic)</small>" : ""}</span></div>`).join("");
