@@ -258,6 +258,14 @@
     parsed.files.forEach((f, idx) => fileRow(f.path, idx, { running: m.pending && !f.closed, content: f.content, kind: "file" }));
     parsed.edits.forEach((e, idx) => fileRow(e.path, `e${idx}`, { running: m.pending && !e.closed, content: e.hunks.map((h) => h.replace).join("\n…\n"), kind: "edit", failed: (m.editErrors || {})[e.path] }));
     const tools = replyTools(m, parsed).filter((t) => !["ask", "push", "attach", "memory"].includes(t.type));
+    // Descriptive progress inferred from streamed prose; never claim the tool ran until it actually does.
+    const progressHint = m.pending ? (() => {
+      const lines = (parsed.prose || "").split("\n").map((x) => x.trim()).filter(Boolean);
+      const line = [...lines].reverse().find((x) => /\b(creat(?:e|ing)|writ(?:e|ing)|edit(?:ing)?|updat(?:e|ing)|install(?:ing)?|run(?:ning)?|execut(?:e|ing)|build(?:ing)?|test(?:ing)?)\b/i.test(x) && x.length < 220);
+      if (!line) return null;
+      const match = line.match(/(?:[\w.-]+\/)*[\w.-]+\.(?:html|css|js|jsx|ts|tsx|json|md|py|yml|yaml|svg|sql)/i);
+      return { text: line.replace(/^[-*\d.\s]+/, "").slice(0, 180), path: match?.[0] || null };
+    })() : null;
     // Turn ordinary progress narration into visible, non-executable activity hints.
     // These hints never modify files or pretend a tool actually ran.
     const progressHint = m.pending ? (() => {
@@ -307,7 +315,7 @@
     label = label && label[0].toUpperCase() + label.slice(1);
     if (writing) label = `Writing ${writing.path}…`;
     else if (running) label = running.progress ? `${toolLabel(running).replace(/^Opened /, "Opening ")} — ${running.progress}` : `${toolLabel(running)}…`;
-    else if (progressHint) label = progressHint.path && progressHint.kind === "file" ? `Preparing ${progressHint.path}…` : progressHint.text;
+    else if (progressHint) label = progressHint.path ? `Preparing ${progressHint.path}…` : progressHint.text;
     else if (!label && tools.length) { const w = tools.find((x) => x.status === "waiting") || tools[0]; label = toolLabel(w); }
     const key = `${m.id}:activity`;
     const open = state.expanded.has(key) || waiting;
