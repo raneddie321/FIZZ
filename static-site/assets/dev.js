@@ -545,7 +545,7 @@
   const MAX_STEPS = () => Math.min(40, Math.max(1, Number(data.settings.agentSteps) || 20));
   let stopLoop = false;
   // Per turn: how many times a cut-off reply was continued and how many self-checks ran.
-  let turn = { continues: 0, verifies: 0 };
+  let turn = { continues: 0, verifies: 0, emptyBuildRetries: 0 };
   const MAX_CONTINUES = 4, MAX_VERIFIES = 2;
   const estimateTokens = (text) => Math.ceil(String(text || "").length / 3.6);
   function contextUse() {
@@ -584,7 +584,7 @@
   async function generate({ step = 1 } = {}) {
     const p = project();
     const c = chat();
-    if (step === 1) { stopLoop = false; turn = { continues: 0, verifies: 0 }; }
+    if (step === 1) { stopLoop = false; turn = { continues: 0, verifies: 0, emptyBuildRetries: 0 }; }
     if (contextUse().pct >= 85) await compactChat({ quiet: true });
     const lastUser = [...c.messages].reverse().find((m) => m.role === "user" && !m.auto) || {};
     const skills = F.skills.forMessage(data, p.skills || [], lastUser.content || "");
@@ -642,8 +642,8 @@
     const hasArtifacts = Boolean((reply.changes || []).length || parsedNow.files.some((x) => x.closed) || parsedNow.edits.length || parsedNow.tools.length);
     const narratedIntent = /\b(?:i(?:'| a)m going to|i(?:'| a)ll|now i|let me|i will|creating|writing|going to create|going to write)\b/i.test(parsedNow.prose || "")
       && /\b(?:file|index\.html|\.css|\.js|component|implement|create|write|run|execute)\b/i.test(parsedNow.prose || "");
-    if (reply.mode === "build" && !hasArtifacts && narratedIntent && !reply.emptyBuildRetry && reply.step < MAX_STEPS()) {
-      reply.emptyBuildRetry = true;
+    if (reply.mode === "build" && !hasArtifacts && narratedIntent && turn.emptyBuildRetries < 1 && reply.step < MAX_STEPS()) {
+      turn.emptyBuildRetries++;
       chat().messages.push({
         id: F.uid(), role: "user", auto: true, autoLabel: "Asked Fizz Code to apply the work instead of narrating",
         content: "Your previous response only described work but did not create a project file or run a tool. Do the work now. For each file, output a complete <fizz-file path=\"relative/path.ext\">...</fizz-file> block. Do not say what you are going to do; emit the actual file contents. If a command is required, use <fizz-run>command</fizz-run>. Keep it concise and create the requested files.",
@@ -651,6 +651,9 @@
       });
       save();
       return generate({ step: reply.step + 1 });
+    }
+    if (reply.mode === "build" && !hasArtifacts && narratedIntent && turn.emptyBuildRetries >= 1) {
+      reply.error = "Fizz Code described the work but still did not create a file or run a tool. Try asking it to create the files directly, or check that the selected model supports the requested output format.";
     }
     const cut = reply.cutOff && reply.mode === "build";
     if (cut && (turn.continues >= MAX_CONTINUES || reply.step >= MAX_STEPS())) {
