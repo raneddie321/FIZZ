@@ -497,3 +497,16 @@
 @keyframes chat-pulse { 50% { opacity: .35; } }
 @media (prefers-reduced-motion: reduce) { .chat-st.running { animation: none; } }
 .proj-chats a .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+
+/* Live agent activity: distinct, readable progress without implying unexecuted actions succeeded. */
+.act-current { display: flex; align-items: flex-start; gap: 10px; padding: 12px; margin: 0 0 10px; border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border)); border-radius: 12px; background: color-mix(in srgb, var(--primary) 6%, var(--card)); }
+.act-current > .st { margin-top: 2px; }
+.act-current > div { min-width: 0; display: grid; gap: 4px; }
+.act-current b { font-size: 13px; font-weight: 650; overflow-wrap: anywhere; }
+.act-current small { font-size: 12px; line-height: 1.45; color: var(--muted); }
+#activity .act-sec { padding: 13px; border: 1px solid var(--border); border-radius: 13px; background: var(--card); margin-bottom: 10px; }
+#activity .act-sec h3 { margin: 0 0 10px; font-size: 11px; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); }
+#activity .act-row { padding: 6px 0; }
+#activity .act-file { min-height: 42px; border-radius: 9px; margin: 3px 0; }
+#activity .act-task { gap: 9px; padding: 8px 0; }
