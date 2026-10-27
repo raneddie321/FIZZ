@@ -17,7 +17,7 @@
     d.id = "fizz-settings";
     d.className = "dlg settings-dlg";
     d.innerHTML = `<form method="dialog" class="dlg-body">
-      <h2>Settings</h2>
+      <div class="settings-heading"><div><span class="settings-kicker">FIZZ PREFERENCES</span><h2>Settings</h2><p>Customize your workspace, AI models and connected tools.</p></div><button type="button" class="settings-close" aria-label="Close settings" data-settings-close>×</button></div>
       <div class="dlg-tabs" role="tablist">
         <button type="button" data-tab="general">General</button><button type="button" data-tab="ai">AI</button>
         <button type="button" data-tab="connections">Connections</button><button type="button" data-tab="tools">Tools</button><button type="button" data-tab="account">Account</button>
@@ -255,6 +255,7 @@
       const t = e.target.closest("button,input");
       if (!t) return;
       if (t.dataset.tab) setTab(t.dataset.tab);
+      if (t.hasAttribute("data-settings-close")) { d.close("cancel"); return; }
       if (t.name === "provider") sub();
       if (t.hasAttribute("data-or-connect")) { ctx.data.settings.provider = "openrouter"; ctx.save(); F.openrouterConnect(); }
       if (t.hasAttribute("data-or-models")) {

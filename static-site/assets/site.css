@@ -406,3 +406,49 @@ svg.dots3 { stroke-width: 3; }
 .mcp-add { display: grid; grid-template-columns: 1fr; gap: 6px; margin-top: 10px; }
 .mcp-add .input { height: 32px; font-size: 13px; }
 .mcp-add .btn { justify-self: start; }
+
+
+/* FIZZ Settings — clearer hierarchy, calmer spacing, responsive provider cards */
+.settings-dlg { width: min(760px, calc(100vw - 24px)); max-height: min(88dvh, 900px); padding: 0; overflow: hidden; }
+.settings-dlg::backdrop { background: rgba(4, 8, 14, .58); backdrop-filter: blur(5px); }
+.settings-dlg > .dlg-body { max-height: min(88dvh, 900px); overflow: auto; padding: 0 22px 18px; gap: 18px; }
+.settings-heading { position: sticky; top: 0; z-index: 4; display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; padding: 22px 0 14px; background: var(--popover); border-bottom: 1px solid var(--border); }
+.settings-heading h2 { margin: 3px 0 0; font-size: 23px; letter-spacing: -.035em; }
+.settings-heading p { margin: 5px 0 0; color: var(--muted); font-size: 13px; }
+.settings-kicker { font-size: 10px; letter-spacing: .14em; color: var(--muted); font-weight: 700; }
+.settings-close { width: 32px; height: 32px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--muted); font-size: 22px; line-height: 1; cursor: pointer; }
+.settings-close:hover { color: var(--fg); background: var(--accent); }
+.settings-dlg .dlg-tabs { position: sticky; top: 83px; z-index: 3; overflow-x: auto; display: flex; gap: 5px; padding: 5px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); scrollbar-width: thin; }
+.settings-dlg .dlg-tabs button { min-width: max-content; padding: 9px 13px; border-radius: 8px; font-weight: 550; }
+.settings-dlg .dlg-tabs button.on { background: var(--accent); box-shadow: none; color: var(--fg); }
+.settings-dlg [data-pane] { min-width: 0; }
+.settings-dlg [data-pane] > .field, .settings-dlg [data-sub] > .field { margin: 0 0 14px; }
+.settings-dlg .field > span { font-size: 13px; font-weight: 600; }
+.settings-dlg .field small { line-height: 1.5; }
+.settings-dlg .input, .settings-dlg .select, .settings-dlg .textarea { min-width: 0; border-radius: 10px; }
+.settings-dlg .provider-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.settings-dlg .provider { min-width: 0; position: relative; display: flex; align-items: flex-start; gap: 10px; padding: 13px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); cursor: pointer; transition: border-color .15s, background .15s, transform .15s; }
+.settings-dlg .provider:hover { border-color: color-mix(in srgb, var(--fg) 28%, var(--border)); background: var(--surface); transform: translateY(-1px); }
+.settings-dlg .provider:has(input:checked) { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 8%, var(--card)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 20%, transparent); }
+.settings-dlg .provider input { margin: 3px 0 0; accent-color: var(--primary); flex: none; }
+.settings-dlg .provider span { display: grid; gap: 4px; min-width: 0; }
+.settings-dlg .provider b { font-size: 13.5px; line-height: 1.3; }
+.settings-dlg .provider small { color: var(--muted); font-size: 12px; line-height: 1.45; }
+.settings-dlg [data-sub] { padding: 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+.settings-dlg [data-pane="ai"] > .provider-list + [data-sub] { margin-top: 14px; }
+.settings-dlg [data-pane="ai"] > [data-sub]:not(.hidden) { margin-top: 14px; }
+.settings-dlg [data-pane="ai"] > .provider-list { margin-bottom: 14px; }
+.settings-dlg [data-pane="ai"] [data-sub].hidden { display: none !important; }
+.settings-dlg .dlg-actions { position: sticky; bottom: -18px; z-index: 2; margin: 0 -22px -18px; padding: 13px 22px; background: var(--popover); border-top: 1px solid var(--border); }
+.settings-dlg .conn { padding: 12px; border-radius: 12px; }
+.settings-dlg .conn-list { display: grid; gap: 9px; }
+@media (max-width: 600px) {
+  .settings-dlg { width: calc(100vw - 12px); max-height: 94dvh; }
+  .settings-dlg > .dlg-body { max-height: 94dvh; padding: 0 14px 14px; gap: 14px; }
+  .settings-heading { padding-top: 16px; }
+  .settings-dlg .dlg-tabs { top: 77px; }
+  .settings-dlg .dlg-tabs button { padding: 8px 10px; font-size: 12px; }
+  .settings-dlg .provider-list { grid-template-columns: minmax(0, 1fr); }
+  .settings-dlg [data-sub] { padding: 12px; }
+  .settings-dlg .dlg-actions { bottom: -14px; margin: 0 -14px -14px; padding: 11px 14px; }
+}

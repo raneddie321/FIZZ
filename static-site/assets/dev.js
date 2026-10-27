@@ -258,6 +258,14 @@
     parsed.files.forEach((f, idx) => fileRow(f.path, idx, { running: m.pending && !f.closed, content: f.content, kind: "file" }));
     parsed.edits.forEach((e, idx) => fileRow(e.path, `e${idx}`, { running: m.pending && !e.closed, content: e.hunks.map((h) => h.replace).join("\n…\n"), kind: "edit", failed: (m.editErrors || {})[e.path] }));
     const tools = replyTools(m, parsed).filter((t) => !["ask", "push", "attach", "memory"].includes(t.type));
+    // Descriptive progress inferred from streamed prose; never claim the tool ran until it actually does.
+    const progressHint = m.pending ? (() => {
+      const lines = (parsed.prose || "").split("\n").map((x) => x.trim()).filter(Boolean);
+      const line = [...lines].reverse().find((x) => /\b(creat(?:e|ing)|writ(?:e|ing)|edit(?:ing)?|updat(?:e|ing)|install(?:ing)?|run(?:ning)?|execut(?:e|ing)|build(?:ing)?|test(?:ing)?)\b/i.test(x) && x.length < 220);
+      if (!line) return null;
+      const match = line.match(/(?:[\w.-]+\/)*[\w.-]+\.(?:html|css|js|jsx|ts|tsx|json|md|py|yml|yaml|svg|sql)/i);
+      return { text: line.replace(/^[-*\d.\s]+/, "").slice(0, 180), path: match?.[0] || null };
+    })() : null;
     // Live cards (app builds) stay visible under the message, outside the collapsed steps.
     const toolCards = tools.map((t) => (t.result ? T()[t.type]?.card?.(t, m) || "" : "")).join("");
     tools.forEach((t, idx) => {
@@ -295,11 +303,12 @@
     label = label && label[0].toUpperCase() + label.slice(1);
     if (writing) label = `Writing ${writing.path}…`;
     else if (running) label = running.progress ? `${toolLabel(running).replace(/^Opened /, "Opening ")} — ${running.progress}` : `${toolLabel(running)}…`;
+    else if (progressHint) label = progressHint.path ? `Preparing ${progressHint.path}…` : progressHint.text;
     else if (!label && tools.length) { const w = tools.find((x) => x.status === "waiting") || tools[0]; label = toolLabel(w); }
     const key = `${m.id}:activity`;
     const open = state.expanded.has(key) || waiting;
-    const busy = m.pending || running;
-    const activity = rows.length && label
+    const busy = m.pending || running || Boolean(progressHint);
+    const activity = (rows.length || progressHint) && label
       ? `<div class="activity"><button class="act-head" data-step="${key}" aria-expanded="${open}">${busy ? '<span class="st run"></span>' : `<span class="act-ic${failed ? " fail" : ""}">${F.icon(failed ? "alert" : actIcon(tools, m))}</span>`}<span>${esc(label)}</span>${failed && !busy ? '<span class="act-warn">needs attention</span>' : ""}${waiting ? '<span class="act-warn">waiting for you</span>' : ""}<svg class="i chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>${open ? `<div class="steps">${rows.join("")}</div>` : ""}</div>`
       : "";
     const skills = (m.skills || []).map((k) => `<div class="act-line"><span class="act-ic">${F.skills.glyph(k)}</span><span>Used the <b>${esc(k.name)}</b> skill${k.auto ? " <small>(automatic)</small>" : ""}</span></div>`).join("");
@@ -397,11 +406,26 @@
     for (const m of replies) for (const k of m.skills || []) skills.set(k.id, { ...k, n: (skills.get(k.id)?.n || 0) + 1 });
     const sources = msgs.filter((m) => m.role === "user").flatMap((m) => m.attachments || []);
     const cmds = replies.flatMap((m) => m.tools || []).filter((x) => x.status === "done" || x.status === "failed");
+    const currentReply = [...replies].reverse().find((m) => m.pending) || null;
+    const currentParsed = currentReply ? parseAssistant(currentReply.content || "", { fences: currentReply.mode === "build" || !currentReply.mode }) : null;
+    const currentFiles = currentParsed ? [...currentParsed.files, ...currentParsed.edits] : [];
+    const currentTools = currentReply ? replyTools(currentReply, currentParsed) : [];
+    const activeLabel = currentFiles.length
+      ? "Writing " + currentFiles.at(-1).path + "…"
+      : currentTools.some((t) => t.status === "running")
+        ? "Running " + toolLabel(currentTools.find((t) => t.status === "running")) + "…"
+        : currentReply ? "Working · " + (String(currentParsed?.prose || "").split("\n").filter(Boolean).at(-1)?.slice(0, 110) || "Preparing next step") : "";
+    const liveProgressHtml = state.controller
+      ? '<div class="act-current"><span class="st run"></span><div><b>' + esc(activeLabel || "Working on your request") + '</b><small>Live status · changes are saved only after a complete file block arrives.</small></div></div>'
+      : "";
+    const planProgressHtml = plan
+      ? plan.map((t) => '<div class="act-task ' + (t.done ? "done" : "") + '"><span class="tk">' + (t.done ? '<svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>' : "") + '</span><span>' + esc(t.text) + '</span><small>' + (t.done ? "Done" : state.controller && last === replies.at(-1) ? "In progress" : "Pending") + '</small></div>').join("")
+      : '<p class="act-empty">No task list yet.</p>';
     const sec = (title, body) => `<section class="act-sec"><h3>${title}</h3>${body}</section>`;
     $("#activity").innerHTML = !msgs.length
       ? `<p class="act-empty">Progress, outputs and skills for this chat appear here.</p>`
       : sec("Activity", `<div class="act-row"><span>Skills</span><b>${skills.size} used</b></div><div class="act-row"><span>Tool steps</span><b>${cmds.length}</b></div><div class="act-row"><span>Messages</span><b>${replies.length}</b></div>`)
-        + sec("Progress", plan ? plan.map((t) => `<div class="act-task ${t.done ? "done" : ""}"><span class="tk">${t.done ? '<svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>' : ""}</span><span>${esc(t.text)}</span><small>${t.done ? "Done" : state.controller && last === replies.at(-1) ? "In progress" : "Pending"}</small></div>`).join("") : `<p class="act-empty">No task list yet.</p>`)
+        + sec("Progress", liveProgressHtml + planProgressHtml)
         + sec("Outputs", outputs.size ? [...outputs.values()].map((ch) => `<button class="act-file" data-open-file="${esc(ch.path)}"><span>${esc(ch.path)}</span><small><span class="add">+${ch.added}</span> <span class="del">−${ch.removed}</span></small></button>`).join("") : `<p class="act-empty">No files changed yet.</p>`)
         + sec("Skills", skills.size ? [...skills.values()].map((k) => `<div class="act-row"><span>${esc(k.name)}</span><small>${k.n}×</small></div>`).join("") : `<p class="act-empty">None used. Press + in the composer to add one.</p>`)
         + sec("Sources", sources.length ? sources.map((a) => `<div class="act-row"><span>${esc(a.name)}</span></div>`).join("") : `<p class="act-empty">No attachments.</p>`);
@@ -500,7 +524,7 @@
         ? "DO MODE (personal agent). The user wants you to get something done for them, not to write code. Follow the DO MODE handbook above: plan briefly, then use the tools (browser, Google, connected services, MCP servers, search, terminal) step by step until the task is really done, verify, and report with links. You may still write files with <fizz-file> when the task needs one (a saved result, a .env value, a document to export), using the same file format as build mode."
         : mode === "ask"
         ? "ASK MODE. Answer questions and explain code. Do NOT write <fizz-file> or <fizz-edit> blocks unless the user explicitly asks for a file; show short snippets in Markdown code blocks instead."
-        : "BUILD MODE. Start with a task list in this exact format (3–10 tasks, one line each, naming the files):\n<fizz-plan>\n- [ ] first task\n- [ ] second task\n</fizz-plan>\nThen a one-sentence intro, then do the work. To create a file or replace it completely, output the COMPLETE file:\n<fizz-file path=\"relative/path.ext\">\n...entire file content...\n</fizz-file>\nTo change part of an existing file, prefer a patch (exact text, including indentation; the SEARCH text must appear once in the file):\n<fizz-edit path=\"relative/path.ext\">\n<<<<<<< SEARCH\nexact existing lines\n=======\nnew lines\n>>>>>>> REPLACE\n</fizz-edit>\nYou may put several SEARCH/REPLACE blocks in one <fizz-edit>. Never use placeholders like '// rest unchanged'. For a new project, decide the file structure first and create every file it needs, in dependency order. When the work is done, repeat the same <fizz-plan> with finished tasks marked [x], then summarize what you changed in a few bullet points.",
+        : "BUILD MODE. Your output is executed by FIZZ DEV, not merely displayed as chat. Start with a task list in this exact format (3–10 tasks naming files):\n<fizz-plan>\n- [ ] create index.html\n- [ ] add styles\n</fizz-plan>\nThen write the actual files immediately. CRITICAL: never say you are about to create a file and then stop; every file you intend to create MUST be emitted as a complete, closed block in the same response whenever possible:\n<fizz-file path=\"relative/path.ext\">\ncomplete file content\n</fizz-file>\nText outside a file block is not saved as code. Do not use ordinary Markdown fences for files unless the opening fence includes the file path. For existing files, patch with:\n<fizz-edit path=\"relative/path.ext\">\n<<<<<<< SEARCH\nexact existing lines\n=======\nreplacement lines\n>>>>>>> REPLACE\n</fizz-edit>\nYou may put several SEARCH/REPLACE blocks in one <fizz-edit>. Never use placeholders such as '// rest unchanged'. For new projects, create index.html first and every required CSS/JS/data file in dependency order. Keep replies to a few complete files at a time to avoid output truncation. When complete, repeat the plan with finished tasks marked [x], then summarize. Do not claim success until you inspect the result.",
       "THE PREVIEW. Projects run in a browser preview with index.html as the entry point. Linked .css files and classic scripts are loaded from the project. ES modules work across files: <script type=\"module\" src=\"js/main.js\"></script> and import { x } from \"./state.js\" between project files (always with the .js extension). fetch(\"data/items.json\") returns project files. Bare imports (import confetti from \"canvas-confetti\") load from esm.sh automatically. Links between project pages work. Servers, build tools and npm scripts need the cloud sandbox.",
       `TOOLS. You can use these tags; FIZZ DEV runs them after your files are written, shows each as a step, and sends you the results in the next message so you can continue:\n${tools}\nUse tools to check your own work (run the script, take a screenshot of the preview) before you say it's done. Work in small steps. When everything works, finish without any tool tags.`,
       "ASKING. When something important is unclear (a preference, missing info, a choice with real trade-offs), ask instead of guessing:\n<fizz-ask question=\"Which style do you want?\" options=\"Minimal|Playful|Corporate\"/>\noptions are optional (separate with |; add multi=\"true\" to allow several). Stop after asking — the user's answer comes in the next message. Never ask for passwords, card numbers or other secrets in the chat.",
@@ -521,7 +545,7 @@
   const MAX_STEPS = () => Math.min(40, Math.max(1, Number(data.settings.agentSteps) || 20));
   let stopLoop = false;
   // Per turn: how many times a cut-off reply was continued and how many self-checks ran.
-  let turn = { continues: 0, verifies: 0 };
+  let turn = { continues: 0, verifies: 0, emptyBuildRetries: 0 };
   const MAX_CONTINUES = 4, MAX_VERIFIES = 2;
   const estimateTokens = (text) => Math.ceil(String(text || "").length / 3.6);
   function contextUse() {
@@ -560,7 +584,7 @@
   async function generate({ step = 1 } = {}) {
     const p = project();
     const c = chat();
-    if (step === 1) { stopLoop = false; turn = { continues: 0, verifies: 0 }; }
+    if (step === 1) { stopLoop = false; turn = { continues: 0, verifies: 0, emptyBuildRetries: 0 }; }
     if (contextUse().pct >= 85) await compactChat({ quiet: true });
     const lastUser = [...c.messages].reverse().find((m) => m.role === "user" && !m.auto) || {};
     const skills = F.skills.forMessage(data, p.skills || [], lastUser.content || "");
@@ -612,6 +636,25 @@
     const results = (reply.tools || []).filter((t) => (t.status === "done" || t.status === "failed") && F.agentTools.registry[t.type]?.feedback);
     const editErrors = Object.entries(reply.editErrors || {});
     if (asked || waiting || stopLoop) return finishLoop(reply, asked ? "question" : waiting ? "approval" : "stopped");
+    // A common failure mode is a model narrating that it will create a file, then ending
+    // without any executable file block or tool call. Retry once with an explicit instruction.
+    const parsedNow = parseAssistant(reply.content || "", { fences: reply.mode === "build" || !reply.mode });
+    const hasArtifacts = Boolean((reply.changes || []).length || parsedNow.files.some((x) => x.closed) || parsedNow.edits.length || parsedNow.tools.length);
+    const narratedIntent = /\b(?:i(?:'| a)m going to|i(?:'| a)ll|now i|let me|i will|creating|writing|going to create|going to write)\b/i.test(parsedNow.prose || "")
+      && /\b(?:file|index\.html|\.css|\.js|component|implement|create|write|run|execute)\b/i.test(parsedNow.prose || "");
+    if (reply.mode === "build" && !hasArtifacts && narratedIntent && turn.emptyBuildRetries < 1 && reply.step < MAX_STEPS()) {
+      turn.emptyBuildRetries++;
+      chat().messages.push({
+        id: F.uid(), role: "user", auto: true, autoLabel: "Asked Fizz Code to apply the work instead of narrating",
+        content: "Your previous response only described work but did not create a project file or run a tool. Do the work now. For each file, output a complete <fizz-file path=\"relative/path.ext\">...</fizz-file> block. Do not say what you are going to do; emit the actual file contents. If a command is required, use <fizz-run>command</fizz-run>. Keep it concise and create the requested files.",
+        mode: "build", at: Date.now()
+      });
+      save();
+      return generate({ step: reply.step + 1 });
+    }
+    if (reply.mode === "build" && !hasArtifacts && narratedIntent && turn.emptyBuildRetries >= 1) {
+      reply.error = "Fizz Code described the work but still did not create a file or run a tool. Try asking it to create the files directly, or check that the selected model supports the requested output format.";
+    }
     const cut = reply.cutOff && reply.mode === "build";
     if (cut && (turn.continues >= MAX_CONTINUES || reply.step >= MAX_STEPS())) {
       reply.content += "\n\n*The reply reached its maximum length — ask Fizz Code to continue.*";
