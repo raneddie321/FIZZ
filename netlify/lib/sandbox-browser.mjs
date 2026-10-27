@@ -35,9 +35,10 @@ export async function ensureBrowser(uid, { waitMs = 35000 } = {}) {
     `mkdir /tmp/fizz-br-lock 2>/dev/null || exit 0`,
     `cd ${DIR}`,
     `(test -d node_modules/@sparticuz/chromium || npm install --no-audit --no-fund >/tmp/fizz-br-install.log 2>&1)`,
-    `pkill -f "node agent.mjs" 2>/dev/null; sleep 0.3`,
-    `FIZZ_BR_TOKEN=${token} FIZZ_BR_PORT=${PORT} AWS_EXECUTION_ENV=AWS_Lambda_nodejs22.x nohup node agent.mjs >/tmp/fizz-br.log 2>&1 &`,
-    `sleep 2; rm -rf /tmp/fizz-br-lock`,
+    // Do not use pkill -f here: it can match the shell command that contains this script
+    // and terminate startup itself. Keep an already-running agent and start only when absent.
+    `if ! pgrep -f '[n]ode agent.mjs' >/dev/null; then FIZZ_BR_TOKEN=${token} FIZZ_BR_PORT=${PORT} AWS_EXECUTION_ENV=AWS_Lambda_nodejs22.x nohup node agent.mjs >/tmp/fizz-br.log 2>&1 & fi`,
+    `sleep 1; rm -rf /tmp/fizz-br-lock`,
   ].join("; ");
   await sbx.runCommand({ cmd: "bash", args: ["-lc", script], detached: true });
   const until = Date.now() + waitMs;
