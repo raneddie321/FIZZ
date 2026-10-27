@@ -216,6 +216,9 @@
     f.geminiKey.value = s.geminiKey || "";
     f.geminiModel.value = s.geminiModel || "gemini-3.8-flash";
     f.apiKey.value = s.apiKey;
+    for (const name of ["groqKey","groqModel","zaiKey","zaiModel","requestyKey","requestyModel","deepseekKey","deepseekModel","cerebrasKey","cerebrasModel","togetherKey","togetherModel","customOpenAIKey","customOpenAIBaseUrl","customOpenAIModel"]) {
+      if (f.elements.namedItem(name)) f.elements.namedItem(name).value = s[name] || "";
+    }
     f.model.innerHTML = F.MODELS.map((m) => `<option value="${m.id}">${m.chat} — ${m.note}</option>`).join("");
     f.model.value = s.model;
     f.name.closest("label").classList.toggle("hidden", !ctx.user.legacy);
@@ -375,6 +378,21 @@
         apiKey: f.apiKey.value.trim(),
         geminiKey: f.geminiKey.value.trim(),
         geminiModel: f.geminiModel.value.trim() || "gemini-3.8-flash",
+        groqKey: f.groqKey.value.trim(),
+        groqModel: f.groqModel.value.trim() || "llama-3.3-70b-versatile",
+        zaiKey: f.zaiKey.value.trim(),
+        zaiModel: f.zaiModel.value.trim() || "glm-4.6",
+        requestyKey: f.requestyKey.value.trim(),
+        requestyModel: f.requestyModel.value.trim() || "openai/gpt-4o-mini",
+        deepseekKey: f.deepseekKey.value.trim(),
+        deepseekModel: f.deepseekModel.value.trim() || "deepseek-chat",
+        cerebrasKey: f.cerebrasKey.value.trim(),
+        cerebrasModel: f.cerebrasModel.value.trim() || "llama-3.3-70b",
+        togetherKey: f.togetherKey.value.trim(),
+        togetherModel: f.togetherModel.value.trim() || "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+        customOpenAIKey: f.customOpenAIKey.value.trim(),
+        customOpenAIBaseUrl: f.customOpenAIBaseUrl.value.trim(),
+        customOpenAIModel: f.customOpenAIModel.value.trim(),
         model: f.model.value,
         style: f.style.value,
         instructions: f.instructions.value.trim(),
