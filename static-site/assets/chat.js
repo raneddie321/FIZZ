@@ -90,6 +90,8 @@
         m.error = "";
         m.stopped = true;
         m.content = String(m.content || "");
+      } else if (m.role === "assistant" && m.interrupted) {
+        // A recovered turn stays visibly interrupted until the user retries it.
       }
     }
   }
@@ -277,6 +279,7 @@
       reply.pending = false;
       reply.working = [];
       reply.content = stripTools(reply.content);
+      if (reply.interrupted) reply.interrupted = false;
       state.controller = null;
       state.streamingId = null;
       if (reply.pending) reply.pending = false;
