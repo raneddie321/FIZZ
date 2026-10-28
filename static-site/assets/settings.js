@@ -88,6 +88,11 @@
           <label class="field"><span>Base URL</span><input class="input mono" name="customOpenAIBaseUrl" type="url" placeholder="https://api.example.com/v1" /><small>Use the provider's OpenAI-compatible base URL (not the full chat-completions URL).</small></label>
           <label class="field"><span>Model ID</span><input class="input mono" name="customOpenAIModel" placeholder="provider/model-name" /></label>
         </div>
+        <div class="row-inline" style="justify-content:space-between;align-items:center;gap:12px;margin-top:12px">
+          <button type="button" class="btn btn-outline btn-sm" data-test-ai>Test connection</button>
+          <span class="muted-sm" data-ai-test-state role="status" aria-live="polite"></span>
+        </div>
+        <p class="muted-sm">Tests the selected provider with one short request using the values currently in this form. It doesn't save your settings.</p>
       </div>
       <div data-pane="connections" class="form"><div class="conn-list" data-conn-list></div>
         <p class="muted-sm">Tokens for GitHub and Vercel are kept encrypted in a secure cookie that page scripts can't read. Google access lasts about an hour and stays in this tab only.</p></div>
@@ -257,6 +262,58 @@
       if (t.dataset.tab) setTab(t.dataset.tab);
       if (t.hasAttribute("data-settings-close")) { d.close("cancel"); return; }
       if (t.name === "provider") sub();
+      if (t.hasAttribute("data-test-ai")) {
+        const out = d.querySelector("[data-ai-test-state]");
+        const providerId = f.querySelector("[name=provider]:checked")?.value || "fizz";
+        const draft = {
+          ...s,
+          provider: providerId,
+          apiKey: f.apiKey.value.trim(),
+          openrouterKey: f.openrouterKey.value.trim(),
+          openrouterModel: f.openrouterModel.value.trim() || "z-ai/glm-4.6",
+          geminiKey: f.geminiKey.value.trim(),
+          geminiModel: f.geminiModel.value.trim() || "gemini-3.8-flash",
+          groqKey: f.groqKey.value.trim(),
+          groqModel: f.groqModel.value.trim() || "llama-3.3-70b-versatile",
+          zaiKey: f.zaiKey.value.trim(),
+          zaiBaseUrl: f.zaiBaseUrl.value.trim() || "https://api.z.ai/api/paas/v4",
+          zaiModel: f.zaiModel.value.trim() || "glm-4.6",
+          requestyKey: f.requestyKey.value.trim(),
+          requestyModel: f.requestyModel.value.trim() || "openai/gpt-4o-mini",
+          deepseekKey: f.deepseekKey.value.trim(),
+          deepseekModel: f.deepseekModel.value.trim() || "deepseek-chat",
+          cerebrasKey: f.cerebrasKey.value.trim(),
+          cerebrasModel: f.cerebrasModel.value.trim() || "llama-3.3-70b",
+          togetherKey: f.togetherKey.value.trim(),
+          togetherModel: f.togetherModel.value.trim() || "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+          customOpenAIKey: f.customOpenAIKey.value.trim(),
+          customOpenAIBaseUrl: f.customOpenAIBaseUrl.value.trim(),
+          customOpenAIModel: f.customOpenAIModel.value.trim(),
+          model: f.model.value,
+        };
+        const providerNames = { fizz: "FIZZ AI", anthropic: "Anthropic Claude", gemini: "Google Gemini", openrouter: "OpenRouter", groq: "Groq", zai: "Z.AI", requesty: "Requesty AI", deepseek: "DeepSeek", cerebras: "Cerebras", together: "Together AI", "custom-openai": "custom provider" };
+        t.disabled = true;
+        out.textContent = "Testing the selected provider…";
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 25000);
+        try {
+          const result = await F.aiStream(draft, {
+            system: "You are checking an AI API connection. Reply with exactly FIZZ_OK and no other text.",
+            messages: [{ role: "user", content: "Reply with exactly FIZZ_OK." }],
+            signal: controller.signal,
+            onText: () => {},
+          });
+          if (!result.text?.trim()) throw new Error("The provider accepted the request but returned no text.");
+          out.textContent = `Connected — ${providerNames[providerId] || providerId} returned a response.`;
+        } catch (err) {
+          const message = err?.name === "AbortError" ? "Test timed out after 25 seconds. Check provider status, model access and API limits." : err?.message === "NO_KEY" ? "Missing API key. Enter it in the selected provider's settings first." : (err?.message || "Unknown connection error.");
+          out.textContent = `Connection failed: ${message}`;
+        } finally {
+          clearTimeout(timeout);
+          t.disabled = false;
+        }
+        return;
+      }
       if (t.hasAttribute("data-or-connect")) { ctx.data.settings.provider = "openrouter"; ctx.save(); F.openrouterConnect(); }
       if (t.hasAttribute("data-or-models")) {
         t.textContent = "Loading…";
