@@ -191,7 +191,7 @@ await assert.rejects(
   "absolute paths are rejected"
 );
 await assert.rejects(
-  sandbox.run({ userId: "user_alice", projectId: "p1", files: { "src\\\\..\\\\..\\\\outside.txt": "nope" }, cmd: "ls" }),
+  sandbox.run({ userId: "user_alice", projectId: "p1", files: { "src\\..\\..\\outside.txt": "nope" }, cmd: "ls" }),
   /Unsafe project file path/,
   "Windows-style traversal is rejected too"
 );
