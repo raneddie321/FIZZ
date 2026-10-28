@@ -37,8 +37,8 @@ const COMMAND_LIMIT = 2000;
 // File names come from the browser project model. Keep every uploaded file inside APP;
 // the sandbox is isolated, but path traversal must not be allowed to overwrite other VM paths.
 function safeProjectPath(input) {
-  if (typeof input !== "string" || !input || input.length > FILE_PATH_LIMIT || input.includes("\\0")) return null;
-  const normalized = input.replace(/\\\\/g, "/");
+  if (typeof input !== "string" || !input || input.length > FILE_PATH_LIMIT || input.includes(String.fromCharCode(0))) return null;
+  const normalized = input.split(String.fromCharCode(92)).join("/");
   if (normalized.startsWith("/") || /^[a-zA-Z]:/.test(normalized)) return null;
   const segments = normalized.split("/");
   if (segments.some((part) => part === ".." || part === "." || part === "")) return null;
