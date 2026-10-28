@@ -180,6 +180,31 @@ assert.equal(j.url, "https://sb-3000.example");
 j = await sandbox.wait({ userId: "user_alice", projectId: "p1", cmdId: "cmd_1" });
 assert.equal(j.exitCode, 0);
 await assert.rejects(sandbox.run({ userId: "u", projectId: "p", files: { "a.txt": "x".repeat(3_200_000) }, cmd: "ls" }), /too large/);
+await assert.rejects(
+  sandbox.run({ userId: "user_alice", projectId: "p1", files: { "../outside.txt": "nope" }, cmd: "ls" }),
+  /Unsafe project file path/,
+  "path traversal is rejected before files are written"
+);
+await assert.rejects(
+  sandbox.run({ userId: "user_alice", projectId: "p1", files: { "/tmp/outside.txt": "nope" }, cmd: "ls" }),
+  /Unsafe project file path/,
+  "absolute paths are rejected"
+);
+await assert.rejects(
+  sandbox.run({ userId: "user_alice", projectId: "p1", files: { "src\\\\..\\\\..\\\\outside.txt": "nope" }, cmd: "ls" }),
+  /Unsafe project file path/,
+  "Windows-style traversal is rejected too"
+);
+await assert.rejects(
+  sandbox.run({ userId: "user_alice", projectId: "p1", files: {}, cmd: "x".repeat(2001) }),
+  /command is too long/,
+  "overlong commands are rejected"
+);
+await assert.rejects(
+  sandbox.run({ userId: "user_alice", projectId: "p1", files: Object.fromEntries(Array.from({ length: 501 }, (_, i) => [`f${i}.txt`, "x"])), cmd: "ls" }),
+  /Too many project files/,
+  "file count is bounded"
+);
 
 // ---------- GitHub Actions: runs, artifact link, dispatch ----------
 const gh = seal({ t: "tok", label: "@octo" });
