@@ -147,7 +147,7 @@ tried.length = 0;
 globalThis.fetch = async (_url, init) => {
   const m = JSON.parse(init.body).model;
   tried.push(m);
-  if (m === "backup-model") return new Response("data: [DONE]\\n\\n");
+  if (m === "backup-model") return new Response("data: [DONE]\n\n");
   throw new Error("simulated temporary network failure");
 };
 r = await vAi.POST(new Request(`${O}/api/ai/chat`, { method: "POST", headers: { origin: O, cookie: "fizz_uid=qrstuvwxyz12345678", "x-forwarded-for": "5.6.7.8" }, body: JSON.stringify({ messages: [{ role: "user", content: "hi" }] }) }));
