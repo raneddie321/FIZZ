@@ -80,6 +80,21 @@
     F.rid.renderMe(root, user);
   }
 
+  // If the browser restores this page after discarding it, make any half-finished turn explicit.
+  // The partial answer has already been persisted by the stream handler below.
+  for (const c of data.conversations) {
+    for (const m of c.messages || []) {
+      if (m.role === "assistant" && m.pending) {
+        m.pending = false;
+        m.interrupted = true;
+        m.error = "";
+        m.stopped = true;
+        m.content = String(m.content || "");
+      }
+    }
+  }
+  save();
+
   // ---------- messages ----------
   function msgHtml(m, i, isLast) {
     const t = new Date(m.at || Date.now()).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
@@ -92,6 +107,7 @@
     if (m.error) body = `<div class="notice ${m.noKey ? "warn" : ""}"><span>${esc(m.error)}</span>${m.noKey ? `<button class="btn btn-sm" data-open-settings="ai">Open AI settings</button>` : isLast ? `<button class="btn btn-outline btn-sm" data-regen>Retry</button>` : ""}</div>`;
     else if (!m.content) body = `<span class="dots" aria-label="FIZZ is writing"><i></i><i></i><i></i></span>`;
     else body = `<div class="md">${F.markdown(stripTools(m.content))}</div>`;
+    if (m.interrupted) body += `<div class="notice">This response was interrupted when the tab was closed or suspended. The saved partial answer is above; retry to continue.</div>`;
     // While FIZZ is searching or reading pages, say exactly what it's doing.
     const working = m.pending && (m.working || []).length
       ? `<div class="m-working">${icon("globe")}<span>${m.working.map((w) => esc(w)).join(" · ")}</span></div>`
