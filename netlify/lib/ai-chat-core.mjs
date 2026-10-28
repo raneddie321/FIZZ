@@ -67,7 +67,7 @@ export async function handleChat(req, { env, ip, bump }) {
     }),
     signal: req.signal,
   }).catch(() => null);
-  const busy = (r) => r && [429, 500, 503].includes(r.status);
+  const busy = (r) => r && [408, 425, 429, 500, 502, 503, 504].includes(r.status);
   const fallbacks = (env("FIZZ_FALLBACK_MODELS") || "").split(",").map((x) => x.trim()).filter((x) => x && x !== model);
   let upstream = await call(model);
   // A rejected fetch is returned as null by call(); treat it like a transient outage so
