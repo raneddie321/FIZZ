@@ -510,3 +510,25 @@
 #activity .act-row { padding: 6px 0; }
 #activity .act-file { min-height: 42px; border-radius: 9px; margin: 3px 0; }
 #activity .act-task { gap: 9px; padding: 8px 0; }
+
+/* Keep the FIZZ DEV composer inside the center editor column. */
+#dev-app .composer-area {
+  min-width: 0;
+  box-sizing: border-box;
+}
+#dev-app .composer-inner {
+  width: 100%;
+  min-width: 0;
+  max-width: min(100%, 640px);
+}
+#dev-app .composer {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+#dev-app .composer textarea {
+  min-width: 0;
+  box-sizing: border-box;
+}
+
