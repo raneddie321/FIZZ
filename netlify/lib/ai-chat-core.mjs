@@ -67,11 +67,19 @@ export async function handleChat(req, { env, ip, bump }) {
     }),
     signal: req.signal,
   }).catch(() => null);
-  const busy = (r) => r && [429, 500, 503].includes(r.status);
+  const busy = (r) => r && [408, 425, 429, 500, 502, 503, 504].includes(r.status);
   const fallbacks = (env("FIZZ_FALLBACK_MODELS") || "").split(",").map((x) => x.trim()).filter((x) => x && x !== model);
   let upstream = await call(model);
-  if (busy(upstream)) { await new Promise((ok) => setTimeout(ok, 1200)); upstream = await call(model); }
-  for (const m of fallbacks) { if (!busy(upstream)) break; upstream = await call(m); }
+  // A rejected fetch is returned as null by call(); treat it like a transient outage so
+  // one network blip doesn't skip the retry and prevent configured fallback models from running.
+  if (!upstream || busy(upstream)) {
+    await new Promise((ok) => setTimeout(ok, 900));
+    upstream = await call(model);
+  }
+  for (const m of fallbacks) {
+    if (upstream && !busy(upstream)) break;
+    upstream = await call(m);
+  }
   if (!upstream) return err(502, "Couldn't reach the AI service. Please try again.", "upstream");
   if (!upstream.ok) {
     const detail = await upstream.text().catch(() => "");

@@ -131,6 +131,37 @@
   }
   const saveData = (user, d) => store.set(`fizz.data.${user.id}`, d);
 
+  // Retry transient provider outages once, before streaming starts. Never retry an in-flight stream.
+  const RETRYABLE_HTTP = new Set([408, 429, 500, 502, 503, 504, 529]);
+  function retryDelay(ms, signal) {
+    return new Promise((resolve, reject) => {
+      let timer;
+      const onAbort = () => {
+        clearTimeout(timer);
+        signal?.removeEventListener("abort", onAbort);
+        reject(new DOMException("The request was aborted.", "AbortError"));
+      };
+      timer = setTimeout(() => {
+        signal?.removeEventListener("abort", onAbort);
+        resolve();
+      }, ms);
+      if (signal?.aborted) onAbort();
+      else signal?.addEventListener("abort", onAbort, { once: true });
+    });
+  }
+  async function fetchWithTransientRetry(url, init) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const response = await fetch(url, init);
+      if (attempt === 0 && RETRYABLE_HTTP.has(response.status) && !init.signal?.aborted) {
+        try { await response.body?.cancel(); } catch {}
+        await retryDelay(900, init.signal);
+        continue;
+      }
+      return response;
+    }
+    throw new Error("The AI provider could not be reached.");
+  }
+
   // ---------- AI (Anthropic Messages API, streamed) ----------
   const MODELS = [
     { id: "claude-opus-5-5", chat: "FIZZ 1.0", dev: "Fizz Code 1.0", note: "Most capable — reasoning, writing and code" },
@@ -140,7 +171,7 @@
 
   async function streamChat({ apiKey, model, system, messages, signal, onText }) {
     if (!apiKey) throw new Error("NO_KEY");
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
+    const res = await fetchWithTransientRetry("https://api.anthropic.com/v1/messages", {
       method: "POST",
       signal,
       headers: {
@@ -203,19 +234,33 @@
 
   // ---------- OpenAI-compatible streaming (FIZZ server proxy and OpenRouter) ----------
   async function streamOpenAI(url, headers, payload, signal, onText) {
-    const res = await fetch(url, { method: "POST", signal, credentials: "same-origin", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify(payload) }).catch((e) => {
+    const res = await fetchWithTransientRetry(url, { method: "POST", signal, credentials: "same-origin", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify(payload) }).catch((e) => {
       if (e.name === "AbortError") throw e;
       throw new Error("Couldn't reach the AI service. Check your internet connection.");
     });
     if (!res.ok) {
       let msg = `The AI service returned an error (${res.status}).`;
       try { const j = await res.json(); msg = j.error?.message || msg; } catch {}
-      if (res.status === 404) msg = "FIZZ AI isn't available on this deployment. Connect OpenRouter or add an API key in Settings → AI.";
-      if (res.status === 401 && url.includes("openrouter")) msg = "OpenRouter rejected your key. Reconnect it in Settings → AI.";
+      const providerName =
+        url.includes("generativelanguage") ? "Google AI Studio" :
+        url.includes("openrouter.ai") ? "OpenRouter" :
+        url.includes("api.groq.com") ? "Groq" :
+        url.includes("api.z.ai") ? "Z.AI" :
+        url.includes("requesty.ai") ? "Requesty AI" :
+        url.includes("deepseek.com") ? "DeepSeek" :
+        url.includes("cerebras.ai") ? "Cerebras" :
+        url.includes("api.together.xyz") ? "Together AI" :
+        url.includes("/api/ai/chat") ? "FIZZ AI" : "The selected AI provider";
+      if (res.status === 404 && url.startsWith("/api/ai/chat")) msg = "FIZZ AI isn't available on this deployment. Check the Vercel deployment and AI environment variables.";
+      else if (res.status === 429) msg = `${providerName} is rate-limiting requests. FIZZ retried once; wait a moment or choose another model.`;
+      else if (res.status === 402) msg = `${providerName} reports a billing or credit limit. Check the provider account and usage limits.`;
+      else if ((res.status === 401 || res.status === 403) && !url.startsWith("/api/ai/chat")) msg = `${providerName} rejected the API key or access to this model. Check the key and model permissions in Settings → AI.`;
+      else if (res.status >= 500) msg = `${providerName} is temporarily unavailable (HTTP ${res.status}). FIZZ retried once; try again or choose another model if it continues.`;
       if (url.includes("generativelanguage")) {
-        if (res.status === 400 && /api key/i.test(msg) || res.status === 401 || res.status === 403) msg = "Google AI Studio rejected your API key. Check it in Settings → AI (aistudio.google.com → Get API key).";
-        else if (res.status === 404) msg = `Google doesn't have the model "${payload.model}". Pick another model in Settings → AI.`;
-        else if (res.status === 429) msg = "Your Google AI Studio key has reached its rate limit. Wait a minute, or switch model in Settings → AI.";
+        if ((res.status === 400 && /api key/i.test(msg)) || res.status === 401 || res.status === 403) msg = "Google AI Studio rejected your API key. Check it in Settings → AI (aistudio.google.com → Get API key).";
+        else if (res.status === 404) msg = `Google doesn't have the model "${payload.model}". Use Settings → AI → Load my models to select a supported model.`;
+        else if (res.status === 429) msg = "Google AI Studio is rate-limiting this key. FIZZ retried once; wait a moment or choose another available model.";
+        else if (res.status >= 500) msg = `Google AI Studio is temporarily unavailable (HTTP ${res.status}). FIZZ retried once; try again or select another model.`;
       }
       const e = new Error(msg);
       e.status = res.status;

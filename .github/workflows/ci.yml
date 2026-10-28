@@ -1,0 +1,34 @@
+name: FIZZ checks
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  syntax-and-backend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Syntax-check the changed AI code
+        run: |
+          node --check static-site/assets/core.js
+          node --check static-site/assets/settings.js
+          node --check netlify/lib/ai-chat-core.mjs
+          node --check api/ai/chat.mjs
+          node --check tests/netlify/functions.test.mjs
+      - name: Test server routes and AI fallback behaviour
+        run: node tests/netlify/functions.test.mjs
+      - name: Test web, sync, sandbox and tool routes
+        run: node tests/netlify/tools.test.mjs
+      - name: Check browser automation test can start
+        run: node tests/netlify/browser.test.mjs
