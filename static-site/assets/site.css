@@ -603,3 +603,40 @@ svg.dots3 { stroke-width: 3; }
 @media(hover:none){
  .hero-primary:hover{transform:none}
 }
+
+
+/* Final viewport fit: keep the landing hero full-width and prevent the preview from collapsing */
+#main{width:100%;max-width:none;margin-inline:auto}
+#main>.landing-hero{
+  width:100%;max-width:1240px;margin-inline:auto;
+  padding:clamp(44px,6vw,80px) clamp(20px,4vw,56px) clamp(36px,5vw,64px);
+  display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.08fr);
+  align-items:center;gap:clamp(28px,4vw,64px);
+}
+#main>.landing-hero>.hero-copy{width:100%;max-width:540px;min-width:0}
+#main>.landing-hero .hero-title{font-size:clamp(42px,5vw,72px);line-height:1.02;overflow-wrap:normal}
+#main>.landing-hero>.hero-visual{width:100%;max-width:680px;min-width:0;justify-self:stretch}
+#main>.landing-hero .workspace-window{width:100%;max-width:100%}
+#main>.landing-hero .workspace-main{min-width:0}
+#main>.landing-hero .workspace-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+#main>.landing-hero .workspace-option{min-width:0}
+@media(max-width:900px){
+  #main>.landing-hero{grid-template-columns:minmax(0,1fr);max-width:760px;gap:26px;padding:52px 24px 36px}
+  #main>.landing-hero>.hero-copy{max-width:620px;margin-inline:auto;text-align:center}
+  #main>.landing-hero .hero-description{margin-inline:auto}
+  #main>.landing-hero .hero-actions,#main>.landing-hero .hero-proof{justify-content:center}
+  #main>.landing-hero>.hero-visual{max-width:680px;justify-self:center}
+}
+@media(max-width:600px){
+  #main>.landing-hero{padding:36px 16px 26px;gap:18px}
+  #main>.landing-hero .hero-title{font-size:clamp(38px,10.5vw,56px);line-height:1.04}
+  #main>.landing-hero .hero-actions{display:grid;grid-template-columns:minmax(0,1fr);width:100%}
+  #main>.landing-hero .hero-actions .btn{width:100%}
+  #main>.landing-hero .workspace-content{grid-template-columns:30px minmax(0,1fr)}
+  #main>.landing-hero .workspace-main{padding:13px 9px 10px}
+  #main>.landing-hero .workspace-options{grid-template-columns:minmax(0,1fr)}
+}
+@media(max-width:360px){
+  #main>.landing-hero{padding-inline:12px}
+  #main>.landing-hero .hero-proof{grid-template-columns:minmax(0,1fr)}
+}
