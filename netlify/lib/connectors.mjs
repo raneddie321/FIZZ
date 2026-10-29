@@ -62,6 +62,12 @@ export const CONNECTORS = {
     base: "https://slack.com/api", headers: (t) => ({ Authorization: `Bearer ${t}` }),
     me: { path: "/auth.test", label: (j) => (j.team ? `${j.user || "bot"} @ ${j.team}` : "Slack"), ok: (j) => j.ok === true },
   },
+  brandfetch: {
+    name: "Brandfetch", desc: "Search brand identities and find official logos for your projects.",
+    help: "https://developers.brandfetch.com/", how: "Create a Brandfetch developer account, generate an API key, then paste it here. Keep the key private.",
+    base: "https://api.brandfetch.io/v2", headers: (t) => ({ Authorization: `Bearer ${t}` }),
+    me: { path: "/search/brandfetch.com", label: (j) => Array.isArray(j) ? "Brandfetch API key" : (j.name || j.domain || "Brandfetch API key") },
+  },
   supabase: {
     name: "Supabase", desc: "Projects, databases and edge functions (Management API).",
     help: "https://supabase.com/dashboard/account/tokens", how: "Generate new token → copy it.",

@@ -105,7 +105,8 @@
         <label class="check"><input type="checkbox" name="autoVerify" /><span>Check Fizz Code's work automatically<small>When it finishes, FIZZ DEV checks the files it wrote (syntax, imports, links, errors in the preview) and has it fix what it finds.</small></span></label>
         <label class="field"><span>Steps per task</span><input class="input" type="number" name="agentSteps" min="5" max="40" step="1" /><small class="muted-sm">How many rounds Fizz Code may work on its own before it asks you to keep going (5–40).</small></label>
         <label class="check"><input type="checkbox" name="reviewChanges" /><span>Review file changes before they're applied</span></label>
-        <label class="check"><input type="checkbox" name="askBeforeRun" /><span>Ask before Fizz Code runs commands<small>Off: it runs them in its own sandbox right away (every change can be undone).</small></span></label>
+        <label class="check"><input type="checkbox" name="askBeforeRun" /><span>Ask before Fizz Code runs commands<small>Off: it runs commands in its sandbox without pausing.</small></span></label>
+        <label class="check"><input type="checkbox" name="autoActions" /><span>Allow automatic GitHub Push and Vercel deploys<small>When enabled, FIZZ DEV can publish the current project after you request it, without an extra confirmation dialog. It still must be connected and must report the real result.</small></span></label>
         <label class="check"><input type="checkbox" name="mcpAsk" data-mcp-ask /><span>Ask before every MCP call<small>Off: the first call to each MCP server asks once, then Fizz may keep using that server for the session. Calls that send, post or delete always ask. Fizz never sees the server's Authorization header — calls go through FIZZ's server.</small></span></label>
       </div>
       <div data-pane="account" class="form"><div data-acct></div></div>
@@ -181,7 +182,7 @@
         notion: ["notion", "000000"], trello: ["trello", "0052CC"], linear: ["linear", "5E6AD2"],
         airtable: ["airtable", "18BFFF"], figma: ["figma", "F24E1E"], netlify: ["netlify", "00C7B7"],
         cloudflare: ["cloudflare", "F38020"], discord: ["discord", "5865F2"], telegram: ["telegram", "26A5E4"],
-        slack: ["slack", "4A154B"], supabase: ["supabase", "3FCF8E"],
+        slack: ["slack", "4A154B"], supabase: ["supabase", "3FCF8E"], brandfetch: ["brandfetch", "FF6B35"],
       };
       const brand = brands[a.id];
       return brand
@@ -262,6 +263,7 @@
     f.autoVerify.checked = s.autoVerify !== false;
     f.agentSteps.value = String(Math.min(40, Math.max(5, Number(s.agentSteps) || 20)));
     f.askBeforeRun.checked = Boolean(s.askBeforeRun);
+    f.autoActions.checked = Boolean(s.autoActions);
     f.mcpAsk.checked = Boolean(s.mcpAsk);
     setTab(tab);
     F.serverStatus().then((st) => {
@@ -477,6 +479,7 @@
         autoVerify: f.autoVerify.checked,
         agentSteps: Math.min(40, Math.max(5, Number(f.agentSteps.value) || 20)),
         askBeforeRun: f.askBeforeRun.checked,
+        autoActions: f.autoActions.checked,
         mcpAsk: f.mcpAsk.checked,
       });
       if (s.cloudSync) F.sync?.now();
