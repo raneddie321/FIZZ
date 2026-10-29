@@ -36,7 +36,7 @@ export const PROVIDERS = {
       u.searchParams.set("client_id", env("CANVA_CLIENT_ID"));
       u.searchParams.set("redirect_uri", `${origin}/api/oauth/canva/callback`);
       u.searchParams.set("response_type", "code");
-      u.searchParams.set("scope", env("CANVA_SCOPES") || "design:content:read design:content:write");
+      u.searchParams.set("scope", env("CANVA_SCOPES") || "asset:read asset:write folder:read folder:write profile:read");
       u.searchParams.set("state", state);
       u.searchParams.set("code_challenge", challenge);
       u.searchParams.set("code_challenge_method", "S256");
@@ -53,8 +53,8 @@ export const PROVIDERS = {
       });
       const res = await fetch("https://api.canva.com/rest/v1/oauth/token", {
         method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
-        body,
+        headers: { Authorization: `Basic ${Buffer.from(`${env("CANVA_CLIENT_ID")}:${env("CANVA_CLIENT_SECRET")}`).toString("base64")}`, "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+        body: new URLSearchParams({ grant_type: "authorization_code", code, code_verifier: verifier, redirect_uri: `${origin}/api/oauth/canva/callback` }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.access_token) throw new Error(data.error_description || data.error?.message || data.message || `Canva token request failed (${res.status}).`);
