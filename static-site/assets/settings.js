@@ -214,6 +214,7 @@
         <input class="input mono" data-mcp-url type="url" placeholder="https://server.example/mcp" spellcheck="false" autocomplete="off" aria-label="MCP server URL" />
         <input class="input" data-mcp-name placeholder="Name (optional)" maxlength="40" autocomplete="off" aria-label="MCP server name" />
         <input class="input mono" type="password" data-mcp-auth placeholder="Authorization header (optional, e.g. Bearer …)" autocomplete="off" spellcheck="false" aria-label="Authorization header" />
+        <textarea class="input mono" data-mcp-headers rows="2" placeholder='Extra headers as JSON, e.g. {"X-API-Key":"…"}' aria-label="Additional HTTP headers as JSON"></textarea>
         <button type="button" class="btn btn-sm" data-mcp-add>Connect</button>
       </div>
       <small class="muted-sm">Works with MCP servers reached over HTTP(S). A local <span class="mono">npx …</span> server needs a public URL first (a tunnel or a hosted endpoint), because the server on this site can't reach your computer.</small>`;
@@ -408,11 +409,14 @@
         const url = d.querySelector("[data-mcp-url]")?.value.trim();
         const name = d.querySelector("[data-mcp-name]")?.value.trim();
         const auth = d.querySelector("[data-mcp-auth]")?.value.trim();
+        let extraHeaders = {};
+        const rawHeaders = d.querySelector("[data-mcp-headers]")?.value.trim();
+        if (rawHeaders) { try { extraHeaders = JSON.parse(rawHeaders); if (!extraHeaders || Array.isArray(extraHeaders) || typeof extraHeaders !== "object") throw new Error(); } catch { F.toast("Extra headers must be a JSON object, e.g. {\"X-API-Key\":\"your-token\"}."); return; } }
         if (!url) { F.toast("Paste the MCP server's URL first."); return; }
         t.disabled = true;
         t.textContent = "Connecting…";
         try {
-          const r = await F.conn.mcp.add(url, name, auth);
+          const r = await F.conn.mcp.add(url, name, auth, extraHeaders);
           F.toast(`Connected ${r.server?.name || "MCP server"} · ${r.server?.toolCount ?? 0} tools`);
           F.mcp?.changed?.();
           renderConnections(d);

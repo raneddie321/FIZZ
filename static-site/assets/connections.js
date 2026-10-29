@@ -180,7 +180,7 @@
     // browser only ever gets the server's name and its tool list.
     mcp: {
       list: () => api("/api/mcp/list", { auth: true }),
-      add: (url, name, auth) => api("/api/mcp/add", { body: { url, name, headers: auth ? { Authorization: auth } : {} }, auth: true }),
+      add: (url, name, auth, extraHeaders = {}) => api("/api/mcp/add", { body: { url, name, headers: { ...(extraHeaders && typeof extraHeaders === "object" && !Array.isArray(extraHeaders) ? extraHeaders : {}), ...(auth ? { Authorization: auth } : {}) } }, auth: true }),
       remove: (id) => api("/api/mcp/remove", { body: { id }, auth: true }),
       refresh: (id) => api("/api/mcp/tools", { body: { id }, auth: true }),
       call: (id, tool, arguments_) => api("/api/mcp/call", { body: { id, tool, arguments: arguments_ }, auth: true }),
