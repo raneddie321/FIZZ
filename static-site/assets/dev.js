@@ -1111,7 +1111,7 @@
       p.chats.push(c);
       state.chatId = c.id;
     }
-    const mentionTokens = [...new Set([...text.matchAll(/(?:^|\\s)@([\\w.\\/-]+)/g)].map((m) => m[1]))];
+    const mentionTokens = [...new Set([...text.matchAll(/(?:^|\s)@([\w./-]+)/g)].map((m) => m[1]))];
     const mentions = mentionTokens.filter((f) => p.files[f] !== undefined).slice(0, 10);
     // MCP mentions are routing hints only: the model still has to choose a listed tool and the
     // MCP tool runner applies the same approval checks as unmentioned calls.
