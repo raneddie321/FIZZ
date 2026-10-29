@@ -177,20 +177,16 @@
     box.innerHTML = `<p class="muted-sm">Checking connections…</p>`;
     const st = await F.serverStatus(true);
     const appLogo = (a) => {
-      const marks = {
-        notion: '<span class="app-mark notion-mark">N</span>',
-        trello: '<span class="app-mark trello-mark">▤</span>',
-        linear: '<span class="app-mark linear-mark">◉</span>',
-        airtable: '<span class="app-mark airtable-mark">▦</span>',
-        figma: '<span class="app-mark figma-mark"><i></i><i></i><i></i><i></i><i></i></span>',
-        netlify: '<span class="app-mark netlify-mark">◆</span>',
-        cloudflare: '<span class="app-mark cloudflare-mark">☁</span>',
-        discord: '<span class="app-mark discord-mark">◕</span>',
-        telegram: '<span class="app-mark telegram-mark">➤</span>',
-        slack: '<span class="app-mark slack-mark">✣</span>',
-        supabase: '<span class="app-mark supabase-mark">ϟ</span>',
+      const brands = {
+        notion: ["notion", "000000"], trello: ["trello", "0052CC"], linear: ["linear", "5E6AD2"],
+        airtable: ["airtable", "18BFFF"], figma: ["figma", "F24E1E"], netlify: ["netlify", "00C7B7"],
+        cloudflare: ["cloudflare", "F38020"], discord: ["discord", "5865F2"], telegram: ["telegram", "26A5E4"],
+        slack: ["slack", "4A154B"], supabase: ["supabase", "3FCF8E"],
       };
-      return marks[a.id] || `<span class="app-ic" aria-hidden="true">${esc(a.name.slice(0, 1))}</span>`;
+      const brand = brands[a.id];
+      return brand
+        ? `<img class="app-mark" src="https://cdn.simpleicons.org/${brand[0]}/${brand[1]}" alt="${esc(a.name)} logo" loading="lazy" />`
+        : `<span class="app-ic" aria-hidden="true">${esc(a.name.slice(0, 1))}</span>`;
     };
     const apps = (st.apps || []).map((a) => `<div class="conn">${appLogo(a)}<div class="conn-body"><b>${esc(a.name)}</b><small>${esc(a.desc)}</small><small class="conn-state">${a.connected ? `Connected · ${esc(a.account || "")}` : "Not connected"}</small>
       ${a.connected ? "" : `<div class="vtoken"><input class="input mono" type="password" data-app-token="${a.id}" placeholder="Paste your ${esc(a.name)} token" autocomplete="off" spellcheck="false" /><button type="button" class="btn btn-sm" data-app-save="${a.id}">Connect</button></div><small><a href="${esc(a.help)}" target="_blank" rel="noopener">Get a token</a> — ${esc(a.how)}</small>`}</div>${a.connected ? `<button type="button" class="btn btn-outline btn-sm" data-app-off="${a.id}">Disconnect</button>` : ""}</div>`).join("");

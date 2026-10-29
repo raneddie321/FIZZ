@@ -402,6 +402,7 @@ svg.dots3 { stroke-width: 3; }
 .vtoken .input { flex: 1; min-width: 0; height: 32px; font-size: 13px; }
 .conn-group { margin: 18px 0 2px; font-size: 14px; }
 .app-ic { width: 28px; height: 28px; flex: none; border-radius: 8px; display: grid; place-items: center; background: var(--surface-2); font-weight: 700; font-size: 13px; color: var(--fg); }
+.app-mark { width: 28px; height: 28px; flex: none; object-fit: contain; padding: 4px; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
 .conn-acts { display: flex; gap: 6px; flex: none; }
 .mcp-add { display: grid; grid-template-columns: 1fr; gap: 6px; margin-top: 10px; }
 .mcp-add .input { height: 32px; font-size: 13px; }
