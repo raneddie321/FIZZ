@@ -496,7 +496,7 @@
     const facts = (data.settings.memory || []).filter(Boolean).slice(0, 60);
     return facts.length ? `ABOUT THE USER (things they asked you to remember; use them, and add new lasting facts with <fizz-remember>):\n${facts.map((f) => `- ${f}`).join("\n")}` : "ABOUT THE USER: nothing saved yet. When they tell you a lasting preference or fact, save it with <fizz-remember>fact</fizz-remember>.";
   }
-  function systemPrompt(skills = [], { mentions = [], selection = null, text = "" } = {}) {
+  function systemPrompt(skills = [], { mentions = [], mcpMentions = [], selection = null, text = "" } = {}) {
     const p = project();
     let budget = state.mode === "do" ? 30_000 : 160_000;
     const order = [...new Set([...mentions.filter((f) => p.files[f] !== undefined), "FIZZ.md", ...Object.keys(p.files)])].filter((f) => p.files[f] !== undefined);
@@ -545,6 +545,7 @@
       data.settings.instructions ? `User instructions: ${data.settings.instructions}` : "",
       F.skills.promptSection(skills),
       mentions.length ? `The user is pointing at these files: ${mentions.join(", ")}. Focus on them.` : "",
+      mcpMentions.length ? `MCP ROUTING HINT: The user explicitly mentioned these connected MCP server(s): ${mcpMentions.join(", ")}. Prefer tools from these servers for this request when relevant. Inspect their listed tools first if needed. This is a preference, not permission to skip approval or safety checks.` : "",
       selection ? `The user selected this element in the preview (${selection.label}, selector ${selection.selector}):\n${selection.html}` : "",
       projectMap(p),
       ctx ? `Current project files:\n${ctx}` : "The project has no files yet.",
@@ -608,7 +609,7 @@
     let last = 0;
     try {
       const r = await F.aiStream(data.settings, {
-        system: systemPrompt(skills, { mentions: lastUser.mentions || [], selection: lastUser.selection || null, text: lastUser.content || "" }),
+        system: systemPrompt(skills, { mentions: lastUser.mentions || [], mcpMentions: lastUser.mcpMentions || [], selection: lastUser.selection || null, text: lastUser.content || "" }),
         messages: c.messages.slice(0, -1).map((m) => (m.summary ? { ...m, role: "user" } : m)), signal: state.controller.signal,
         onText: (_d, full) => { reply.content = full; if (Date.now() - last > 70) { last = Date.now(); renderThread(); } },
       });
@@ -1107,10 +1108,23 @@
       p.chats.push(c);
       state.chatId = c.id;
     }
-    const mentions = [...new Set([...text.matchAll(/(?:^|\s)@([\w.\/-]+)/g)].map((m) => m[1]).filter((f) => p.files[f] !== undefined))].slice(0, 10);
+    const mentionTokens = [...new Set([...text.matchAll(/(?:^|\\s)@([\\w.\\/-]+)/g)].map((m) => m[1]))];
+    const mentions = mentionTokens.filter((f) => p.files[f] !== undefined).slice(0, 10);
+    // MCP mentions are routing hints only: the model still has to choose a listed tool and the
+    // MCP tool runner applies the same approval checks as unmentioned calls.
+    let mcpMentions = [];
+    try {
+      if (F.mcp && !F.mcp.loaded()) await F.mcp.refresh();
+      const servers = F.mcp?.servers?.() || [];
+      const norm = (v) => String(v || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+      mcpMentions = mentionTokens.filter((token) => servers.some((s) =>
+        norm(s.id) === norm(token) || norm(s.name) === norm(token) ||
+        norm(String(s.name || "").split(/[ ._-]/)[0]) === norm(token)
+      )).slice(0, 8);
+    } catch { /* MCP is optional; ordinary chat must still work if it is unavailable. */ }
     const selection = state.selection;
     state.selection = null;
-    chat().messages.push({ id: F.uid(), role: "user", content: text, attachments, mentions, selection, mode: state.mode, at: Date.now() });
+    chat().messages.push({ id: F.uid(), role: "user", content: text, attachments, mentions, mcpMentions, selection, mode: state.mode, at: Date.now() });
     state.pending = [];
     renderComposer();
     // Ask once for notifications, so a long agent run can say when it's done while you're in another tab.
