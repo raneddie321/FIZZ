@@ -6,7 +6,8 @@
 
   const CONN = [
     { id: "github", name: "GitHub", desc: "Import repositories and push your projects as commits.", icon: '<svg viewBox="0 0 24 24" class="i" aria-hidden="true"><path fill="currentColor" stroke="none" d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.46-1.16-1.11-1.47-1.11-1.47-.9-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02a9.6 9.6 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2z"/></svg>' },
-    { id: "vercel", name: "Vercel", desc: "Deploy projects and get a live URL.", icon: '<svg viewBox="0 0 24 24" class="i" aria-hidden="true"><path fill="currentColor" stroke="none" d="M12 3l10 18H2z"/></svg>' },
+    { id: "vercel", name: "Vercel", desc: "Deploy projects and get a live URL.", icon: '<svg viewBox="0 0 24 24" class="i conn-logo logo-vercel" aria-hidden="true"><path fill="currentColor" stroke="none" d="M12 3l10 18H2z"/></svg>' },
+    { id: "canva", name: "Canva", desc: "Connect Canva to prepare design workflows in FIZZ DEV.", icon: '<svg viewBox="0 0 24 24" class="i conn-logo logo-canva" aria-hidden="true"><defs><linearGradient id="fizz-canva-gradient" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#00C4CC"/><stop offset=".5" stop-color="#7D2AE8"/><stop offset="1" stop-color="#00C4CC"/></linearGradient></defs><rect x="1" y="1" width="22" height="22" rx="7" fill="url(#fizz-canva-gradient)"/><path d="M15.8 8.2c-1.2-1.1-3.1-.6-4.4.6-1.5 1.4-2.3 3.6-1.6 5.2.6 1.4 2.1 1.4 3.2.6.5-.4.9-.9 1.2-1.4.2-.3.5-.4.8-.2.3.2.3.5.1.8-1.1 1.9-3.1 3.1-5 2.5-2.5-.8-2.5-4.2-.6-6.8 1.8-2.5 5.1-3.7 7.3-1.8.4.4.4.8.1 1.1-.3.3-.7.2-1.1-.2z" fill="#fff"/></svg>' },
     { id: "google", name: "Google Workspace", desc: "Gmail, Calendar, Docs, Sheets, Slides, Drive, Tasks and Contacts — Fizz Code can use them for you.", icon: '<svg viewBox="0 0 24 24" class="i" aria-hidden="true"><path d="M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6"/></svg>' },
   ];
 
@@ -95,7 +96,7 @@
         <p class="muted-sm">Tests the selected provider with one short request using the values currently in this form. It doesn't save your settings.</p>
       </div>
       <div data-pane="connections" class="form"><div class="conn-list" data-conn-list></div>
-        <p class="muted-sm">Tokens for GitHub and Vercel are kept encrypted in a secure cookie that page scripts can't read. Google access lasts about an hour and stays in this tab only.</p></div>
+        <p class="muted-sm">Tokens for GitHub, Vercel and Canva are kept encrypted in secure cookies that page scripts can't read. Google access lasts about an hour and stays in this tab only.</p></div>
       <div data-pane="tools" class="form">
         <div class="conn-list" data-tools></div>
         <label class="check"><input type="checkbox" name="cloudSync" /><span>Sync chats and projects to my RanEddie ID<small>Use them on every device. Images and PDFs stay in the browser that made them.</small></span></label>
@@ -124,8 +125,9 @@
       action = !ok ? "" : on ? `<button type="button" class="btn btn-outline btn-sm" data-disconnect="google">Disconnect</button>` : `<button type="button" class="btn btn-sm" data-connect="google">Connect</button>`;
     } else {
       const s = st.connections?.[c.id] || {};
-      state = !s.configured ? "Not available yet" : s.connected ? `Connected · ${esc(s.account || "")}` : "Not connected";
-      action = !s.configured ? "" : s.connected ? `<button type="button" class="btn btn-outline btn-sm" data-disconnect="${c.id}">Disconnect</button>` : `<button type="button" class="btn btn-sm" data-connect="${c.id}">Connect</button>`;
+      const ready = c.id === "canva" ? Boolean(s.oauth) : Boolean(s.configured);
+      state = !ready ? "Not available yet" : s.connected ? `Connected · ${esc(s.account || "")}` : "Not connected";
+      action = !ready ? "" : s.connected ? `<button type="button" class="btn btn-outline btn-sm" data-disconnect="${c.id}">Disconnect</button>` : `<button type="button" class="btn btn-sm" data-connect="${c.id}">Connect</button>`;
       if (s.connected && s.scopes?.length) state += ` <span class="mono muted-sm">(${esc(s.scopes.join(", "))})</span>`;
       if ((c.id === "vercel" || c.id === "github") && s.configured && !s.connected) {
         const help = c.id === "github" ? `<a href="https://github.com/settings/tokens/new?scopes=repo,workflow&description=FIZZ%20DEV" target="_blank" rel="noopener">Create a GitHub token</a> with <b>repo</b> and <b>workflow</b> ticked` : `Create one at <a href="https://vercel.com/account/settings/tokens" target="_blank" rel="noopener">vercel.com/account/settings/tokens</a>`;
