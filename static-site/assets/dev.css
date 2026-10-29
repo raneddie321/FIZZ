@@ -257,7 +257,7 @@
 #dev-app .composer .row { gap: 6px; padding: 4px 4px 6px; }
 #dev-app .composer #attach { width: 34px; height: 34px; border: 1px solid var(--border); border-radius: 10px; color: var(--fg); background: transparent; }
 #dev-app .composer #attach:hover { background: var(--accent); }
-#dev-app .model-btn { display: inline-flex; flex: 0 0 auto; min-width: max-content; align-items: center; gap: 4px; border: 0; height: 32px; padding: 0 10px; color: var(--muted); font-weight: 500; border-radius: 9px; }
+#dev-app .model-btn { display: inline-flex !important; flex: 0 0 auto !important; width: auto; min-width: 112px !important; max-width: 180px; visibility: visible !important; opacity: 1 !important; position: relative; z-index: 1; align-items: center; justify-content: center; gap: 4px; border: 0; height: 32px; padding: 0 10px; color: var(--muted); font-weight: 500; border-radius: 9px; white-space: nowrap; }
 #dev-app .model-btn:hover { background: var(--accent); }
 #dev-app .mic { width: 34px; height: 34px; border-radius: 10px; color: var(--muted); }
 #dev-app .mic.on { color: #fff; background: var(--danger); animation: mic-pulse 1.4s ease-in-out infinite; }
@@ -476,7 +476,7 @@
 @media (max-width: 760px) {
   .dev-app .composer-inner, .dev-app .composer { min-width: 0; max-width: 100%; }
   .dev-app .composer .row { min-width: 0; flex-wrap: nowrap; }
-  #dev-app .model-btn { flex: 0 1 120px; min-width: 76px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; justify-content: center; }
+  #dev-app .model-btn { flex: 0 0 auto !important; min-width: 92px !important; max-width: 124px; overflow: hidden; text-overflow: ellipsis; }
 }
 @media (max-width: 420px) { #dev-app #mic { display: none; } #dev-app .mode button { padding: 3px 7px; font-size: 12px; } }
 .auto-notice { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px dashed var(--border); border-radius: 12px; font-size: 13.5px; color: var(--muted); }

@@ -1754,9 +1754,7 @@
   const closeDrawer = () => { app.classList.remove("drawer"); $("#scrim").classList.add("hidden"); };
 
   $("#composer").addEventListener("submit", (e) => { e.preventDefault(); send(); });
-  // Explicit button handling prevents browser/form edge cases from swallowing a tap.
-  // Preventing the default click avoids a second submit event for the same message.
-  $("#send").addEventListener("click", (e) => { e.preventDefault(); send(); });
+
   $("#input").addEventListener("input", () => { grow(); slashIdx = 0; renderSlash(); });
   $("#input").addEventListener("keydown", (e) => {
     const slashOpen = !$("#slash").classList.contains("hidden");
