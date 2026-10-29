@@ -5,14 +5,14 @@ This repository contains:
 | Folder | What it is |
 |---|---|
 | `static-site/` | The website: public pages, RANEDDIE ID sign-up/sign-in, **FIZZ** chat (`chat.html`) and **FIZZ DEV** (`dev.html`) |
-| `netlify/` | Server functions: OAuth for GitHub & Vercel, GitHub/Vercel APIs, and the FIZZ AI proxy |
+| `netlify/` | Server functions: OAuth for GitHub, Vercel & Canva, GitHub/Vercel APIs, and the FIZZ AI proxy |
 | `src/`, `prisma/` | The full Next.js + PostgreSQL platform (alternative, server-rendered version) |
 
 ## Two ways to deploy
 
 **1. Netlify Drop (no server).** Drag `deploy/fizz-netlify-drop.zip` onto https://app.netlify.com/drop.
 Everything in the browser works — accounts, chats, projects, editor, terminal, preview, ZIP export,
-and AI with each user's own OpenRouter or Anthropic key. GitHub, Vercel, Google and the included
+and AI with each user's own OpenRouter or Anthropic key. GitHub, Vercel, Canva, Google and the included
 FIZZ AI show **"Not available yet"**, because Drop can't run server functions.
 
 **2. Netlify from GitHub (recommended — enables everything).**
@@ -40,6 +40,7 @@ Never put secrets in code or in chat. Set them only in Netlify or Vercel (Vercel
 | `FIZZ_DAILY_LIMIT` | optional | Free messages per visitor per day, default `50` |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | GitHub sign-in button (optional) | github.com → Settings → Developer settings → **OAuth Apps**. Without them users connect with a personal token (scopes `repo` + `workflow`) in Settings → Connections. |
 | `VERCEL_CLIENT_ID`, `VERCEL_CLIENT_SECRET` | Vercel sign-in button (optional) | vercel.com → Team settings → **Sign in with Vercel / Apps**. Users can always connect with a Vercel token (vercel.com/account/settings/tokens) instead — the most reliable way to deploy. |
+| `CANVA_CLIENT_ID`, `CANVA_CLIENT_SECRET` | Canva OAuth connection (optional) | Canva Developers → your integration → OAuth settings. Add redirect URL `https://YOUR-SITE/api/oauth/canva/callback`. Optional `CANVA_SCOPES` overrides the default `design:content:read design:content:write`; use scopes enabled for your integration. |
 | `GOOGLE_CLIENT_ID` | Google Workspace (Gmail, Calendar, Docs, Sheets, Slides, Drive, Tasks, Contacts) | console.cloud.google.com: turn on the Gmail, Calendar, Docs, Sheets, Slides, Drive, Tasks and People APIs; Google Auth Platform → External, add test users; Clients → **Web application** with your site as an Authorized JavaScript origin. No client secret needed. |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | RanEddie ID sign-in (optional for users) | Same value as the RanEddie ID project (Clerk → API keys). Public by design. |
 | `CLERK_SECRET_KEY` | Saving FIZZ settings to the RanEddie ID | Same value as the RanEddie ID project. Secret. |
@@ -57,6 +58,7 @@ Never put secrets in code or in chat. Set them only in Netlify or Vercel (Vercel
 - **GitHub OAuth App** — Homepage URL `https://YOUR-SITE`, Authorization callback URL
   `https://YOUR-SITE/api/oauth/github/callback`. Scopes requested: `repo workflow read:user`
   (`workflow` lets FIZZ add the app-build workflows; people who connected earlier reconnect once).
+- **Canva integration** — Redirect URL `https://YOUR-SITE/api/oauth/canva/callback`. OAuth uses PKCE (S256); keep the client secret in Vercel/Netlify environment variables, never in browser code.
 - **Vercel app** — Redirect URL `https://YOUR-SITE/api/oauth/vercel/callback`. In the app's
   **Permissions**, allow creating/reading **Deployments**. Scopes: `openid email profile offline_access`.
 - **Google OAuth client (Web application)** — Authorized JavaScript origin `https://YOUR-SITE`.
