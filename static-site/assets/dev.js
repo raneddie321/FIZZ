@@ -1754,6 +1754,15 @@
   const closeDrawer = () => { app.classList.remove("drawer"); $("#scrim").classList.add("hidden"); };
 
   $("#composer").addEventListener("submit", (e) => { e.preventDefault(); send(); });
+  // The Send control is a plain button. Invoke the async handler explicitly for touch devices.
+  $("#send").addEventListener("click", async (e) => {
+    e.preventDefault();
+    try { await send(); }
+    catch (err) {
+      console.error("[FIZZ DEV] Couldn't send message", err);
+      F.toast(`Couldn't send message: ${err?.message || "unexpected error"}`);
+    }
+  });
 
   $("#input").addEventListener("input", () => { grow(); slashIdx = 0; renderSlash(); });
   $("#input").addEventListener("keydown", (e) => {
