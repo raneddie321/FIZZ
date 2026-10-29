@@ -257,7 +257,7 @@
 #dev-app .composer .row { gap: 6px; padding: 4px 4px 6px; }
 #dev-app .composer #attach { width: 34px; height: 34px; border: 1px solid var(--border); border-radius: 10px; color: var(--fg); background: transparent; }
 #dev-app .composer #attach:hover { background: var(--accent); }
-#dev-app .model-btn { border: 0; height: 32px; padding: 0 10px; color: var(--muted); font-weight: 500; border-radius: 9px; }
+#dev-app .model-btn { display: inline-flex; flex: 0 0 auto; min-width: max-content; align-items: center; gap: 4px; border: 0; height: 32px; padding: 0 10px; color: var(--muted); font-weight: 500; border-radius: 9px; }
 #dev-app .model-btn:hover { background: var(--accent); }
 #dev-app .mic { width: 34px; height: 34px; border-radius: 10px; color: var(--muted); }
 #dev-app .mic.on { color: #fff; background: var(--danger); animation: mic-pulse 1.4s ease-in-out infinite; }
