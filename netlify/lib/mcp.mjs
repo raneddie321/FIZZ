@@ -67,15 +67,20 @@ export async function validateServer({ url, headers }) {
     throw bad("That isn't a valid URL. Paste the MCP server's full address, e.g. https://example.com/mcp");
   }
   if (u.protocol !== "http:" && u.protocol !== "https:") throw bad("MCP servers must be reached over http:// or https://.");
+  if (u.username || u.password || u.hash) throw bad("Remove embedded credentials and URL fragments. Put authentication in the headers field.");
   await assertPublic(u);
+  if (headers !== undefined && headers !== null && (typeof headers !== "object" || Array.isArray(headers))) throw bad("Additional headers must be a JSON object.");
+  const entries = Object.entries(headers || {});
+  if (entries.length > 20) throw bad("Use at most 20 custom HTTP headers.");
   const out = {};
-  for (const [k, v] of Object.entries(headers || {})) {
+  for (const [k, v] of entries) {
     const key = String(k).trim();
-    const val = String(v ?? "");
+    if (typeof v !== "string" && typeof v !== "number") throw bad(`The ${key.slice(0, 40)} header value must be text.`);
+    const val = String(v);
     if (!/^[A-Za-z0-9-]{1,40}$/.test(key)) throw bad(`"${key.slice(0, 40)}" isn't a valid header name.`);
     if (/[\r\n]/.test(val)) throw bad("Header values can't contain line breaks.");
     if (val.length > 2000) throw bad(`The ${key} header is too long.`);
-    if (["host", "content-length", "content-type", "accept", "connection", "transfer-encoding", "cookie"].includes(key.toLowerCase())) throw bad(`FIZZ sets the ${key} header itself.`);
+    if (["host", "content-length", "content-type", "accept", "connection", "transfer-encoding", "cookie", "proxy-authorization", "proxy-connection", "upgrade", "expect"].includes(key.toLowerCase())) throw bad(`FIZZ sets or blocks the ${key} header itself.`);
     if (val.trim()) out[key] = val;
   }
   return { url: u.href, headers: out };
