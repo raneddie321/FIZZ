@@ -476,7 +476,7 @@
 @media (max-width: 760px) {
   .dev-app .composer-inner, .dev-app .composer { min-width: 0; max-width: 100%; }
   .dev-app .composer .row { min-width: 0; flex-wrap: nowrap; }
-  #dev-app .model-btn { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  #dev-app .model-btn { flex: 0 1 120px; min-width: 76px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; justify-content: center; }
 }
 @media (max-width: 420px) { #dev-app #mic { display: none; } #dev-app .mode button { padding: 3px 7px; font-size: 12px; } }
 .auto-notice { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px dashed var(--border); border-radius: 12px; font-size: 13.5px; color: var(--muted); }
