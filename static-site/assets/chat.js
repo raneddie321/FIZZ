@@ -355,6 +355,19 @@
   const closeDrawer = () => { root.classList.remove("drawer"); $("#scrim").classList.add("hidden"); };
 
   $("#composer").addEventListener("submit", (e) => { e.preventDefault(); send(); });
+  // A tap must call send directly; do not rely on mobile browsers dispatching native form submit.
+  $("#send").addEventListener("click", async (e) => {
+    e.preventDefault();
+    const input = $("#input");
+    const draft = input.value;
+    try { await send(); }
+    catch (err) {
+      if (draft && !input.value) input.value = draft;
+      grow();
+      console.error("[FIZZ] Couldn't send message", err);
+      F.toast(`Couldn't send message: ${err?.message || "unexpected error"}`);
+    }
+  });
   $("#input").addEventListener("input", grow);
   $("#input").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); } });
   $("#input").addEventListener("paste", (e) => { const files = [...e.clipboardData.files]; if (files.length) { e.preventDefault(); addFiles(files); } });

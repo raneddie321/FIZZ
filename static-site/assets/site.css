@@ -665,3 +665,6 @@ svg.dots3 { stroke-width: 3; }
   #main>.landing-hero{padding-inline:12px}
   #main>.landing-hero .hero-proof{grid-template-columns:minmax(0,1fr)}
 }
+
+/* Keep the model selector readable and clickable in FIZZ's shared composer on narrow screens. */
+#chat-app .composer .model-btn { display: inline-flex; flex: 0 0 auto; min-width: max-content; visibility: visible; opacity: 1; pointer-events: auto; }
