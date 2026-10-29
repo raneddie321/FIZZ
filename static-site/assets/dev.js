@@ -1774,7 +1774,46 @@
   $("#input").addEventListener("click", () => renderSlash());
   $$(".mode button").forEach((b) => b.addEventListener("click", () => { state.mode = b.dataset.mode; data.settings.devMode = state.mode; save(); renderComposer(); if (state.mode === "do") F.web?.warmUp?.(); }));
   if (state.mode === "do") setTimeout(() => F.web?.warmUp?.(), 3000);
-  $("#model-btn").addEventListener("click", () => openSettings("ai"));
+  $("#model-btn").addEventListener("click", async (e) => {
+    const providers = [
+      ["fizz", "FIZZ AI", "Included with your account"],
+      ["gemini", "Google AI Studio", "Use a Gemini API key from AI Studio"],
+      ["openrouter", "OpenRouter", "Choose from many models"],
+      ["anthropic", "Anthropic Claude", "Use your Anthropic API key"],
+      ["groq", "Groq", "Fast hosted models"],
+      ["zai", "Z.AI (GLM)", "Use your Z.AI API key"],
+      ["requesty", "Requesty AI", "Models from multiple providers"],
+      ["deepseek", "DeepSeek", "Use your DeepSeek API key"],
+      ["cerebras", "Cerebras", "Fast hosted models"],
+      ["together", "Together AI", "Hosted open models"],
+      ["custom-openai", "Custom OpenAI-compatible", "Use a compatible endpoint"],
+    ];
+    const keyByProvider = {
+      openrouter: "openrouterKey", anthropic: "apiKey", gemini: "geminiKey",
+      groq: "groqKey", zai: "zaiKey", requesty: "requestyKey",
+      deepseek: "deepseekKey", cerebras: "cerebrasKey", together: "togetherKey",
+      "custom-openai": "customOpenAIKey",
+    };
+    const choices = await menu(e.currentTarget, [
+      { label: "Choose AI provider" },
+      ...providers.map(([id, name, detail]) => ({
+        k: `provider:${id}`,
+        html: `<span>${id === data.settings.provider ? "✓ " : ""}${esc(name)}<small>${esc(detail)}</small></span>`,
+      })),
+      "-",
+      { k: "settings", html: "AI settings…" },
+    ]);
+    if (choices === "settings") return openSettings("ai");
+    if (!choices?.startsWith("provider:")) return;
+    const provider = choices.slice("provider:".length);
+    data.settings.provider = provider;
+    save();
+    renderComposer();
+    const keyName = keyByProvider[provider];
+    const missingKey = keyName && !data.settings[keyName];
+    const incompleteCustom = provider === "custom-openai" && (!data.settings.customOpenAIBaseUrl || !data.settings.customOpenAIModel);
+    if (missingKey || incompleteCustom) openSettings("ai");
+  });
   function openMemory() {
     const p = project();
     if (p.files["FIZZ.md"] === undefined) {
