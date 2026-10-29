@@ -1047,10 +1047,13 @@
     const box = $("#slash");
     const mention = mentionAt();
     if (mention) {
-      const files = Object.keys(project().files).filter((f) => f.toLowerCase().includes(mention.query)).sort((a, b) => a.length - b.length).slice(0, 8);
-      if (!files.length) { box.classList.add("hidden"); return; }
-      slashIdx = Math.min(slashIdx, files.length - 1);
-      box.innerHTML = files.map((f, i) => `<button type="button" data-mention="${esc(f)}" class="${i === slashIdx ? "on" : ""}" role="option"><code>@</code><span>${esc(f)}</span></button>`).join("");
+      const q = mention.query;
+      const files = Object.keys(project().files).filter((f) => f.toLowerCase().includes(q)).sort((a, b) => a.length - b.length).slice(0, 6);
+      const servers = (F.mcp?.servers?.() || []).filter((s) => String(s.id || "").toLowerCase().includes(q) || String(s.name || "").toLowerCase().includes(q)).slice(0, 6);
+      const options = [...servers.map((s) => ({ id: s.id, label: `${s.name} · MCP server`, kind: "mcp" })), ...files.map((f) => ({ id: f, label: f, kind: "file" }))].slice(0, 10);
+      if (!options.length) { box.classList.add("hidden"); return; }
+      slashIdx = Math.min(slashIdx, options.length - 1);
+      box.innerHTML = options.map((o, i) => `<button type="button" ${o.kind === "mcp" ? `data-mention-mcp="${esc(o.id)}"` : `data-mention="${esc(o.id)}"`} class="${i === slashIdx ? "on" : ""}" role="option"><code>@</code><span>${esc(o.label)}</span></button>`).join("");
       box.classList.remove("hidden");
       return;
     }
@@ -1741,14 +1744,14 @@
     if (slashOpen && (e.key === "ArrowDown" || e.key === "ArrowUp")) { e.preventDefault(); slashIdx = Math.max(0, slashIdx + (e.key === "ArrowDown" ? 1 : -1)); renderSlash(); return; }
     if (slashOpen && (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey))) {
       const b = $("#slash .on");
-      if (b?.dataset.mention) { e.preventDefault(); insertMention(b.dataset.mention); return; }
+      if (b?.dataset.mention || b?.dataset.mentionMcp) { e.preventDefault(); insertMention(b.dataset.mentionMcp || b.dataset.mention); return; }
       if (b) { e.preventDefault(); $("#input").value = b.dataset.slash; $("#slash").classList.add("hidden"); if (e.key === "Enter") send(); return; }
     }
     if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); }
   });
   $("#slash").addEventListener("click", (e) => {
-    const mb = e.target.closest("[data-mention]");
-    if (mb) return insertMention(mb.dataset.mention);
+    const mb = e.target.closest("[data-mention],[data-mention-mcp]");
+    if (mb) return insertMention(mb.dataset.mentionMcp || mb.dataset.mention);
     const b = e.target.closest("[data-slash]");
     if (b) { $("#input").value = b.dataset.slash; $("#slash").classList.add("hidden"); send(); }
   });
