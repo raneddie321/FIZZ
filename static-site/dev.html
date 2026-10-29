@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="assets/site.css?v=20261029-fizzdev-fix1" />
 <link rel="stylesheet" href="vendor/codemirror/codemirror.css" />
 <link rel="stylesheet" href="vendor/xterm/xterm.css" />
-<link rel="stylesheet" href="assets/dev.css?v=20261029-dev-reliability-fix2" />
+<link rel="stylesheet" href="assets/dev.css?v=20261029-dev-reliability-fix3" />
 <script>document.documentElement.dataset.app=/\/dev(\.html)?$/.test(location.pathname)?"dev":"chat";try{var t=localStorage.getItem("fizz.theme");t=t?JSON.parse(t):"system";if(t==="dark"||(t!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}</script>
 <script src="vendor/marked.min.js"></script>
 <script src="vendor/purify.min.js"></script>
@@ -148,8 +148,8 @@
             <div class="mode" role="radiogroup" aria-label="Mode">
               <button type="button" role="radio" data-mode="build" title="Fizz Code builds and runs things">Build</button><button type="button" role="radio" data-mode="plan" title="Plan first; build after you approve">Plan</button><button type="button" role="radio" data-mode="ask" title="Questions only, no file changes">Ask</button><button type="button" role="radio" data-mode="do" title="Your personal agent: Fizz does tasks for you on websites, in Google and your connected apps">Do</button>
             </div>
+            <button type="button" class="model-btn" id="model-btn">Choose AI model</button>
             <button type="button" class="ctx-ring" id="ctx"><span></span></button>
-            <button type="button" class="model-btn" id="model-btn">Fizz Code 1.0</button>
             <button type="button" class="icon-btn mic" id="mic" aria-label="Dictate" title="Dictate"><svg class="i" viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
             <button type="submit" class="send" id="send" aria-label="Send"><svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
           </div>
@@ -221,6 +221,6 @@
 </div>
 
 <script src="assets/chat.js?v=20261029-fizzdev-fix1"></script>
-<script src="assets/dev.js?v=20261029-dev-reliability-fix2"></script>
+<script src="assets/dev.js?v=20261029-dev-reliability-fix3"></script>
 </body>
 </html>
