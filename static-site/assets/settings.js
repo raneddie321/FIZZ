@@ -176,7 +176,23 @@
     const box = d.querySelector("[data-conn-list]");
     box.innerHTML = `<p class="muted-sm">Checking connections…</p>`;
     const st = await F.serverStatus(true);
-    const apps = (st.apps || []).map((a) => `<div class="conn"><span class="app-ic" aria-hidden="true">${esc(a.name.slice(0, 1))}</span><div class="conn-body"><b>${esc(a.name)}</b><small>${esc(a.desc)}</small><small class="conn-state">${a.connected ? `Connected · ${esc(a.account || "")}` : "Not connected"}</small>
+    const appLogo = (a) => {
+      const marks = {
+        notion: '<span class="app-mark notion-mark">N</span>',
+        trello: '<span class="app-mark trello-mark">▤</span>',
+        linear: '<span class="app-mark linear-mark">◉</span>',
+        airtable: '<span class="app-mark airtable-mark">▦</span>',
+        figma: '<span class="app-mark figma-mark"><i></i><i></i><i></i><i></i><i></i></span>',
+        netlify: '<span class="app-mark netlify-mark">◆</span>',
+        cloudflare: '<span class="app-mark cloudflare-mark">☁</span>',
+        discord: '<span class="app-mark discord-mark">◕</span>',
+        telegram: '<span class="app-mark telegram-mark">➤</span>',
+        slack: '<span class="app-mark slack-mark">✣</span>',
+        supabase: '<span class="app-mark supabase-mark">ϟ</span>',
+      };
+      return marks[a.id] || `<span class="app-ic" aria-hidden="true">${esc(a.name.slice(0, 1))}</span>`;
+    };
+    const apps = (st.apps || []).map((a) => `<div class="conn">${appLogo(a)}<div class="conn-body">`;<b>${esc(a.name)}</b><small>${esc(a.desc)}</small><small class="conn-state">${a.connected ? `Connected · ${esc(a.account || "")}` : "Not connected"}</small>
       ${a.connected ? "" : `<div class="vtoken"><input class="input mono" type="password" data-app-token="${a.id}" placeholder="Paste your ${esc(a.name)} token" autocomplete="off" spellcheck="false" /><button type="button" class="btn btn-sm" data-app-save="${a.id}">Connect</button></div><small><a href="${esc(a.help)}" target="_blank" rel="noopener">Get a token</a> — ${esc(a.how)}</small>`}</div>${a.connected ? `<button type="button" class="btn btn-outline btn-sm" data-app-off="${a.id}">Disconnect</button>` : ""}</div>`).join("");
     box.innerHTML = (st.server ? "" : `<div class="alert alert-info"><div><strong>Connections need the FIZZ server</strong><p>Deploy this site from GitHub to Netlify (with the environment variables from the README) to enable GitHub, Vercel and Google.</p></div></div>`) + CONN.map((c) => connCard(c, st)).join("") + (apps ? `<h3 class="conn-group">Apps Fizz can use</h3><p class="muted-sm">Connect an app with your own token. Fizz creates and edits things there when you ask; sending, posting and deleting always wait for your OK.</p>${apps}` : "") + (await mcpSection(st));
   }
