@@ -252,6 +252,8 @@
       d.querySelectorAll("[data-sub]").forEach((x) => x.classList.toggle("hidden", x.dataset.sub !== p));
     };
     sub();
+    // React to native radio changes (including keyboard selection and label activation).
+    f.onchange = (e) => { if (e.target?.matches('input[name="provider"]')) sub(); };
     const setTab = (t) => {
       d.querySelectorAll(".dlg-tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === t));
       d.querySelectorAll("[data-pane]").forEach((p) => p.classList.toggle("hidden", p.dataset.pane !== t));
