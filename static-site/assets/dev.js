@@ -444,7 +444,10 @@
     ring.title = `Context: about ${Math.round(cu.used / 1000)}k of ${Math.round(cu.max / 1000)}k tokens (${cu.pct}%). Click to summarise older messages.`;
     ring.setAttribute("aria-label", ring.title);
     $$(".mode button").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.mode === state.mode)));
-    $("#model-btn").innerHTML = `${esc(F.providerLabel(data.settings, "dev"))} <svg class="i" viewBox="0 0 24 24" style="width:14px"><path d="M6 9l6 6 6-6"/></svg>`;
+    const modelLabel = typeof F.providerLabel === "function" ? F.providerLabel(data.settings, "dev") : "";
+    $("#model-btn").innerHTML = `${esc(modelLabel || "Choose AI model")} <svg class="i" viewBox="0 0 24 24" style="width:14px"><path d="M6 9l6 6 6-6"/></svg>`;
+    $("#model-btn").title = `Selected model: ${modelLabel || "not available"}. Click to open AI settings.`;
+    $("#model-btn").setAttribute("aria-label", `Selected model ${modelLabel || "not available"}; open AI settings`);
     $("#pending").innerHTML = state.pending.map((a, i) => `<span class="chip">${esc(a.name)}<button type="button" data-rm="${i}" aria-label="Remove ${esc(a.name)}">${F.icon("x")}</button></span>`).join("");
     $("#pending").classList.toggle("hidden", !state.pending.length);
     const busy = Boolean(state.controller);
@@ -1088,7 +1091,16 @@
     }
     input.value = "";
     grow();
-    await sendText(text, { attachments: state.pending });
+    try {
+      await sendText(text, { attachments: state.pending });
+    } catch (err) {
+      // Don't swallow an unexpected client-side failure or leave the user with a lost draft.
+      if (!input.value && text) input.value = text;
+      grow();
+      renderComposer();
+      console.error("[FIZZ DEV] Couldn't send message", err);
+      F.toast(`Couldn't send message: ${err?.message || "unexpected error"}`);
+    }
   }
   /** Sends a message as the user (also used by answers, plan approval and "keep going"). */
   /** A message FIZZ sends for the user (an automatic build fix): shown as a short notice, then Fizz Code works. */
@@ -1117,7 +1129,11 @@
     // MCP tool runner applies the same approval checks as unmentioned calls.
     let mcpMentions = [];
     try {
-      if (F.mcp && !F.mcp.loaded()) await F.mcp.refresh();
+      // MCP is optional. Warm its server list in the background rather than blocking every
+      // message while a network request is pending or the MCP endpoint is unavailable.
+      if (F.mcp && !F.mcp.loaded()) {
+        try { void F.mcp.refresh(); } catch { /* continue without MCP routing hints */ }
+      }
       const servers = F.mcp?.servers?.() || [];
       const norm = (v) => String(v || "").toLowerCase().replace(/[^a-z0-9]/g, "");
       mcpMentions = mentionTokens.filter((token) => servers.some((s) =>
