@@ -523,6 +523,19 @@
       : gh.configured
         ? "GITHUB CONNECTION: OAuth is configured on the server, but no GitHub session is currently connected in this browser. Do not claim GitHub is connected. Ask the user to click the GitHub button and finish authorization; then retry."
         : "GITHUB CONNECTION: no active GitHub session is available to this chat. Do not claim GitHub is connected. Tell the user to configure the GitHub OAuth environment variables and/or connect GitHub first.";
+    // These two context strings are included in systemPrompt below. Keep them defined on
+    // every render: contextUse() calls systemPrompt during initial UI rendering.
+    const connectedApps = F.serverStatusCached?.()?.apps || [];
+    const brandfetch = connectedApps.find((item) => item.id === "brandfetch");
+    const brandfetchContext = brandfetch?.connected
+      ? "BRANDFETCH: Brandfetch is connected. When suitable for the user's requested design, use the connected Brandfetch integration to look up brand identity and official logos; do not invent a logo result."
+      : brandfetch
+        ? "BRANDFETCH: Brandfetch is available but not connected. Do not claim that official logos were retrieved; ask the user to connect it if needed."
+        : "BRANDFETCH: Brandfetch connection status is not available in this session. Do not claim it is connected or that logos were retrieved.";
+
+    const autoActionsContext = data.settings.autoActions
+      ? "PUBLISHING PERMISSION: automatic publish preference is enabled. You may skip an extra confirmation only after the user explicitly requests a GitHub push or Vercel deployment. Respect all tool-level safety/approval checks and verify the actual result."
+      : "PUBLISHING PERMISSION: automatic publish preference is disabled. Request confirmation before writing through a GitHub push or publishing a Vercel deployment, and never claim success without a verified tool result.";
     const history = (chat()?.messages || []).filter((m) => m.role === "user" && !m.auto).slice(-6).map((m) => m.content || "").join("\n");
     const brain = F.brain.compose({ text: text || history.split("\n").slice(-20).join("\n"), history, files: p.files, mode: state.mode });
     return [
