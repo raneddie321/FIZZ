@@ -9,7 +9,7 @@ import { kvConfigured, redis } from "./kv.mjs";
 
 const PROTOCOL = "2025-06-18";
 const COOKIE = "fizz_mcp";
-const MAX_SERVERS = 12;
+const MAX_SERVERS = 50;
 const MAX_TOOLS = 200;
 /** Handshake/listing are quick; a tool call may legitimately take longer (capped below 60s on Vercel). */
 export const MCP_MS = { handshake: 25_000, call: 30_000 };
