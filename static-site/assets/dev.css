@@ -510,3 +510,37 @@
 #activity .act-row { padding: 6px 0; }
 #activity .act-file { min-height: 42px; border-radius: 9px; margin: 3px 0; }
 #activity .act-task { gap: 9px; padding: 8px 0; }
+
+
+/* Brand marks for the Connections settings cards. */
+.settings-dlg .conn > .i,
+.settings-dlg .conn > .app-ic,
+.settings-dlg .conn > .app-mark {
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  border-radius: 12px;
+}
+.settings-dlg .conn > .i { padding: 8px; box-sizing: border-box; color: var(--text); background: var(--surface-2, rgba(127,127,127,.1)); }
+.settings-dlg .conn > .canva-logo { background: #fff; padding: 5px; }
+.settings-dlg .conn > .brand-logo { background: #fff; padding: 7px; }
+.settings-dlg .conn > .app-ic, .settings-dlg .conn > .app-mark { display:inline-flex; align-items:center; justify-content:center; font-weight:800; font-size:20px; }
+.settings-dlg .app-ic { background:var(--surface-2, rgba(127,127,127,.1)); color:var(--text); }
+.settings-dlg .app-mark { font-family:Inter,sans-serif; }
+.settings-dlg .notion-mark { background:#111; color:#fff; border:2px solid #fff; border-radius:7px!important; }
+.settings-dlg .trello-mark { background:#1676d2; color:#fff; }
+.settings-dlg .linear-mark { background:#5e6ad2; color:#fff; }
+.settings-dlg .airtable-mark { background:#fff; color:#fc8c3c; border:1px solid #eee; }
+.settings-dlg .figma-mark { background:#fff; display:grid!important; grid-template-columns:repeat(2,9px); grid-template-rows:repeat(3,8px); gap:0; padding:7px; box-sizing:border-box; }
+.settings-dlg .figma-mark i { width:9px; height:8px; display:block; background:#f24e1e; border-radius:5px 0 0 5px; }
+.settings-dlg .figma-mark i:nth-child(2) { background:#ff7262; border-radius:0 5px 5px 0; }
+.settings-dlg .figma-mark i:nth-child(3) { background:#a259ff; }
+.settings-dlg .figma-mark i:nth-child(4) { background:#1abcfe; border-radius:50%; }
+.settings-dlg .figma-mark i:nth-child(5) { background:#0acf83; border-radius:5px 0 5px 5px; }
+.settings-dlg .netlify-mark { background:#fff; color:#00ad9f; }
+.settings-dlg .cloudflare-mark { background:#fff0dc; color:#f38020; }
+.settings-dlg .discord-mark { background:#5865f2; color:#fff; }
+.settings-dlg .telegram-mark { background:#229ed9; color:#fff; }
+.settings-dlg .slack-mark { background:#fff; color:#611f69; }
+.settings-dlg .supabase-mark { background:#e6fff1; color:#3ecf8e; }

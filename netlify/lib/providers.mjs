@@ -27,6 +27,46 @@ export const PROVIDERS = {
       return { t: data.access_token, label: me.login ? `@${me.login}` : "GitHub account", scopes: (data.scope || "").split(",").filter(Boolean) };
     },
   },
+  canva: {
+    cookie: "fizz_cv",
+    pkce: true,
+    configured: () => Boolean(env("CANVA_CLIENT_ID") && env("CANVA_CLIENT_SECRET")),
+    authorizeUrl: (origin, state, challenge) => {
+      const u = new URL("https://www.canva.com/api/oauth/authorize");
+      u.searchParams.set("client_id", env("CANVA_CLIENT_ID"));
+      u.searchParams.set("redirect_uri", `${origin}/api/oauth/canva/callback`);
+      u.searchParams.set("response_type", "code");
+      u.searchParams.set("scope", env("CANVA_SCOPES") || "design:content:read design:content:write");
+      u.searchParams.set("state", state);
+      u.searchParams.set("code_challenge", challenge);
+      u.searchParams.set("code_challenge_method", "S256");
+      return u.toString();
+    },
+    async exchange(origin, code, verifier) {
+      const body = new URLSearchParams({
+        grant_type: "authorization_code",
+        code,
+        code_verifier: verifier,
+        redirect_uri: `${origin}/api/oauth/canva/callback`,
+        client_id: env("CANVA_CLIENT_ID"),
+        client_secret: env("CANVA_CLIENT_SECRET"),
+      });
+      const res = await fetch("https://api.canva.com/rest/v1/oauth/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+        body,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.access_token) throw new Error(data.error_description || data.error?.message || data.message || `Canva token request failed (${res.status}).`);
+      return {
+        t: data.access_token,
+        r: data.refresh_token,
+        at: Date.now() + (Number(data.expires_in) || 3600) * 1000,
+        label: "Canva account",
+        scopes: String(data.scope || env("CANVA_SCOPES") || "").split(/[ ,]+/).filter(Boolean),
+      };
+    },
+  },
   vercel: {
     cookie: "fizz_vc",
     pkce: true,

@@ -6,8 +6,9 @@
 
   const CONN = [
     { id: "github", name: "GitHub", desc: "Import repositories and push your projects as commits.", icon: '<svg viewBox="0 0 24 24" class="i" aria-hidden="true"><path fill="currentColor" stroke="none" d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.46-1.16-1.11-1.47-1.11-1.47-.9-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02a9.6 9.6 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2z"/></svg>' },
-    { id: "vercel", name: "Vercel", desc: "Deploy projects and get a live URL.", icon: '<svg viewBox="0 0 24 24" class="i" aria-hidden="true"><path fill="currentColor" stroke="none" d="M12 3l10 18H2z"/></svg>' },
-    { id: "google", name: "Google Workspace", desc: "Gmail, Calendar, Docs, Sheets, Slides, Drive, Tasks and Contacts — Fizz Code can use them for you.", icon: '<svg viewBox="0 0 24 24" class="i" aria-hidden="true"><path d="M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6"/></svg>' },
+    { id: "vercel", name: "Vercel", desc: "Deploy projects and get a live URL.", icon: '<svg viewBox="0 0 24 24" class="i conn-logo logo-vercel" aria-hidden="true"><path fill="currentColor" stroke="none" d="M12 3l10 18H2z"/></svg>' },
+    { id: "canva", name: "Canva", desc: "Connect Canva to prepare design workflows in FIZZ DEV.", icon: '<svg viewBox="0 0 24 24" class="i conn-logo logo-canva" aria-hidden="true"><defs><linearGradient id="fizz-canva-gradient" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#00C4CC"/><stop offset=".5" stop-color="#7D2AE8"/><stop offset="1" stop-color="#00C4CC"/></linearGradient></defs><rect x="1" y="1" width="22" height="22" rx="7" fill="url(#fizz-canva-gradient)"/><path d="M15.8 8.2c-1.2-1.1-3.1-.6-4.4.6-1.5 1.4-2.3 3.6-1.6 5.2.6 1.4 2.1 1.4 3.2.6.5-.4.9-.9 1.2-1.4.2-.3.5-.4.8-.2.3.2.3.5.1.8-1.1 1.9-3.1 3.1-5 2.5-2.5-.8-2.5-4.2-.6-6.8 1.8-2.5 5.1-3.7 7.3-1.8.4.4.4.8.1 1.1-.3.3-.7.2-1.1-.2z" fill="#fff"/></svg>' },
+    { id: "google", name: "Google Workspace", desc: "Gmail, Calendar, Docs, Sheets, Slides, Drive, Tasks and Contacts — Fizz Code can use them for you.", icon: '<svg viewBox="0 0 24 24" class="i conn-logo logo-google" aria-hidden="true"><path fill="#4285F4" stroke="none" d="M21.6 12.23c0-.72-.06-1.42-.18-2.09H12v3.95h5.38a4.6 4.6 0 0 1-2 3.02v2.56h3.23c1.89-1.74 2.99-4.3 2.99-7.44z"/><path fill="#34A853" stroke="none" d="M12 22c2.7 0 4.97-.9 6.62-2.43l-3.23-2.56c-.9.6-2.05.96-3.39.96-2.6 0-4.8-1.75-5.59-4.1H3.08v2.64A10 10 0 0 0 12 22z"/><path fill="#FBBC05" stroke="none" d="M6.41 13.87a6 6 0 0 1 0-3.74V7.49H3.08a10 10 0 0 0 0 9.02z"/><path fill="#EA4335" stroke="none" d="M12 6.03c1.47 0 2.79.5 3.82 1.5l2.86-2.86A9.6 9.6 0 0 0 12 2a10 10 0 0 0-8.92 5.49l3.33 2.64C7.2 7.78 9.4 6.03 12 6.03z"/></svg>' },
   ];
 
   function ensureDialog() {
@@ -95,7 +96,7 @@
         <p class="muted-sm">Tests the selected provider with one short request using the values currently in this form. It doesn't save your settings.</p>
       </div>
       <div data-pane="connections" class="form"><div class="conn-list" data-conn-list></div>
-        <p class="muted-sm">Tokens for GitHub and Vercel are kept encrypted in a secure cookie that page scripts can't read. Google access lasts about an hour and stays in this tab only.</p></div>
+        <p class="muted-sm">Tokens for GitHub, Vercel and Canva are kept encrypted in secure cookies that page scripts can't read. Google access lasts about an hour and stays in this tab only.</p></div>
       <div data-pane="tools" class="form">
         <div class="conn-list" data-tools></div>
         <label class="check"><input type="checkbox" name="cloudSync" /><span>Sync chats and projects to my RanEddie ID<small>Use them on every device. Images and PDFs stay in the browser that made them.</small></span></label>
@@ -124,8 +125,9 @@
       action = !ok ? "" : on ? `<button type="button" class="btn btn-outline btn-sm" data-disconnect="google">Disconnect</button>` : `<button type="button" class="btn btn-sm" data-connect="google">Connect</button>`;
     } else {
       const s = st.connections?.[c.id] || {};
-      state = !s.configured ? "Not available yet" : s.connected ? `Connected · ${esc(s.account || "")}` : "Not connected";
-      action = !s.configured ? "" : s.connected ? `<button type="button" class="btn btn-outline btn-sm" data-disconnect="${c.id}">Disconnect</button>` : `<button type="button" class="btn btn-sm" data-connect="${c.id}">Connect</button>`;
+      const ready = c.id === "canva" ? Boolean(s.oauth) : Boolean(s.configured);
+      state = !ready ? "Not available yet" : s.connected ? `Connected · ${esc(s.account || "")}` : "Not connected";
+      action = !ready ? "" : s.connected ? `<button type="button" class="btn btn-outline btn-sm" data-disconnect="${c.id}">Disconnect</button>` : `<button type="button" class="btn btn-sm" data-connect="${c.id}">Connect</button>`;
       if (s.connected && s.scopes?.length) state += ` <span class="mono muted-sm">(${esc(s.scopes.join(", "))})</span>`;
       if ((c.id === "vercel" || c.id === "github") && s.configured && !s.connected) {
         const help = c.id === "github" ? `<a href="https://github.com/settings/tokens/new?scopes=repo,workflow&description=FIZZ%20DEV" target="_blank" rel="noopener">Create a GitHub token</a> with <b>repo</b> and <b>workflow</b> ticked` : `Create one at <a href="https://vercel.com/account/settings/tokens" target="_blank" rel="noopener">vercel.com/account/settings/tokens</a>`;
@@ -174,9 +176,25 @@
     const box = d.querySelector("[data-conn-list]");
     box.innerHTML = `<p class="muted-sm">Checking connections…</p>`;
     const st = await F.serverStatus(true);
-    const apps = (st.apps || []).map((a) => `<div class="conn"><span class="app-ic" aria-hidden="true">${esc(a.name.slice(0, 1))}</span><div class="conn-body"><b>${esc(a.name)}</b><small>${esc(a.desc)}</small><small class="conn-state">${a.connected ? `Connected · ${esc(a.account || "")}` : "Not connected"}</small>
+    const appLogo = (a) => {
+      const marks = {
+        notion: '<span class="app-mark notion-mark">N</span>',
+        trello: '<span class="app-mark trello-mark">▤</span>',
+        linear: '<span class="app-mark linear-mark">◉</span>',
+        airtable: '<span class="app-mark airtable-mark">▦</span>',
+        figma: '<span class="app-mark figma-mark"><i></i><i></i><i></i><i></i><i></i></span>',
+        netlify: '<span class="app-mark netlify-mark">◆</span>',
+        cloudflare: '<span class="app-mark cloudflare-mark">☁</span>',
+        discord: '<span class="app-mark discord-mark">◕</span>',
+        telegram: '<span class="app-mark telegram-mark">➤</span>',
+        slack: '<span class="app-mark slack-mark">✣</span>',
+        supabase: '<span class="app-mark supabase-mark">ϟ</span>',
+      };
+      return marks[a.id] || `<span class="app-ic" aria-hidden="true">${esc(a.name.slice(0, 1))}</span>`;
+    };
+    const apps = (st.apps || []).map((a) => `<div class="conn">${appLogo(a)}<div class="conn-body"><b>${esc(a.name)}</b><small>${esc(a.desc)}</small><small class="conn-state">${a.connected ? `Connected · ${esc(a.account || "")}` : "Not connected"}</small>
       ${a.connected ? "" : `<div class="vtoken"><input class="input mono" type="password" data-app-token="${a.id}" placeholder="Paste your ${esc(a.name)} token" autocomplete="off" spellcheck="false" /><button type="button" class="btn btn-sm" data-app-save="${a.id}">Connect</button></div><small><a href="${esc(a.help)}" target="_blank" rel="noopener">Get a token</a> — ${esc(a.how)}</small>`}</div>${a.connected ? `<button type="button" class="btn btn-outline btn-sm" data-app-off="${a.id}">Disconnect</button>` : ""}</div>`).join("");
-    box.innerHTML = (st.server ? "" : `<div class="alert alert-info"><div><strong>Connections need the FIZZ server</strong><p>Deploy this site from GitHub to Netlify (with the environment variables from the README) to enable GitHub, Vercel and Google.</p></div></div>`) + CONN.map((c) => connCard(c, st)).join("") + (apps ? `<h3 class="conn-group">Apps Fizz can use</h3><p class="muted-sm">Connect an app with your own token. Fizz creates and edits things there when you ask; sending, posting and deleting always wait for your OK.</p>${apps}` : "") + (await mcpSection(st));
+    box.innerHTML = (st.server ? "" : `<div class="alert alert-info"><div><strong>Connections need the FIZZ server</strong><p>Deploy this site from GitHub to Netlify (with the environment variables from the README) to enable GitHub, Vercel, Canva and Google.</p></div></div>`) + CONN.map((c) => connCard(c, st)).join("") + (apps ? `<h3 class="conn-group">Apps Fizz can use</h3><p class="muted-sm">Connect an app with your own token. Fizz creates and edits things there when you ask; sending, posting and deleting always wait for your OK.</p>${apps}` : "") + (await mcpSection(st));
   }
 
   /** MCP servers (Model Context Protocol): one card per server plus the form to connect another. */
