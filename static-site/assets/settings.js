@@ -96,7 +96,7 @@
         <p class="muted-sm">Tests the selected provider with one short request using the values currently in this form. It doesn't save your settings.</p>
       </div>
       <div data-pane="connections" class="form"><div class="conn-list" data-conn-list></div>
-        <p class="muted-sm">Tokens for GitHub, Vercel and Canva are kept encrypted in secure cookies that page scripts can't read. Google access lasts about an hour and stays in this tab only.</p></div>
+        <p class="muted-sm">Connected services use scoped access where supported. App tokens are stored by the FIZZ server in secure, HttpOnly cookies; FIZZ does not display saved secrets. You can disconnect an integration at any time. Google access is temporary and stays in this tab only.</p></div>
       <div data-pane="tools" class="form">
         <div class="conn-list" data-tools></div>
         <label class="check"><input type="checkbox" name="cloudSync" /><span>Sync chats and projects to my RanEddie ID<small>Use them on every device. Images and PDFs stay in the browser that made them.</small></span></label>
@@ -107,7 +107,7 @@
         <label class="check"><input type="checkbox" name="reviewChanges" /><span>Review file changes before they're applied</span></label>
         <label class="check"><input type="checkbox" name="askBeforeRun" /><span>Ask before Fizz Code runs commands<small>Off: it runs commands in its sandbox without pausing.</small></span></label>
         <label class="check"><input type="checkbox" name="autoActions" /><span>Allow automatic GitHub Push and Vercel deploys<small>When enabled, FIZZ DEV can publish the current project after you request it, without an extra confirmation dialog. It still must be connected and must report the real result.</small></span></label>
-        <label class="check"><input type="checkbox" name="mcpAsk" data-mcp-ask /><span>Ask before every MCP call<small>Off: the first call to each MCP server asks once, then Fizz may keep using that server for the session. Calls that send, post or delete always ask. Fizz never sees the server's Authorization header — calls go through FIZZ's server.</small></span></label>
+
       </div>
       <div data-pane="account" class="form"><div data-acct></div></div>
       <p class="err" data-err style="color:var(--danger);margin:0;font-size:14px"></p>
@@ -169,8 +169,6 @@
       return `<div class="conn"><span class="tool-dot ${on ? "on" : ""}" aria-hidden="true"></span><div class="conn-body"><b>${t.name}</b><small>${esc(t.hint)}</small><small class="conn-state" ${t.k === "browser" ? "data-browser-state" : ""}>${esc(t.state ? t.state(st) : on ? "On" : "Off")}</small></div>${test}</div>`;
     }).join("");
     d.querySelector("[name=cloudSync]").closest("label").classList.toggle("hidden", !st.tools?.sync);
-    // The MCP checkbox only makes sense when the server can host MCP connections.
-    d.querySelector("[data-mcp-ask]")?.closest("label").classList.toggle("hidden", !st.mcp?.configured);
   }
 
   async function renderConnections(d) {
@@ -198,34 +196,10 @@
     };
     const apps = (st.apps || []).map((a) => `<div class="conn">${appLogo(a)}<div class="conn-body"><b>${esc(a.name)}</b><small>${esc(a.desc)}</small><small class="conn-state">${a.connected ? `Connected · ${esc(a.account || "")}` : "Not connected"}</small>
       ${a.connected ? "" : `<div class="vtoken"><input class="input mono" type="password" data-app-token="${a.id}" placeholder="Paste your ${esc(a.name)} token" autocomplete="off" spellcheck="false" /><button type="button" class="btn btn-sm" data-app-save="${a.id}">Connect</button></div><small><a href="${esc(a.help)}" target="_blank" rel="noopener">Get a token</a> — ${esc(a.how)}</small>`}</div>${a.connected ? `<button type="button" class="btn btn-outline btn-sm" data-app-off="${a.id}">Disconnect</button>` : ""}</div>`).join("");
-    box.innerHTML = (st.server ? "" : `<div class="alert alert-info"><div><strong>Connections need the FIZZ server</strong><p>Deploy this site from GitHub to Netlify (with the environment variables from the README) to enable GitHub, Vercel, Canva and Google.</p></div></div>`) + CONN.map((c) => connCard(c, st)).join("") + (apps ? `<h3 class="conn-group">Apps Fizz can use</h3><p class="muted-sm">Connect an app with your own token. Fizz creates and edits things there when you ask; sending, posting and deleting always wait for your OK.</p>${apps}` : "") + (await mcpSection(st));
+    box.innerHTML = (st.server ? "" : `<div class="alert alert-info"><div><strong>Connections need the FIZZ server</strong><p>Deploy this site from GitHub to Netlify (with the environment variables from the README) to enable GitHub, Vercel, Canva and Google.</p></div></div>`) + CONN.map((c) => connCard(c, st)).join("") + (apps ? `<h3 class="conn-group">Apps Fizz can use</h3><p class="muted-sm">Connect an app with your own token. FIZZ only uses connected apps when you ask. Actions that send, publish, or delete should be reviewed before they happen.</p>${apps}` : "");
   }
 
-  /** MCP servers (Model Context Protocol): one card per server plus the form to connect another. */
-  async function mcpSection(st) {
-    if (!st.mcp?.configured) return "";
-    const head = `<h3 class="conn-group">MCP servers</h3><p class="muted-sm">Add any MCP (Model Context Protocol) server by its URL and Fizz Code gets its tools — data, browsers, GitHub, Notion, your own services. The address and its Authorization header stay encrypted on the server; the page only ever sees the tool list.</p>`;
-    let servers = null;
-    if (F.conn?.mcp) servers = await F.conn.mcp.list().then((r) => (Array.isArray(r?.servers) ? r.servers : [])).catch(() => null);
-    if (servers === null) return `${head}<p class="muted-sm">Connecting an MCP server needs the FIZZ server — deploy this site from GitHub to Netlify or Vercel.</p>`;
-    const cards = servers
-      .map((s) => {
-        const tools = Array.isArray(s.tools) ? s.tools : [];
-        const state = `${s.toolCount ?? tools.length} tool${(s.toolCount ?? tools.length) === 1 ? "" : "s"}${tools.length ? ` · ${esc(tools.slice(0, 3).map((x) => x.name).join(", "))}${tools.length > 3 ? "…" : ""}` : ""}`;
-        return `<div class="conn"><span class="app-ic" aria-hidden="true">M</span><div class="conn-body"><b>${esc(s.name || "MCP server")}</b><small class="mono">${esc(s.url)}</small><small class="conn-state">${state}</small></div>
-          <div class="conn-acts"><button type="button" class="btn btn-outline btn-sm" data-mcp-refresh="${esc(s.id)}">Refresh</button><button type="button" class="btn btn-outline btn-sm" data-mcp-off="${esc(s.id)}">Remove</button></div></div>`;
-      })
-      .join("");
-    return `${head}${cards || `<p class="muted-sm">No MCP servers connected yet.</p>`}
-      <div class="mcp-add">
-        <input class="input mono" data-mcp-url type="url" placeholder="https://server.example/mcp" spellcheck="false" autocomplete="off" aria-label="MCP server URL" />
-        <input class="input" data-mcp-name placeholder="Name (optional)" maxlength="40" autocomplete="off" aria-label="MCP server name" />
-        <input class="input mono" type="password" data-mcp-auth placeholder="Authorization header (optional, e.g. Bearer …)" autocomplete="off" spellcheck="false" aria-label="Authorization header" />
-        <textarea class="input mono" data-mcp-headers rows="2" placeholder='Extra headers as JSON, e.g. {"X-API-Key":"…"}' aria-label="Additional HTTP headers as JSON"></textarea>
-        <button type="button" class="btn btn-sm" data-mcp-add>Connect</button>
-      </div>
-      <small class="muted-sm">Works with MCP servers reached over HTTP(S). A local <span class="mono">npx …</span> server needs a public URL first (a tunnel or a hosted endpoint), because the server on this site can't reach your computer.</small>`;
-  }
+  // MCP connections are temporarily hidden from Settings while the feature is being refined.
 
   /**
    * Opens Settings. ctx = { user, data, save, onSaved(changed) }.
@@ -274,7 +248,6 @@
     f.agentSteps.value = String(Math.min(40, Math.max(5, Number(s.agentSteps) || 20)));
     f.askBeforeRun.checked = Boolean(s.askBeforeRun);
     f.autoActions.checked = Boolean(s.autoActions);
-    f.mcpAsk.checked = Boolean(s.mcpAsk);
     setTab(tab);
     F.serverStatus().then((st) => {
       d.querySelector("[data-ai-status]").textContent = st.ai?.configured
@@ -413,43 +386,7 @@
       if (t.dataset.disconnect) {
         try { await F.conn.disconnect(t.dataset.disconnect); F.toast("Disconnected"); renderConnections(d); } catch (err) { F.toast(err.message); }
       }
-      // MCP servers: connect (the handshake checks it first), remove, refresh the tool list.
-      if (t.hasAttribute("data-mcp-add")) {
-        const url = d.querySelector("[data-mcp-url]")?.value.trim();
-        const name = d.querySelector("[data-mcp-name]")?.value.trim();
-        const auth = d.querySelector("[data-mcp-auth]")?.value.trim();
-        let extraHeaders = {};
-        const rawHeaders = d.querySelector("[data-mcp-headers]")?.value.trim();
-        if (rawHeaders) { try { extraHeaders = JSON.parse(rawHeaders); if (!extraHeaders || Array.isArray(extraHeaders) || typeof extraHeaders !== "object") throw new Error(); } catch { F.toast("Extra headers must be a JSON object, e.g. {\"X-API-Key\":\"your-token\"}."); return; } }
-        if (!url) { F.toast("Paste the MCP server's URL first."); return; }
-        t.disabled = true;
-        t.textContent = "Connecting…";
-        try {
-          const r = await F.conn.mcp.add(url, name, auth, extraHeaders);
-          F.toast(`Connected ${r.server?.name || "MCP server"} · ${r.server?.toolCount ?? 0} tools`);
-          F.mcp?.changed?.();
-          renderConnections(d);
-        } catch (err) { F.toast(err.message); t.disabled = false; t.textContent = "Connect"; }
-      }
-      if (t.dataset.mcpOff) {
-        t.disabled = true;
-        try {
-          await F.conn.mcp.remove(t.dataset.mcpOff);
-          F.toast("MCP server removed");
-          F.mcp?.changed?.();
-          renderConnections(d);
-        } catch (err) { F.toast(err.message); t.disabled = false; }
-      }
-      if (t.dataset.mcpRefresh) {
-        t.disabled = true;
-        t.textContent = "…";
-        try {
-          const r = await F.conn.mcp.refresh(t.dataset.mcpRefresh);
-          F.toast(`Refreshed — ${r.server?.toolCount ?? 0} tools`);
-          F.mcp?.changed?.();
-          renderConnections(d);
-        } catch (err) { F.toast(err.message); t.disabled = false; t.textContent = "Refresh"; }
-      }
+      // MCP management is temporarily hidden; backend support remains intact.
       if (t.hasAttribute("data-export")) F.download("fizz-export.json", JSON.stringify({ exportedAt: new Date().toISOString(), user: ctx.user, conversations: ctx.data.conversations, projects: ctx.data.projects }, null, 2));
       if (t.hasAttribute("data-signout")) { d.close(); F.auth.signOut(); }
     };
@@ -493,7 +430,6 @@
         agentSteps: Math.min(40, Math.max(5, Number(f.agentSteps.value) || 20)),
         askBeforeRun: f.askBeforeRun.checked,
         autoActions: f.autoActions.checked,
-        mcpAsk: f.mcpAsk.checked,
       });
       if (s.cloudSync) F.sync?.now();
       ctx.save();
