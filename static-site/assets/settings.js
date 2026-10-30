@@ -191,7 +191,7 @@
       };
       const brand = brands[a.id];
       return brand
-        ? `<img class="app-mark" src="/assets/brand-logos/${brand[0]}.svg" alt="${esc(a.name)} logo" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'app-ic',textContent:'${esc(a.name.slice(0,1))}'}))" />`
+        ? `<img class="app-mark" src="https://cdn.simpleicons.org/${brand[0]}/${brand[1]}" alt="${esc(a.name)} logo" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'app-ic',textContent:'${esc(a.name.slice(0,1))}'}))" />`
         : `<span class="app-ic" aria-hidden="true">${esc(a.name.slice(0, 1))}</span>`;
     };
     const apps = (st.apps || []).map((a) => `<div class="conn">${appLogo(a)}<div class="conn-body"><b>${esc(a.name)}</b><small>${esc(a.desc)}</small><small class="conn-state">${a.connected ? `Connected · ${esc(a.account || "")}` : "Not connected"}</small>
