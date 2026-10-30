@@ -182,7 +182,7 @@
         notion: ["notion", "000000"], trello: ["trello", "0052CC"], linear: ["linear", "5E6AD2"],
         airtable: ["airtable", "18BFFF"], figma: ["figma", "F24E1E"], netlify: ["netlify", "00C7B7"],
         cloudflare: ["cloudflare", "F38020"], discord: ["discord", "5865F2"], telegram: ["telegram", "26A5E4"],
-        slack: ["slack", "4A154B"], supabase: ["supabase", "3FCF8E"], brandfetch: ["brandfetch", "FF6B35"], dropbox: ["dropbox","0061FF"], asana: ["asana","F06A6A"], monday: ["monday","6161FF"], clickup: ["clickup","7B68EE"], todoist: ["todoist","E44332"], hubspot: ["hubspot","FF7A59"], intercom: ["intercom","6AFDEF"], sendgrid: ["sendgrid","1A82E2"], resend: ["resend","000000"], postmark: ["postmark","FFDE00"], algolia: ["algolia","003DFF"], openai: ["openai","412991"], huggingface: ["huggingface","FFD21E"], replicate: ["replicate","000000"], elevenlabs: ["elevenlabs","000000"], shopify: ["shopify","7AB55C"], jira: ["jira","0052CC"], paypal: ["paypal","003087"], stripe: ["stripe","635BFF"], pusher: ["pusher","300D4F"], googlemaps: ["googlemaps","4285F4"],
+        slack: ["slack", "4A154B"], supabase: ["supabase", "3FCF8E"], brandfetch: ["brandfetch", "FF6B35"], 
         dropbox: ["dropbox", "0061FF"], asana: ["asana", "F06A6A"], monday: ["monday", "6161FF"],
         clickup: ["clickup", "7B68EE"], todoist: ["todoist", "E44332"], hubspot: ["hubspot", "FF7A59"],
         intercom: ["intercom", "6AFDEF"], sendgrid: ["sendgrid", "1A82E2"], resend: ["resend", "000000"],
