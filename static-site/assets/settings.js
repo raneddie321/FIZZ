@@ -183,10 +183,17 @@
         airtable: ["airtable", "18BFFF"], figma: ["figma", "F24E1E"], netlify: ["netlify", "00C7B7"],
         cloudflare: ["cloudflare", "F38020"], discord: ["discord", "5865F2"], telegram: ["telegram", "26A5E4"],
         slack: ["slack", "4A154B"], supabase: ["supabase", "3FCF8E"], brandfetch: ["brandfetch", "FF6B35"],
+        dropbox: ["dropbox", "0061FF"], asana: ["asana", "F06A6A"], monday: ["monday", "6161FF"],
+        clickup: ["clickup", "7B68EE"], todoist: ["todoist", "E44332"], hubspot: ["hubspot", "FF7A59"],
+        intercom: ["intercom", "6AFDEF"], sendgrid: ["sendgrid", "1A82E2"], resend: ["resend", "000000"],
+        postmark: ["postmark", "FFDE00"], algolia: ["algolia", "003DFF"], openai: ["openai", "412991"],
+        huggingface: ["huggingface", "FFD21E"], replicate: ["replicate", "000000"], elevenlabs: ["elevenlabs", "000000"],
+        shopify: ["shopify", "7AB55C"], jira: ["jira", "0052CC"], paypal: ["paypal", "003087"],
+        stripe: ["stripe", "635BFF"], pusher: ["pusher", "300D4F"], googlemaps: ["googlemaps", "4285F4"],
       };
       const brand = brands[a.id];
       return brand
-        ? `<img class="app-mark" src="https://cdn.simpleicons.org/${brand[0]}/${brand[1]}" alt="${esc(a.name)} logo" loading="lazy" />`
+        ? `<img class="app-mark" src="https://cdn.simpleicons.org/${brand[0]}/${brand[1]}" alt="${esc(a.name)} logo" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'app-ic',textContent:'${esc(a.name.slice(0,1))}'}))" />`
         : `<span class="app-ic" aria-hidden="true">${esc(a.name.slice(0, 1))}</span>`;
     };
     const apps = (st.apps || []).map((a) => `<div class="conn">${appLogo(a)}<div class="conn-body"><b>${esc(a.name)}</b><small>${esc(a.desc)}</small><small class="conn-state">${a.connected ? `Connected · ${esc(a.account || "")}` : "Not connected"}</small>
