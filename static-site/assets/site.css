@@ -668,3 +668,9 @@ svg.dots3 { stroke-width: 3; }
 
 /* Keep the model selector readable and clickable in FIZZ's shared composer on narrow screens. */
 #chat-app .composer .model-btn { display: inline-flex; flex: 0 0 auto; min-width: max-content; visibility: visible; opacity: 1; pointer-events: auto; }
+
+/* FIZZ integration logo and clarity polish */
+.conn .app-mark,.conn-logo { width:28px;height:28px;flex:0 0 28px;object-fit:contain;border-radius:7px; }
+.conn .app-mark { padding:3px;background:#fff;border:1px solid var(--border); }
+.conn .conn-body small { line-height:1.55; }
+.conn .conn-state { overflow-wrap:anywhere; }
