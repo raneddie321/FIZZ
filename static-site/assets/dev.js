@@ -30,6 +30,25 @@
   const isPhone = () => matchMedia("(max-width: 760px)").matches;
   const isNarrow = () => matchMedia("(max-width: 1100px)").matches;
 
+  // Keep the workspace aligned with the actually visible viewport when the
+  // on-screen keyboard opens on mobile browsers.
+  const visualViewport = window.visualViewport;
+  function syncMobileViewport() {
+    if (!isPhone()) {
+      app.classList.remove("keyboard-open");
+      app.style.removeProperty("--fizz-visual-height");
+      return;
+    }
+    const viewportHeight = visualViewport?.height || window.innerHeight;
+    app.style.setProperty("--fizz-visual-height", `${Math.round(viewportHeight)}px`);
+    const keyboardOpen = Boolean(visualViewport && window.innerHeight - visualViewport.height > 120);
+    app.classList.toggle("keyboard-open", keyboardOpen);
+  }
+  visualViewport?.addEventListener("resize", syncMobileViewport);
+  visualViewport?.addEventListener("scroll", syncMobileViewport);
+  window.addEventListener("resize", syncMobileViewport, { passive: true });
+  syncMobileViewport();
+
   // ---------- line diff ----------
   function diffLines(a, b) {
     const x = a == null ? [] : a.split("\n"), y = b == null ? [] : b.split("\n");
