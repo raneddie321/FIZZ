@@ -348,11 +348,7 @@
     const c = chat();
     const th = $("#thread");
     if (!c || !c.messages.length) {
-      const empty = !Object.keys(project().files).length;
-      th.innerHTML = `<div class="dev-welcome"><div><h1>${empty ? "What do you want to build?" : `Continue ${esc(project().name)}`}</h1><p>${empty ? "Describe it and Fizz Code writes the files. You'll see the code and a live preview side by side." : "Ask for a change, a fix or a new feature."}</p></div>
-        <div class="starter${state.allTemplates ? " all" : ""}">${STARTERS.map(([ic, t, p], i) => `<button data-starter="${i}" title="${esc(p)}"><span class="st-ic">${F.icon(ic)}</span><b>${t}</b><span>${esc(p)}</span></button>`).join("")}</div>
-        ${state.allTemplates ? "" : `<button type="button" class="link" data-all-templates>More templates (${STARTERS.length - 6})</button>`}
-        <div class="connect-row"><button class="btn btn-outline btn-sm" data-act="gh-import">Import from GitHub</button><button class="btn btn-outline btn-sm" data-act="gdoc-import">Import a Google Doc</button><button class="btn btn-outline btn-sm" data-act="settings-conn">Connections</button></div></div>`;
+      th.innerHTML = "";
       return;
     }
     const sc = $("#scroll");
