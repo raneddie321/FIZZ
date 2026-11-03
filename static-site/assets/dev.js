@@ -2367,6 +2367,65 @@
   });
   window.addEventListener("resize", () => { if (!isPhone() && app.dataset.view !== "chat") app.dataset.view = "chat"; });
 
+  // ---------- compact mobile workspace menu ----------
+  const mobileViewMenu = document.getElementById("mobile-view-menu");
+  let mobileViewSheet = null;
+  let mobileViewBackdrop = null;
+  function closeMobileViewMenu() {
+    mobileViewSheet?.classList.remove("open");
+    mobileViewBackdrop?.classList.remove("open");
+    mobileViewMenu?.setAttribute("aria-expanded", "false");
+    mobileViewSheet?.setAttribute("aria-hidden", "true");
+  }
+  function openMobileViewMenu() {
+    if (!mobileViewSheet) {
+      mobileViewBackdrop = document.createElement("div");
+      mobileViewBackdrop.className = "mobile-view-backdrop";
+      mobileViewBackdrop.addEventListener("click", closeMobileViewMenu);
+      mobileViewSheet = document.createElement("div");
+      mobileViewSheet.className = "mobile-view-sheet";
+      mobileViewSheet.setAttribute("role", "dialog");
+      mobileViewSheet.setAttribute("aria-label", "Workspace views");
+      mobileViewSheet.setAttribute("aria-hidden", "true");
+      mobileViewSheet.innerHTML = '<div class="mobile-view-heading">Workspace</div>' +
+        [
+          ["chat", "chat", "Chat"],
+          ["code", "code", "Code"],
+          ["terminal", "terminal", "Terminal"],
+          ["browser", "globe", "Browser"],
+          ["activity", "history", "Activity"]
+        ].map(([view, icon, label]) => '<button type="button" data-mobile-view="' + view + '"><span data-icon="' + icon + '"></span><span>' + label + '</span></button>').join("");
+      mobileViewSheet.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-mobile-view]");
+        if (!button) return;
+        const view = button.dataset.mobileView;
+        closeMobileViewMenu();
+        if (view === "chat") setView("chat");
+        else showTab(view);
+      });
+      document.body.append(mobileViewBackdrop, mobileViewSheet);
+    }
+    const current = app.dataset.view || "chat";
+    mobileViewSheet.querySelectorAll("[data-mobile-view]").forEach((button) => {
+      button.setAttribute("aria-current", String(button.dataset.mobileView === current));
+      const icon = button.querySelector("[data-icon]");
+      if (icon) icon.innerHTML = F.icon(icon.dataset.icon);
+    });
+    mobileViewSheet.classList.add("open");
+    mobileViewBackdrop.classList.add("open");
+    mobileViewSheet.setAttribute("aria-hidden", "false");
+    mobileViewMenu?.setAttribute("aria-expanded", "true");
+  }
+  mobileViewMenu?.addEventListener("click", openMobileViewMenu);
+  window.addEventListener("keydown", (event) => { if (event.key === "Escape") closeMobileViewMenu(); });
+  const originalSetView = setView;
+  setView = function(view) {
+    originalSetView(view);
+    mobileViewSheet?.querySelectorAll("[data-mobile-view]").forEach((button) => {
+      button.setAttribute("aria-current", String(button.dataset.mobileView === view));
+    });
+  };
+
   // ---------- boot ----------
   app.dataset.panel = ui.panel === "closed" ? "closed" : "open";
   F.settings.handleRedirects(settingsCtx);
