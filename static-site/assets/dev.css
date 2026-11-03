@@ -544,3 +544,69 @@
 .settings-dlg .telegram-mark { background:#229ed9; color:#fff; }
 .settings-dlg .slack-mark { background:#fff; color:#611f69; }
 .settings-dlg .supabase-mark { background:#e6fff1; color:#3ecf8e; }
+
+/* Mobile chat layout: reserve real space for the tab bar and keep the composer
+   inside the visible app viewport (including devices with a home-indicator inset). */
+@media (max-width: 760px) {
+  .dev-app {
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .dev-app[data-view="chat"] .dev-main {
+    display: flex;
+    width: 100%;
+    height: calc(100% - 56px - env(safe-area-inset-bottom));
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+  }
+
+  .dev-app[data-view="chat"] .dev-main > .scroll {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 12px;
+  }
+
+  .dev-app[data-view="chat"] .composer-area {
+    position: relative;
+    z-index: 2;
+    flex: 0 0 auto;
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+    background: var(--bg);
+  }
+
+  .dev-app[data-view="chat"] .composer-inner {
+    padding-top: 8px;
+    padding-bottom: 4px;
+  }
+
+  .dev-app[data-view="chat"] .tabbar {
+    z-index: 50;
+    bottom: 0;
+    height: calc(56px + env(safe-area-inset-bottom));
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Keep the latest message and send controls clear of the bottom navigation. */
+  .dev-app[data-view="chat"] .dev-thread {
+    padding-bottom: 18px;
+  }
+}
+
+/* When the software keyboard is open, visualViewport-based height is applied
+   by dev.js; the tab bar stays out of the way so the composer remains tappable. */
+@media (max-width: 760px) {
+  .dev-app.keyboard-open[data-view="chat"] .tabbar {
+    display: none;
+  }
+  .dev-app.keyboard-open[data-view="chat"] .dev-main {
+    height: var(--fizz-visual-height, 100dvh);
+  }
+}
