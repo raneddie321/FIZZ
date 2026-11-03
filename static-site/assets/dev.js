@@ -2107,11 +2107,6 @@
   $("#panel-btn").addEventListener("click", togglePanel);
   $("#panel-btn-mid").addEventListener("click", () => { app.classList.add("panel-open"); showTab(ui.tab); });
   $("#panel-close").addEventListener("click", () => (isNarrow() ? app.classList.remove("panel-open") : togglePanel()));
-  $("#mobile-back-chat").addEventListener("click", () => {
-    closeMobileViewMenu();
-    setView("chat");
-    $("#input")?.focus({ preventScroll: true });
-  });
   $$(".panel-tabs [role=tab]").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
   $("#activity").addEventListener("click", (e) => { const b = e.target.closest("[data-open-file]"); if (b) { showTab("code"); openFile(b.dataset.openFile); } });
   $$(".tabbar button").forEach((b) => b.addEventListener("click", () => (b.dataset.goto === "chat" ? setView("chat") : showTab(b.dataset.goto))));
