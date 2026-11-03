@@ -348,7 +348,7 @@
     const c = chat();
     const th = $("#thread");
     if (!c || !c.messages.length) {
-      th.innerHTML = "";
+      th.innerHTML = '<div class="dev-welcome"><h1>How can I help?</h1></div>';
       return;
     }
     const sc = $("#scroll");
