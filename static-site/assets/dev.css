@@ -179,12 +179,12 @@
   .dev-app.panel-open .panel { transform: none; }
   .dev-app[data-panel="closed"] .panel { display: flex; }
 }
-/* phone: one view at a time with a bottom tab bar */
+/* phone: one workspace view at a time; navigation lives in the top menu */
 @media (max-width: 760px) {
   .only-mid { display: none !important; }
-  .dev-app { flex-direction: column; padding-bottom: calc(56px + env(safe-area-inset-bottom)); }
+  .dev-app { flex-direction: column; padding-bottom: 0; }
   .dev-main { min-width: 0; }
-  .panel { position: fixed; inset: 0 0 calc(56px + env(safe-area-inset-bottom)) 0; width: 100% !important; transform: none; box-shadow: none; display: none !important; }
+  .panel { position: fixed; inset: 0; width: 100% !important; transform: none; box-shadow: none; display: none !important; }
   .dev-app:not([data-view="chat"]) .panel { display: flex !important; }
   .dev-app:not([data-view="chat"]) .dev-main { display: none; }
   #panel-close { display: none; }
@@ -559,7 +559,7 @@
   .dev-app[data-view="chat"] .dev-main {
     display: flex;
     width: 100%;
-    height: calc(100% - 56px - env(safe-area-inset-bottom));
+    height: 100%;
     min-height: 0;
     flex: 1 1 auto;
     overflow: hidden;
@@ -587,25 +587,14 @@
     padding-bottom: 4px;
   }
 
-  .dev-app[data-view="chat"] .tabbar {
-    z-index: 50;
-    bottom: 0;
-    height: calc(56px + env(safe-area-inset-bottom));
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-
   /* Keep the latest message and send controls clear of the bottom navigation. */
   .dev-app[data-view="chat"] .dev-thread {
     padding-bottom: 18px;
   }
 }
 
-/* When the software keyboard is open, visualViewport-based height is applied
-   by dev.js; the tab bar stays out of the way so the composer remains tappable. */
+/* The top workspace menu replaces the bottom navigation on phones. */
 @media (max-width: 760px) {
-  .dev-app.keyboard-open[data-view="chat"] .tabbar {
-    display: none;
-  }
   .dev-app.keyboard-open[data-view="chat"] .dev-main {
     height: var(--fizz-visual-height, 100dvh);
   }
