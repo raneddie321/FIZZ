@@ -123,8 +123,7 @@
     const th = $("#thread");
     if (!c || !c.messages.length) {
       const first = user.name.split(" ")[0];
-      th.innerHTML = `<div class="welcome"><div><h1>How can I help${user.guest ? "" : `, ${esc(first)}`}?</h1><p>Ask a question, share a file, or start with an idea.</p></div>
-        <div class="suggestions">${SUGGESTIONS.map(([ic, t, p], i) => `<button class="suggestion" data-suggest="${i}">${icon(ic)}<span><b>${t}</b><span>${esc(p)}</span></span></button>`).join("")}</div></div>`;
+      th.innerHTML = `<div class="welcome"><div><h1>How can I help${user.guest ? "" : `, ${esc(first)}`}?</h1></div></div>`;
       setTitle("FIZZ");
       return;
     }
