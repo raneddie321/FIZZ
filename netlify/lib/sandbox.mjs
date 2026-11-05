@@ -1,7 +1,7 @@
 // Fizz Code's own Linux sandbox (Vercel Sandbox: a Firecracker microVM with Node 22, npm, git, Python).
 // One named sandbox per user and project; the project's text files are copied in before each command and
 // files the command creates or changes come back. Turned on with FIZZ_SANDBOX=on on a Vercel deployment.
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { posix as path } from "node:path";
 import { env } from "./util.mjs";
 
@@ -33,11 +33,15 @@ const TEXT_LIMIT = 3 * 1048576;
 const FILE_LIMIT = 500;
 const FILE_PATH_LIMIT = 240;
 const COMMAND_LIMIT = 2000;
+const MAX_CHANGED_FILES = 200;
+const MAX_DELETED_FILES = 500;
+const MAX_SYNC_BYTES = 2_500_000;
+const RUN_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 // File names come from the browser project model. Keep every uploaded file inside APP;
 // the sandbox is isolated, but path traversal must not be allowed to overwrite other VM paths.
 function safeProjectPath(input) {
-  if (typeof input !== "string" || !input || input.length > FILE_PATH_LIMIT || input.includes(String.fromCharCode(0))) return null;
+  if (typeof input !== "string" || !input || input.length > FILE_PATH_LIMIT || /[\u0000-\u001f\u007f]/.test(input)) return null;
   const normalized = input.split(String.fromCharCode(92)).join("/");
   if (normalized.startsWith("/") || /^[a-zA-Z]:/.test(normalized)) return null;
   const segments = normalized.split("/");
@@ -69,15 +73,61 @@ export async function run({ userId, projectId, files = {}, cmd, waitMs = 45000, 
 
   const sbx = await open(userId, projectId);
   const boundedWaitMs = Number.isFinite(Number(waitMs)) ? Math.max(1000, Math.min(45000, Number(waitMs))) : 45000;
+
+  // Keep a server-side manifest of the text files synced from the browser. Later commands
+  // can remove files the user deleted without touching node_modules or generated build output.
+  const manifestPath = `/tmp/${sandboxName(userId, projectId)}-manifest.json`;
+  let previousPaths = [];
+  try {
+    const previous = await sbx.readFileToBuffer({ path: manifestPath });
+    const parsed = previous ? JSON.parse(previous.toString("utf8")) : [];
+    if (Array.isArray(parsed)) previousPaths = parsed.filter((p) => safeProjectPath(p));
+  } catch {}
+  const currentPaths = new Set(list.map(([projectPath]) => projectPath));
+  const stalePaths = previousPaths.filter((p) => !currentPaths.has(p));
+  if (stalePaths.length) {
+    const quote = (value) => "'" + String(value).replace(/'/g, "'\\''") + "'";
+    const cleanup = stalePaths.map((p) => {
+      const target = quote(`${APP}/${p}`);
+      return `if [ -f ${target} ] || [ -L ${target} ]; then rm -f -- ${target}; fi`;
+    }).join("\n");
+    await sbx.runCommand({ cmd: "bash", args: ["-lc", cleanup] });
+  }
   await sbx.runCommand({ cmd: "mkdir", args: ["-p", APP] });
-  if (list.length) await sbx.writeFiles(list.map(([projectPath, value]) => ({ path: `${APP}/${projectPath}`, content: Buffer.from(value) })));
-  const script = `cd ${APP} && find . -type f -not -path './node_modules/*' -not -path './.git/*' -not -path '*/__pycache__/*' 2>/dev/null | sort > /tmp/fizz-before && touch /tmp/fizz-start && (${cmd}) 2>&1; code=$?; find . -newer /tmp/fizz-start -type f -not -path './node_modules/*' -not -path './.git/*' -not -path '*/__pycache__/*' -size -400k 2>/dev/null | head -100 > /tmp/fizz-changed; find . -type f -not -path './node_modules/*' -not -path './.git/*' -not -path '*/__pycache__/*' 2>/dev/null | sort > /tmp/fizz-after; comm -23 /tmp/fizz-before /tmp/fizz-after | head -100 > /tmp/fizz-deleted; exit $code`;
+  const synced = list.map(([projectPath, value]) => ({ path: `${APP}/${projectPath}`, content: Buffer.from(value) }));
+  synced.push({ path: manifestPath, content: Buffer.from(JSON.stringify([...currentPaths].sort())) });
+  await sbx.writeFiles(synced);
+
+  // Each command owns its metadata files. Parallel runs no longer overwrite one another's
+  // before/after/changed/deleted lists.
+  const runId = randomUUID();
+  const meta = `/tmp/fizz-${runId}`;
+  const beforePath = meta + "-before";
+  const startedPath = meta + "-start";
+  const changedPath = meta + "-changed";
+  const afterPath = meta + "-after";
+  const deletedPath = meta + "-deleted";
+  const script = [
+    `cd ${APP} || exit $?`,
+    `find . -type f -not -path './node_modules/*' -not -path './.git/*' -not -path './.next/*' -not -path './dist/*' -not -path './build/*' -not -path '*/__pycache__/*' 2>/dev/null | sort > ${beforePath}`,
+    `touch ${startedPath}`,
+    `(${cmd}) 2>&1`,
+    "code=$?",
+    `find . -newer ${startedPath} -type f -not -path './node_modules/*' -not -path './.git/*' -not -path './.next/*' -not -path './dist/*' -not -path './build/*' -not -path '*/__pycache__/*' 2>/dev/null | sort > ${changedPath}`,
+    `find . -type f -not -path './node_modules/*' -not -path './.git/*' -not -path './.next/*' -not -path './dist/*' -not -path './build/*' -not -path '*/__pycache__/*' 2>/dev/null | sort > ${afterPath}`,
+    `comm -23 ${beforePath} ${afterPath} | sort > ${deletedPath}`,
+    "exit $code",
+  ].join("\n");
   const command = await sbx.runCommand({ cmd: "bash", args: ["-lc", script], detached: true });
-  if (background) return { running: true, cmdId: command.cmdId, url: sbx.domain(PORT), text: `Started in the background. If it serves on port ${PORT}, it's at ${sbx.domain(PORT)}` };
-  return collect(sbx, command, boundedWaitMs);
+  if (background) return { running: true, cmdId: command.cmdId, runId, url: sbx.domain(PORT), text: `Started in the background. If it serves on port ${PORT}, it's at ${sbx.domain(PORT)}` };
+  return collect(sbx, command, boundedWaitMs, runId);
 }
 
-async function collect(sbx, command, waitMs) {
+function trackingPath(runId, suffix) {
+  const legacy = { before: "before", start: "start", changed: "changed", after: "after", deleted: "deleted" };
+  return RUN_ID_RE.test(String(runId || "")) ? `/tmp/fizz-${runId}-${suffix}` : `/tmp/fizz-${legacy[suffix]}`;
+}
+async function collect(sbx, command, waitMs, runId = null) {
   let timer;
   let done;
   try {
@@ -86,33 +136,51 @@ async function collect(sbx, command, waitMs) {
   } finally {
     if (timer) clearTimeout(timer);
   }
-  if (!done) return { running: true, cmdId: command.cmdId, text: (await safeOutput(command)).slice(-6000) };
+  if (!done) return { running: true, cmdId: command.cmdId, runId, text: (await safeOutput(command)).slice(-6000) };
   const text = (await done.output("both")).slice(-20000);
-  const changed = await changedFiles(sbx);
-  const deleted = await deletedFiles(sbx);
-  return { running: false, exitCode: done.exitCode, text, files: changed, deleted, url: sbx.domain(PORT) };
+  const [changed, deleted] = await Promise.all([changedFiles(sbx, runId), deletedFiles(sbx, runId)]);
+  return {
+    running: false, exitCode: done.exitCode, text, files: changed.files, deleted: deleted.files,
+    syncWarnings: [...changed.warnings, ...deleted.warnings], runId, url: sbx.domain(PORT),
+  };
 }
 const safeOutput = async (c) => { try { return await c.output("both"); } catch { return ""; } };
 
-async function changedFiles(sbx) {
-  const listBuf = await sbx.readFileToBuffer({ path: "/tmp/fizz-changed" });
-  const paths = String(listBuf || "").split("\n").map((l) => l.replace(/^\.\//, "").trim()).filter(Boolean).slice(0, 100);
+async function changedFiles(sbx, runId = null) {
+  let listBuf;
+  try { listBuf = await sbx.readFileToBuffer({ path: trackingPath(runId, "changed") }); }
+  catch (error) { return { files: {}, warnings: [`Couldn't read the changed-file list: ${error.message || error}`] }; }
+  const all = [...new Set(String(listBuf || "").split("\n").map((l) => l.replace(/^\.\//, "").trim()).filter(Boolean))];
+  const warnings = [];
+  if (all.length > MAX_CHANGED_FILES) warnings.push(`Only the first ${MAX_CHANGED_FILES} changed files were synced; ${all.length - MAX_CHANGED_FILES} more need to be inspected or synced in a follow-up command.`);
   const out = {};
-  for (const p of paths) {
-    const b = await sbx.readFileToBuffer({ path: `${APP}/${p}` });
-    if (!b) continue;
+  let totalBytes = 0;
+  for (const p of all.slice(0, MAX_CHANGED_FILES)) {
+    if (!safeProjectPath(p)) { warnings.push(`Skipped an unsafe changed-file path: ${p.slice(0, 100)}`); continue; }
+    let b;
+    try { b = await sbx.readFileToBuffer({ path: `${APP}/${p}` }); }
+    catch (error) { warnings.push(`Couldn't read changed file ${p}: ${error.message || error}`); continue; }
+    if (!b) { warnings.push(`Changed file disappeared before sync: ${p}`); continue; }
+    if (totalBytes + b.length > MAX_SYNC_BYTES) {
+      warnings.push(`Stopped syncing at ${(MAX_SYNC_BYTES / 1_000_000).toFixed(1)} MB; ${p} and later changed files were not returned to the project.`);
+      break;
+    }
+    totalBytes += b.length;
     const text = b.toString("utf8");
     out[p] = /[\u0000-\u0008\u000E-\u001F]/.test(text.slice(0, 2000)) ? { base64: b.toString("base64") } : text;
   }
-  return out;
+  return { files: out, warnings };
 }
 
-async function deletedFiles(sbx) {
-  const listBuf = await sbx.readFileToBuffer({ path: "/tmp/fizz-deleted" });
-  return String(listBuf || "").split("\n")
-    .map((line) => (line.startsWith("./") ? line.slice(2) : line).trim())
-    .filter((path) => safeProjectPath(path))
-    .slice(0, 100);
+async function deletedFiles(sbx, runId = null) {
+  let listBuf;
+  try { listBuf = await sbx.readFileToBuffer({ path: trackingPath(runId, "deleted") }); }
+  catch (error) { return { files: [], warnings: [`Couldn't read the deleted-file list: ${error.message || error}`] }; }
+  const all = [...new Set(String(listBuf || "").split("\n").map((line) => (line.startsWith("./") ? line.slice(2) : line).trim()).filter(Boolean))];
+  const files = all.filter((path) => safeProjectPath(path)).slice(0, MAX_DELETED_FILES);
+  const warnings = [];
+  if (files.length < all.length) warnings.push(`Only ${MAX_DELETED_FILES} deleted paths were returned; ${all.length - files.length} more deletions were not synced.`);
+  return { files, warnings };
 }
 
 /** Picks up a command that was still running. */
