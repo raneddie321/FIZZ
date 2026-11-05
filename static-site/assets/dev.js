@@ -906,6 +906,7 @@
       F, data, user, reply, project, save, esc, signal: state.controller?.signal,
       term: () => ensureTerm(),
       writeFile: (path, content, meta = {}) => { const r = writeFile(path, content, { source: meta.source || "agent", msgId: reply.id }); renderTree(); renderHeader(); return r; },
+      removeFile: (path) => { removeFile(path, { source: "agent", msgId: reply.id }); renderTree(); renderHeader(); return true; },
       openFile: (path) => openFile(path, { focus: false }),
       showTab, refreshPreview, buildPreview,
       previewFrame: () => $("#preview"),
@@ -1262,7 +1263,12 @@
         projectName: () => project().name,
         userName: () => user.name || user.email?.split("@")[0] || "user",
         sandboxAvailable: () => Boolean(F.serverStatusCached?.()?.tools?.sandbox),
-        sandbox: (cmd, opts) => F.cloudTools.sandbox(cmd, { ...opts, project: project(), write: (p, c) => { writeFile(p, c, { source: "terminal" }); save(); renderTree(); renderHeader(); if (p === state.file) renderEditor(); } }),
+        sandbox: (cmd, opts) => F.cloudTools.sandbox(cmd, {
+          ...opts,
+          project: project(),
+          write: (p, c) => { writeFile(p, c, { source: "terminal" }); save(); renderTree(); renderHeader(); if (p === state.file) renderEditor(); },
+          removeFile: (p) => { removeFile(p, { source: "terminal" }); save(); renderTree(); renderHeader(); renderEditor(); },
+        }),
       });
       return term;
   }
