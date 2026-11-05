@@ -377,6 +377,7 @@
       const body = m.error
         ? `<div class="notice ${m.soft ? "warn" : ""}"><span>${esc(m.error)}</span>${m.soft ? `<button class="btn btn-sm" data-act="settings-ai">Open AI settings</button>` : last ? `<button class="btn btn-outline btn-sm" data-regen>Retry</button>` : ""}</div>`
         : prose ? `<div class="md">${F.markdown(prose)}</div>` : "";
+      const interruptedNotice = m.interrupted ? '<div class="notice warn">This task was interrupted by the browser or operating system. Saved text and file changes were kept; inspect any tool marked failed before retrying because its final side effect may be unknown.</div>' : "";
       const askHtml = asks.map((q, k) => {
         const answered = m.answers?.[k];
         if (answered) return `<div class="ask done"><b>${esc(q.attrs.question || "Question")}</b><span class="ask-answer">${esc(answered)}</span></div>`;
@@ -389,7 +390,7 @@
       }).join("");
       const next = c.messages[i + 1];
       const turnEnd = !next || (next.role === "user" && !next.auto);
-      if (!turnEnd && !m.pending) return `<div class="a-msg mid">${html}${thinking}${body}${cards}${askHtml}</div>`;
+      if (!turnEnd && !m.pending) return `<div class="a-msg mid">${html}${thinking}${body}${interruptedNotice}${cards}${askHtml}</div>`;
       const reverted = m.changes?.length && m.reverted;
       const canRestore = !last && !m.pending && project().history.some((h) => !h.reverted && h.at > (m.doneAt || m.at));
       const actions = m.pending ? "" : `<div class="a-actions">${m.content ? `<button data-copy="${i}">Copy</button>` : ""}${m.mode === "plan" && last && !m.error ? `<button data-approve-plan="${m.id}" class="primary">Approve plan &amp; build</button>` : ""}${m.changes?.length && !m.reverted ? `<button data-revert="${m.id}">Revert ${m.changes.length} change${m.changes.length === 1 ? "" : "s"}</button>` : ""}${reverted ? `<span style="padding:4px 8px">Changes reverted</span>` : ""}${canRestore ? `<button data-restore="${m.id}" title="Put every file back the way it was right after this reply">Restore to here</button>` : ""}${last && !m.error ? `<button data-regen>Regenerate</button>` : ""}${m.changes?.length ? `<button data-act="preview">Open preview</button><button data-push="${m.id}" class="${m.pushAsked ? "primary" : ""}">Push to GitHub</button>` : ""}${m.loopStopped && last ? `<button data-continue="${m.id}" class="primary">Keep going</button>` : ""}<span style="padding:4px 8px">${t} · ${esc(m.model || "")}${m.step > 1 ? ` · step ${m.step}` : ""}</span></div>`;
@@ -711,7 +712,7 @@
   async function continueIfNeeded(reply) {
     const asked = parseAssistant(reply.content).tools.some((t) => t.type === "ask");
     const waiting = (reply.tools || []).some((t) => t.status === "waiting");
-    const results = (reply.tools || []).filter((t) => (t.status === "done" || t.status === "failed") && F.agentTools.registry[t.type]?.feedback);
+    const results = (reply.tools || []).filter((t) => (t.status === "done" || t.status === "failed") && (F.agentTools.registry[t.type]?.feedback || !F.agentTools.registry[t.type]));
     const editErrors = Object.entries(reply.editErrors || {});
     if (asked || waiting || stopLoop) return finishLoop(reply, asked ? "question" : waiting ? "approval" : "stopped");
     // A common failure mode is a model narrating that it will create a file, then ending
@@ -720,7 +721,7 @@
     const hasArtifacts = Boolean((reply.changes || []).length || parsedNow.files.some((x) => x.closed) || parsedNow.edits.length || parsedNow.tools.length);
     const narratedIntent = /\b(?:i(?:'| a)m going to|i(?:'| a)ll|now i|let me|i will|creating|writing|going to create|going to write)\b/i.test(parsedNow.prose || "")
       && /\b(?:file|index\.html|\.css|\.js|component|implement|create|write|run|execute)\b/i.test(parsedNow.prose || "");
-    if (reply.mode === "build" && !hasArtifacts && narratedIntent && turn.emptyBuildRetries < 1 && reply.step < MAX_STEPS()) {
+    if (reply.mode === "build" && !hasArtifacts && narratedIntent && turn.emptyBuildRetries < 1 && reply.step < maxTurnSteps()) {
       turn.emptyBuildRetries++;
       chat().messages.push({
         id: F.uid(), role: "user", auto: true, autoLabel: "Asked Fizz Code to apply the work instead of narrating",
@@ -734,7 +735,7 @@
       reply.error = "Fizz Code described the work but still did not create a file or run a tool. Try asking it to create the files directly, or check that the selected model supports the requested output format.";
     }
     const cut = reply.cutOff && reply.mode === "build";
-    if (cut && (turn.continues >= MAX_CONTINUES || reply.step >= MAX_STEPS())) {
+    if (cut && (turn.continues >= MAX_CONTINUES || reply.step >= maxTurnSteps())) {
       reply.content += "\n\n*The reply reached its maximum length — ask Fizz Code to continue.*";
       reply.loopStopped = true; save(); renderThread();
       return finishLoop(reply, "limit");
@@ -744,9 +745,10 @@
     const parts = results.map((t) => `<tool-result tool="${t.type}" request="${esc(toolLabel(t)).slice(0, 200)}" ok="${t.status === "done"}">\n${scrubSecrets(String(t.result?.text || "").slice(0, 12_000))}\n</tool-result>`);
     for (const [path, err] of editErrors) parts.push(`<tool-result tool="edit" request="${esc(path)}" ok="false">\n${err}\nThe file was not changed. Send the edit again with SEARCH text copied exactly from the current file, or rewrite the whole file with <fizz-file>.\n</tool-result>`);
     const images = results.filter((t) => t.result?.sendImages !== false).flatMap((t) => (t.result?.images || []).slice(0, 2)).slice(0, 3).map((src, k) => ({ type: "image", name: `screenshot-${k + 1}.jpg`, mime: src.slice(5, src.indexOf(";")), data: src.split(",")[1] }));
-    let tail = "Continue the task from here. Fix anything that failed. If everything works, finish with the updated <fizz-plan> and a short summary, without tool tags.";
+    let tail = "Continue the task from here. Diagnose failures from their exact output, inspect affected files and logs, and choose a materially different fix. Do not repeat the same failed command or tool call unchanged. If a tool outcome is unknown, inspect the current state before any retry. If everything works, finish with the updated <fizz-plan> and a short summary, without tool tags.";
     if (cut) {
       turn.continues++;
+      persistTurn("running");
       const parsed = parseAssistant(reply.content);
       const open = [...parsed.files, ...parsed.edits].filter((f) => !f.closed).map((f) => f.path);
       const saved = (reply.changes || []).map((c) => c.path);
@@ -790,6 +792,7 @@
     const canFix = issues.length && turn.verifies < MAX_VERIFIES && reply.step < MAX_STEPS() && !stopLoop;
     if (canFix) {
       turn.verifies++;
+      persistTurn("running");
       reply.verified = { ok: false, count: issues.length, fixing: true, warnings: warnings.length, skipped };
       const notice = `Checked the project and found ${issues.length} problem${issues.length === 1 ? "" : "s"} — Fizz Code is fixing ${issues.length === 1 ? "it" : "them"}`;
       chat().messages.push({
@@ -815,6 +818,8 @@
   }
 
   function finishLoop(reply, why = "done") {
+    const status = reply.error ? "failed" : why === "done" ? "completed" : ["question", "approval", "review"].includes(why) ? "waiting" : why === "limit" ? "paused" : why;
+    persistTurn(status);
     renderAll();
     const c = chat();
     // Telegram updates (Settings → Tools): only for real work, not for plain answers.
@@ -1154,7 +1159,7 @@
   }
 
   async function send() {
-    if (state.controller) { state.controller.abort(); return; }
+    if (state.controller) { stopLoop = true; state.controller.abort(); renderComposer(); return; }
     const input = $("#input");
     const text = input.value.trim();
     if (!text && !state.pending.length) return;
