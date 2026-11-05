@@ -184,10 +184,13 @@ async function deletedFiles(sbx, runId = null) {
 }
 
 /** Picks up a command that was still running. */
-export async function wait({ userId, projectId, cmdId, waitMs = 45000 }) {
+export async function wait({ userId, projectId, cmdId, runId = null, waitMs = 45000 }) {
+  if (!cmdId || String(cmdId).length > 200) throw Object.assign(new Error("A valid command id is required."), { status: 400 });
+  if (runId && !RUN_ID_RE.test(String(runId))) throw Object.assign(new Error("The sandbox run id is invalid."), { status: 400 });
   const sbx = await open(userId, projectId);
   const command = await sbx.getCommand(cmdId);
-  return collect(sbx, command, waitMs);
+  if (!command) throw Object.assign(new Error("That sandbox command could not be found."), { status: 404 });
+  return collect(sbx, command, waitMs, runId);
 }
 
 export async function stop({ userId, projectId }) {
