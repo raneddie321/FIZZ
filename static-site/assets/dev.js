@@ -516,17 +516,19 @@
   }
   function systemPrompt(skills = [], { mentions = [], mcpMentions = [], selection = null, text = "" } = {}) {
     const p = project();
-    let budget = state.mode === "do" ? 30_000 : 160_000;
-    const order = [...new Set([...mentions.filter((f) => p.files[f] !== undefined), "FIZZ.md", ...Object.keys(p.files)])].filter((f) => p.files[f] !== undefined);
-    const ctx = order.map((path) => {
-      const content = p.files[path];
-      if (isBinary(content)) return `<fizz-file path="${path}" binary="true">[binary file, ${F.blobs?.describe?.(content) || "not shown"}]</fizz-file>`;
-      // Secrets in .env never go to the AI: it sees the names, not the values.
-      if (SECRET_FILE.test(path)) return `<fizz-file path="${path}" secret="true">\n${maskEnv(content)}\n</fizz-file>`;
-      const chunk = content.slice(0, Math.max(mentions.includes(path) ? 60_000 : 0, budget));
-      budget -= chunk.length;
-      return `<fizz-file path="${path}">\n${chunk}${chunk.length < content.length ? "\n[truncated]" : ""}\n</fizz-file>`;
-    }).join("\n");
+    const contextWindow = Math.max(8_000, Math.min(1_000_000, Number(data.settings.contextWindow) || 128_000));
+    const contextShare = state.mode === "do" ? 0.18 : 0.28;
+    const projectBudgetChars = Math.min(144_000, Math.max(18_000, Math.floor(contextWindow * contextShare) * 3.5));
+    // Keep .env variable names but never send their values to the model.
+    const safeFiles = Object.fromEntries(Object.entries(p.files).map(([path, value]) => [
+      path,
+      SECRET_FILE.test(path) && typeof value === "string" && !isBinary(value) ? maskEnv(value) : value,
+    ]));
+    const retrieved = F.agentContext?.buildProjectContext
+      ? F.agentContext.buildProjectContext(safeFiles, { mentions, query: text || history, budgetChars: projectBudgetChars, maxFiles: 80 })
+      : { text: "", files: [] };
+    state.contextFiles = retrieved.files;
+    const ctx = retrieved.text;
     const mode = state.mode;
     const memory = typeof p.files["FIZZ.md"] === "string" && !isBinary(p.files["FIZZ.md"]) ? p.files["FIZZ.md"].slice(0, 8000) : "";
     const tools = Object.entries(F.agentTools.registry).filter(([, d]) => d.prompt && (!d.available || d.available())).map(([, d]) => `- ${d.prompt}`)
@@ -630,7 +632,7 @@
     if (contextUse().pct >= 85) await compactChat({ quiet: true });
     const lastUser = [...c.messages].reverse().find((m) => m.role === "user" && !m.auto) || {};
     const skills = F.skills.forMessage(data, p.skills || [], lastUser.content || "");
-    const reply = { id: F.uid(), role: "assistant", content: "", pending: true, mode: state.mode, step, model: F.providerLabel(data.settings, "dev"), at: Date.now(), readCount: step === 1 ? Object.keys(p.files).length : 0, skills: step === 1 ? skills.map(({ id, name, icon, auto }) => ({ id, name, icon, auto })) : [] };
+    const reply = { id: F.uid(), role: "assistant", content: "", pending: true, mode: state.mode, step, model: F.providerLabel(data.settings, "dev"), at: Date.now(), readCount: 0, skills: step === 1 ? skills.map(({ id, name, icon, auto }) => ({ id, name, icon, auto })) : [] };
     c.messages.push(reply);
     state.controller = new AbortController();
     renderSidebar();
@@ -639,8 +641,10 @@
     const tick = setInterval(() => { const el = $(`#thread .thinking .t`); if (el) el.textContent = `${Math.round((Date.now() - reply.at) / 1000)}s`; }, 1000);
     let last = 0;
     try {
+      const prompt = systemPrompt(skills, { mentions: lastUser.mentions || [], mcpMentions: lastUser.mcpMentions || [], selection: lastUser.selection || null, text: lastUser.content || "" });
+      if (step === 1) reply.readCount = state.contextFiles?.length || 0;
       const r = await F.aiStream(data.settings, {
-        system: systemPrompt(skills, { mentions: lastUser.mentions || [], mcpMentions: lastUser.mcpMentions || [], selection: lastUser.selection || null, text: lastUser.content || "" }),
+        system: prompt,
         messages: c.messages.slice(0, -1).map((m) => (m.summary ? { ...m, role: "user" } : m)), signal: state.controller.signal,
         onText: (_d, full) => {
           reply.content = full;
