@@ -664,7 +664,14 @@
       clearInterval(tick);
       reply.pending = false;
       state.controller = null;
-      if (reply.content && !reply.error) applyReply(reply);
+      try {
+        if (reply.content && !reply.error) applyReply(reply);
+      } catch (e) {
+        // A failure while applying the reply must end the turn cleanly: files already
+        // applied stay applied, and the error is shown instead of aborting this finally.
+        reply.error = `Fizz Code's reply could not be fully applied: ${String(e?.message || e).slice(0, 200)}`;
+        console.error("[FIZZ DEV] Couldn't apply the reply", e);
+      }
       reply.doneAt = Date.now() + 1;
       if (c.title === "New chat") {
         const first = c.messages.find((m) => m.role === "user" && !m.auto)?.content || "New chat";
