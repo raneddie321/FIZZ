@@ -105,14 +105,17 @@
         return { ok: false, text: "Stopped waiting for command " + (r.cmdId || "(command id unavailable)") + ". The detached Linux process may still be running; its final result is unknown. Inspect the project/process state before retrying. Last output:\n" + String(r.text || "").slice(-6000) };
       }
       if (r.running && !background) return { ok: false, text: "Still running after 10 minutes, so FIZZ stopped waiting. Command id: " + (r.cmdId || "unknown") + ". Output so far:\n" + r.text };
-      const changed = await bringBack(r.files, ctx);
+      const sync = await bringBack(r.files, ctx, r.deleted);
+      const changed = [...sync.changed, ...sync.removed];
       if (changed.length) ctx.rerender();
       const out = String(r.text || "").trim();
-      const parts = [`$ ${cmd}`, out || "(no output)"];
-      if (background) parts.push(`Running in the background. Public link (port 3000): ${r.url}`);
-      else parts.push(`[exit code ${r.exitCode}]`);
-      if (changed.length) parts.push(`Files updated in the project: ${changed.slice(0, 40).join(", ")}${changed.length > 40 ? ` and ${changed.length - 40} more` : ""}`);
-      return { ok: background || r.exitCode === 0, text: parts.join("\n"), files: changed, html: background && r.url ? `<div class="web-read"><a href="${esc(r.url)}" target="_blank" rel="noopener">Open ${esc(host(r.url))}</a></div>` : undefined };
+      const parts = ["$ " + cmd, out || "(no output)"];
+      if (background) parts.push("Running in the background. Public link (port 3000): " + r.url);
+      else parts.push("[exit code " + r.exitCode + "]");
+      if (sync.changed.length) parts.push("Files updated in the project: " + sync.changed.slice(0, 40).join(", ") + (sync.changed.length > 40 ? " and " + (sync.changed.length - 40) + " more" : ""));
+      if (sync.removed.length) parts.push("Files deleted from the project: " + sync.removed.slice(0, 40).join(", ") + (sync.removed.length > 40 ? " and " + (sync.removed.length - 40) + " more" : ""));
+      if (sync.skippedDeleted.length) parts.push("Could not sync deletions because no delete handler was provided: " + sync.skippedDeleted.join(", "));
+      return { ok: background || (r.exitCode === 0 && sync.skippedDeleted.length === 0), text: parts.join("\\n"), files: changed, html: background && r.url ? '<div class="web-read"><a href="' + esc(r.url) + '" target="_blank" rel="noopener">Open ' + esc(host(r.url)) + "</a></div>" : undefined };
     },
   });
 })();
