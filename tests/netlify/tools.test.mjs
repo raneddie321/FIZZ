@@ -197,14 +197,14 @@ j = await sandbox.run({ userId: "user_alice", projectId: "p1", files: { "package
 assert.deepEqual([j.running, j.text], [true, "partial output"], "long commands keep running");
 assert.notEqual(j.runId, initialRun.runId, "successive runs never share tracking files");
 j = await sandbox.run({ userId: "user_alice", projectId: "p1", cmd: "npm run dev", background: true });
+const backgroundRun = j;
 assert.equal(j.url, "https://sb-3000.example");
-j = await sandbox.wait({ userId: "user_alice", projectId: "p1", cmdId: "cmd_1", runId: initialRun.runId });
-await assert.rejects(sandbox.wait({ userId: "user_alice", projectId: "p1", cmdId: "cmd_1", runId: "not-a-run-id" }), /run id is invalid/);
+j = await sandbox.wait({ userId: "user_alice", projectId: "p1", cmdId: backgroundRun.cmdId, runId: backgroundRun.runId });
 assert.equal(j.exitCode, 0);
+await assert.rejects(sandbox.wait({ userId: "user_alice", projectId: "p1", cmdId: backgroundRun.cmdId, runId: "not-a-run-id" }), /run id is invalid/);
 j = await sandbox.run({ userId: "user_alice", projectId: "p1", files: {}, cmd: "make-overflow" });
 assert.equal(Object.keys(j.files).length, 200, "sandbox sync is bounded to 200 changed files");
 assert.ok(j.syncWarnings.some((warning) => warning.includes("1 more")), "truncated file sync is reported instead of silently losing changes");
-await assert.rejects(sandbox.wait({ userId: "user_alice", projectId: "p1", cmdId: "cmd_1", runId: "not-a-run-id" }), /run id is invalid/);
 await assert.rejects(sandbox.run({ userId: "u", projectId: "p", files: { "a.txt": "x".repeat(3_200_000) }, cmd: "ls" }), /too large/);
 await assert.rejects(
   sandbox.run({ userId: "user_alice", projectId: "p1", files: { "../outside.txt": "nope" }, cmd: "ls" }),
