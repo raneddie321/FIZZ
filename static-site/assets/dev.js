@@ -620,6 +620,7 @@
   let stopLoop = false;
   // Per turn: how many times a cut-off reply was continued and how many self-checks ran.
   let turn = { id: null, step: 0, maxSteps: MAX_STEPS(), continues: 0, verifies: 0, emptyBuildRetries: 0, failedTools: [], status: "idle" };
+  const fileSnapshots = new Map();
   const MAX_CONTINUES = 4, MAX_VERIFIES = 2;
   const maxTurnSteps = () => Number(turn.maxSteps) || MAX_STEPS();
   function persistTurn(status = turn.status) {
@@ -678,6 +679,9 @@
     const lastUser = [...c.messages].reverse().find((m) => m.role === "user" && !m.auto) || {};
     const skills = F.skills.forMessage(data, p.skills || [], lastUser.content || "");
     const reply = { id: F.uid(), role: "assistant", content: "", pending: true, mode: state.mode, step, model: F.providerLabel(data.settings, "dev"), at: Date.now(), readCount: 0, skills: step === 1 ? skills.map(({ id, name, icon, auto }) => ({ id, name, icon, auto })) : [] };
+    const fileSnapshot = Object.create(null);
+    for (const [path, value] of Object.entries(p.files)) fileSnapshot[path] = value;
+    fileSnapshots.set(reply.id, fileSnapshot);
     c.messages.push(reply);
     const controller = new AbortController();
     state.controller = controller;
@@ -714,7 +718,9 @@
     } finally {
       clearInterval(tick);
       reply.pending = false;
-      if (reply.content && !reply.error) applyReply(reply);
+      const snapshot = fileSnapshots.get(reply.id);
+      fileSnapshots.delete(reply.id);
+      if (reply.content && !reply.error) applyReply(reply, snapshot);
       reply.doneAt = Date.now() + 1;
       if (c.title === "New chat") {
         const first = c.messages.find((m) => m.role === "user" && !m.auto)?.content || "New chat";
@@ -1047,7 +1053,7 @@
     },
   });
 
-  function applyReply(reply) {
+  function applyReply(reply, snapshot = null) {
     const { files, edits, push } = parseAssistant(reply.content, { fences: reply.mode === "build" });
     reply.pushAsked = Boolean(push);
     reply.pushMessage = push?.message || "";
@@ -1056,12 +1062,21 @@
     if (reply.mode !== "build" && reply.mode !== "do") return;
     const p = project();
     const proposals = [];
+    const conflicted = (path) => snapshot && F.agentContext?.fileChangedSinceSnapshot(snapshot, p.files, path);
     for (const f of files) {
       if (!f.closed || !validPath(f.path)) continue;
+      if (conflicted(f.path)) {
+        reply.editErrors[f.path] = "Skipped " + f.path + ": the project file changed while Fizz Code was working. The newer edit was preserved; review it and ask Fizz Code to retry against the current version.";
+        continue;
+      }
       proposals.push({ path: f.path, after: f.content, kind: "file" });
     }
     for (const e of edits) {
       if (!e.closed || !validPath(e.path)) continue;
+      if (conflicted(e.path)) {
+        reply.editErrors[e.path] = "Skipped " + e.path + ": the project file changed while Fizz Code was working. The newer edit was preserved; review it and ask Fizz Code to retry against the current version.";
+        continue;
+      }
       const current = proposals.findLast((x) => x.path === e.path)?.after ?? p.files[e.path];
       if (typeof current !== "string" || isBinary(current)) { reply.editErrors[e.path] = `${e.path} doesn't exist yet (or is binary). Create it with <fizz-file>.`; continue; }
       const res = applyHunks(current, e.hunks);
@@ -1073,10 +1088,20 @@
       if (reply.staged.length) F.toast(`${reply.staged.length} change${reply.staged.length === 1 ? "" : "s"} ready for review`);
       return;
     }
-    commitProposals(reply, proposals);
+    commitProposals(reply, proposals, snapshot);
   }
-  function commitProposals(reply, proposals) {
+  function commitProposals(reply, proposals, snapshot = null) {
     for (const x of proposals) {
+      const hasStagedBaseline = Object.prototype.hasOwnProperty.call(x, "before");
+      const hasSnapshotBaseline = snapshot && Object.prototype.hasOwnProperty.call(snapshot, x.path);
+      if (hasStagedBaseline || snapshot) {
+        const expected = hasStagedBaseline ? x.before : hasSnapshotBaseline ? snapshot[x.path] : null;
+        const current = p.files[x.path] ?? null;
+        if (current !== expected) {
+          reply.editErrors[x.path] = "Skipped " + x.path + ": the file changed after Fizz Code prepared this change. Your current version was preserved; review it and regenerate the patch.";
+          continue;
+        }
+      }
       const res = writeFile(x.path, x.after, { source: "agent", msgId: reply.id });
       if (res) {
         const prev = reply.changes.find((c) => c.path === x.path);
