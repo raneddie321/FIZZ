@@ -636,7 +636,8 @@
     const contextShare = state.mode === "do" ? 0.18 : 0.28;
     const projectBudgetChars = Math.min(144_000, Math.max(18_000, Math.floor(contextWindow * contextShare) * 3.5));
     const messageChars = (c?.messages || []).reduce((n, m) => n + String(m.content || "").length + (m.attachments || []).reduce((k, a) => k + (a.type === "image" ? 5_400 : String(a.text || "").length), 0), 0);
-    const used = estimateTokens(projectBudgetChars + messageChars + 4_000);
+    const projectChars = Object.values(project().files).reduce((n, value) => n + (typeof value === "string" ? value.length : 0), 0);
+    const used = estimateTokens(Math.min(projectBudgetChars, projectChars) + messageChars + 4_000);
     return { used, max: contextWindow, pct: Math.min(100, Math.round((used / contextWindow) * 100)) };
   }
 
