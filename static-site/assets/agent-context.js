@@ -139,7 +139,7 @@
       const available = Math.max(0, Math.min(cap, remaining - 100));
       if (available < 350) continue;
       const body = excerpt(item.value, terms, available);
-      const block = '<fizz-file path="' + item.path.replace(/[&<>"']/g, "") + '">\n' + body + "\n</fizz-file>";
+      const block = '<fizz-file path="' + attr(item.path) + '">\n' + body + "\n</fizz-file>";
       if (block.length > remaining) continue;
       blocks.push(block); selected.push(item.path); remaining -= block.length;
     }
