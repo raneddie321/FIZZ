@@ -82,12 +82,21 @@
       const background = t.attrs.background === "true";
       let r = await F.conn.sandbox({ action: "run", projectId, cmd, background, files: textFiles(ctx.project().files) });
       const started = Date.now();
-      while (r.running && !background && Date.now() - started < 10 * 60_000) {
+      while (r.running && !background && !ctx.signal?.aborted && Date.now() - started < 10 * 60_000) {
         t.progress = r.text;
         ctx.rerender();
-        r = await F.conn.sandbox({ action: "wait", projectId, cmdId: r.cmdId });
+        try {
+          // Polling is abortable. The detached Linux command may outlive this browser request.
+          r = await F.conn.sandbox({ action: "wait", projectId, cmdId: r.cmdId }, ctx.signal);
+        } catch (error) {
+          if (!ctx.signal?.aborted) throw error;
+          break;
+        }
       }
-      if (r.running && !background) return { ok: false, text: `Still running after 10 minutes, so FIZZ stopped waiting. Output so far:\n${r.text}` };
+      if (ctx.signal?.aborted && r.running) {
+        return { ok: false, text: "Stopped waiting for command " + (r.cmdId || "(command id unavailable)") + ". The detached Linux process may still be running; its final result is unknown. Inspect the project/process state before retrying. Last output:\n" + String(r.text || "").slice(-6000) };
+      }
+      if (r.running && !background) return { ok: false, text: "Still running after 10 minutes, so FIZZ stopped waiting. Command id: " + (r.cmdId || "unknown") + ". Output so far:\n" + r.text };
       const changed = await bringBack(r.files, ctx);
       if (changed.length) ctx.rerender();
       const out = String(r.text || "").trim();
