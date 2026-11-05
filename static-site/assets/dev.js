@@ -589,8 +589,16 @@
   const MAX_STEPS = () => Math.min(40, Math.max(1, Number(data.settings.agentSteps) || 20));
   let stopLoop = false;
   // Per turn: how many times a cut-off reply was continued and how many self-checks ran.
-  let turn = { continues: 0, verifies: 0, emptyBuildRetries: 0 };
+  let turn = { id: null, step: 0, maxSteps: MAX_STEPS(), continues: 0, verifies: 0, emptyBuildRetries: 0, status: "idle" };
   const MAX_CONTINUES = 4, MAX_VERIFIES = 2;
+  const maxTurnSteps = () => Number(turn.maxSteps) || MAX_STEPS();
+  function persistTurn(status = turn.status) {
+    const c = chat();
+    if (!c) return;
+    turn.status = status;
+    c.agentTask = { ...turn, status, updatedAt: Date.now() };
+    save();
+  }
   const estimateTokens = (text) => Math.ceil(String(text || "").length / 3.6);
   function contextUse() {
     const c = chat();
@@ -628,13 +636,19 @@
   async function generate({ step = 1 } = {}) {
     const p = project();
     const c = chat();
-    if (step === 1) { stopLoop = false; turn = { continues: 0, verifies: 0, emptyBuildRetries: 0 }; }
+    if (step === 1 || !turn.id || turn.status !== "running") {
+      stopLoop = false;
+      turn = { id: F.uid(), startedAt: Date.now(), step: 0, maxSteps: MAX_STEPS(), continues: 0, verifies: 0, emptyBuildRetries: 0, status: "running" };
+    }
+    turn.step = step;
+    persistTurn("running");
     if (contextUse().pct >= 85) await compactChat({ quiet: true });
     const lastUser = [...c.messages].reverse().find((m) => m.role === "user" && !m.auto) || {};
     const skills = F.skills.forMessage(data, p.skills || [], lastUser.content || "");
     const reply = { id: F.uid(), role: "assistant", content: "", pending: true, mode: state.mode, step, model: F.providerLabel(data.settings, "dev"), at: Date.now(), readCount: 0, skills: step === 1 ? skills.map(({ id, name, icon, auto }) => ({ id, name, icon, auto })) : [] };
     c.messages.push(reply);
-    state.controller = new AbortController();
+    const controller = new AbortController();
+    state.controller = controller;
     renderSidebar();
     renderThread();
     renderComposer();
@@ -645,13 +659,14 @@
       if (step === 1) reply.readCount = state.contextFiles?.length || 0;
       const r = await F.aiStream(data.settings, {
         system: prompt,
-        messages: c.messages.slice(0, -1).map((m) => (m.summary ? { ...m, role: "user" } : m)), signal: state.controller.signal,
+        messages: c.messages.slice(0, -1).map((m) => (m.summary ? { ...m, role: "user" } : m)), signal: controller.signal,
         onText: (_d, full) => {
           reply.content = full;
           const now = Date.now();
           if (now - last > 350) {
             last = now;
             // Persist checkpoints because mobile browsers may freeze background tabs.
+            persistTurn("running");
             save();
             if (active()) renderThread();
           }
@@ -667,7 +682,6 @@
     } finally {
       clearInterval(tick);
       reply.pending = false;
-      state.controller = null;
       if (reply.content && !reply.error) applyReply(reply);
       reply.doneAt = Date.now() + 1;
       if (c.title === "New chat") {
@@ -678,10 +692,19 @@
       renderAll();
       if (reply.changes?.length) refreshPreview();
     }
-    if (reply.error) return finishLoop(reply);
-    if ((reply.staged || []).some((x) => !x.decided)) return finishLoop(reply, "review");
-    await runTools(reply);
-    return continueIfNeeded(reply);
+    try {
+      if (reply.error) return finishLoop(reply);
+      if (controller.signal.aborted) { stopLoop = true; return finishLoop(reply, "stopped"); }
+      if ((reply.staged || []).some((x) => !x.decided)) return finishLoop(reply, "review");
+      await runTools(reply);
+      if (controller.signal.aborted || stopLoop) return finishLoop(reply, "stopped");
+      return await continueIfNeeded(reply);
+    } finally {
+      if (state.controller === controller) {
+        state.controller = null;
+        renderComposer();
+      }
+    }
   }
 
   /** After the tools ran: send the results back and keep going, or stop and tell the user. */
@@ -820,9 +843,15 @@
     const ctx = toolContext(reply);
     const before = { ...project().files };
     for (const [idx, t] of reply.tools.entries()) {
-      if (stopLoop) break;
+      if (stopLoop || ctx.signal?.aborted) break;
+      if (["done", "failed", "denied"].includes(t.status)) continue;
       const def = F.agentTools.registry[t.type];
-      if (!def?.run || t.status === "done" || t.status === "failed" || t.status === "denied") continue;
+      if (!def?.run || (def.available && !def.available())) {
+        t.status = "failed";
+        t.result = { ok: false, text: !def?.run ? "No executor is registered for the " + t.type + " tool. Do not claim it ran; use a supported tool or explain the limitation." : (def.unavailable || "The " + t.type + " tool is not available in this deployment.") };
+        save(); renderThread();
+        continue;
+      }
       if (t.status !== "approved" && def.needsApproval?.(t, ctx)) {
         t.status = "waiting";
         save();
@@ -832,6 +861,8 @@
         continue;
       }
       t.status = "running";
+      t.startedAt = Date.now();
+      save();
       renderThread();
       try {
         const res = await def.run(t, ctx);
@@ -850,8 +881,10 @@
         t.result = { ok: false, text: e.message || String(e) };
         t.status = "failed";
       }
+      t.finishedAt = Date.now();
       save();
       renderThread();
+      if (stopLoop || ctx.signal?.aborted) break;
       void idx;
     }
     // Documents and images made in this step are shown to the user as file cards.
@@ -864,7 +897,7 @@
   /** What tools get to work with: the project, the terminal, previews and a way to add files. */
   function toolContext(reply) {
     return {
-      F, data, user, reply, project, save, esc,
+      F, data, user, reply, project, save, esc, signal: state.controller?.signal,
       term: () => ensureTerm(),
       writeFile: (path, content, meta = {}) => { const r = writeFile(path, content, { source: meta.source || "agent", msgId: reply.id }); renderTree(); renderHeader(); return r; },
       openFile: (path) => openFile(path, { focus: false }),
