@@ -565,7 +565,7 @@
         ? "DO MODE (personal agent). The user wants you to get something done for them, not to write code. Follow the DO MODE handbook above: plan briefly, then use the tools (browser, Google, connected services, MCP servers, search, terminal) step by step until the task is really done, verify, and report with links. You may still write files with <fizz-file> when the task needs one (a saved result, a .env value, a document to export), using the same file format as build mode."
         : mode === "ask"
         ? "ASK MODE. Answer questions and explain code. Do NOT write <fizz-file> or <fizz-edit> blocks unless the user explicitly asks for a file; show short snippets in Markdown code blocks instead."
-        : "BUILD MODE. Your output is executed by FIZZ DEV, not merely displayed as chat. Start with a task list in this exact format (3–10 tasks naming files):\n<fizz-plan>\n- [ ] create index.html\n- [ ] add styles\n</fizz-plan>\nThen write the actual files immediately. CRITICAL: never say you are about to create a file and then stop; every file you intend to create MUST be emitted as a complete, closed block in the same response whenever possible:\n<fizz-file path=\"relative/path.ext\">\ncomplete file content\n</fizz-file>\nText outside a file block is not saved as code. Do not use ordinary Markdown fences for files unless the opening fence includes the file path. For existing files, patch with:\n<fizz-edit path=\"relative/path.ext\">\n<<<<<<< SEARCH\nexact existing lines\n=======\nreplacement lines\n>>>>>>> REPLACE\n</fizz-edit>\nYou may put several SEARCH/REPLACE blocks in one <fizz-edit>. Never use placeholders such as '// rest unchanged'. For new projects, create index.html first and every required CSS/JS/data file in dependency order. Keep replies to a few complete files at a time to avoid output truncation. When complete, repeat the plan with finished tasks marked [x], then summarize. Do not claim success until you inspect the result.",
+        : "BUILD MODE. Your output is executed by FIZZ DEV, not merely displayed as chat. For a simple, focused fix or one-file change, skip the visible plan and implement it directly. For a new application, multi-file feature, or task with dependencies, begin with a concise task list of 3–10 steps naming files:\n<fizz-plan>\n- [ ] create index.html\n- [ ] add styles\n</fizz-plan>\nThen write the actual files immediately. CRITICAL: never say you are about to create a file and then stop; every file you intend to create MUST be emitted as a complete, closed block in the same response whenever possible:\n<fizz-file path=\"relative/path.ext\">\ncomplete file content\n</fizz-file>\nText outside a file block is not saved as code. Do not use ordinary Markdown fences for files unless the opening fence includes the file path. For existing files, patch with:\n<fizz-edit path=\"relative/path.ext\">\n<<<<<<< SEARCH\nexact existing lines\n=======\nreplacement lines\n>>>>>>> REPLACE\n</fizz-edit>\nYou may put several SEARCH/REPLACE blocks in one <fizz-edit>. Never use placeholders such as '// rest unchanged'. For new projects, create index.html first and every required CSS/JS/data file in dependency order. Keep replies to a few complete files at a time to avoid output truncation. When complete, repeat the plan with finished tasks marked [x], then summarize. Do not claim success until you inspect the result.",
       "THE PREVIEW. Projects run in a browser preview with index.html as the entry point. Linked .css files and classic scripts are loaded from the project. ES modules work across files: <script type=\"module\" src=\"js/main.js\"></script> and import { x } from \"./state.js\" between project files (always with the .js extension). fetch(\"data/items.json\") returns project files. Bare imports (import confetti from \"canvas-confetti\") load from esm.sh automatically. Links between project pages work. Servers, build tools and npm scripts need the cloud sandbox.",
       `TOOLS. You can use these tags; FIZZ DEV runs them after your files are written, shows each as a step, and sends you the results in the next message so you can continue:\n${tools}\nUse tools to check your own work (run the script, take a screenshot of the preview) before you say it's done. Work in small steps. When everything works, finish without any tool tags.`,
       githubContext,
@@ -590,7 +590,7 @@
   const MAX_STEPS = () => Math.min(40, Math.max(1, Number(data.settings.agentSteps) || 20));
   let stopLoop = false;
   // Per turn: how many times a cut-off reply was continued and how many self-checks ran.
-  let turn = { id: null, step: 0, maxSteps: MAX_STEPS(), continues: 0, verifies: 0, emptyBuildRetries: 0, status: "idle" };
+  let turn = { id: null, step: 0, maxSteps: MAX_STEPS(), continues: 0, verifies: 0, emptyBuildRetries: 0, failedTools: [], status: "idle" };
   const MAX_CONTINUES = 4, MAX_VERIFIES = 2;
   const maxTurnSteps = () => Number(turn.maxSteps) || MAX_STEPS();
   function persistTurn(status = turn.status) {
@@ -640,7 +640,7 @@
     const c = chat();
     if (step === 1 || !turn.id || turn.status !== "running") {
       stopLoop = false;
-      turn = { id: F.uid(), startedAt: Date.now(), step: 0, maxSteps: MAX_STEPS(), continues: 0, verifies: 0, emptyBuildRetries: 0, status: "running" };
+      turn = { id: F.uid(), startedAt: Date.now(), step: 0, maxSteps: MAX_STEPS(), continues: 0, verifies: 0, emptyBuildRetries: 0, failedTools: [], status: "running" };
     }
     turn.step = step;
     persistTurn("running");
@@ -851,6 +851,13 @@
     for (const [idx, t] of reply.tools.entries()) {
       if (stopLoop || ctx.signal?.aborted) break;
       if (["done", "failed", "denied"].includes(t.status)) continue;
+      const fingerprint = String(t.type) + ":" + JSON.stringify(t.attrs || {}) + ":" + String(t.body || "").trim().replace(/\\s+/g, " ");
+      if ((turn.failedTools || []).includes(fingerprint)) {
+        t.status = "failed";
+        t.result = { ok: false, text: "This exact tool request already failed earlier in the current task. FIZZ DEV did not execute it again. Inspect the previous error and current project state, then choose a different command, parameters, or repair approach." };
+        save(); renderThread();
+        continue;
+      }
       const def = F.agentTools.registry[t.type];
       if (!def?.run || (def.available && !def.available())) {
         t.status = "failed";
@@ -888,6 +895,11 @@
         t.status = "failed";
       }
       t.finishedAt = Date.now();
+      if (t.status === "failed") {
+        turn.failedTools ||= [];
+        if (!turn.failedTools.includes(fingerprint)) turn.failedTools.push(fingerprint);
+        persistTurn("running");
+      }
       save();
       renderThread();
       if (stopLoop || ctx.signal?.aborted) break;
