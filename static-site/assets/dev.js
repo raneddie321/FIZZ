@@ -892,6 +892,9 @@
       if (!def?.run || (def.available && !def.available())) {
         t.status = "failed";
         t.result = { ok: false, text: !def?.run ? "No executor is registered for the " + t.type + " tool. Do not claim it ran; use a supported tool or explain the limitation." : (def.unavailable || "The " + t.type + " tool is not available in this deployment.") };
+        turn.failedTools ||= [];
+        if (!turn.failedTools.includes(fingerprint)) turn.failedTools.push(fingerprint);
+        persistTurn("running");
         save(); renderThread();
         continue;
       }
