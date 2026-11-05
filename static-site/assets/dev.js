@@ -517,6 +517,7 @@
   }
   function systemPrompt(skills = [], { mentions = [], mcpMentions = [], selection = null, text = "" } = {}) {
     const p = project();
+    const history = (chat()?.messages || []).filter((m) => m.role === "user" && !m.auto).slice(-6).map((m) => m.content || "").join("\n");
     const contextWindow = Math.max(8_000, Math.min(1_000_000, Number(data.settings.contextWindow) || 128_000));
     const contextShare = state.mode === "do" ? 0.18 : 0.28;
     const projectBudgetChars = Math.min(144_000, Math.max(18_000, Math.floor(contextWindow * contextShare) * 3.5));
@@ -554,7 +555,6 @@
     const autoActionsContext = data.settings.autoActions
       ? "PUBLISHING PERMISSION: automatic publish preference is enabled. You may skip an extra confirmation only after the user explicitly requests a GitHub push or Vercel deployment. Respect all tool-level safety/approval checks and verify the actual result."
       : "PUBLISHING PERMISSION: automatic publish preference is disabled. Request confirmation before writing through a GitHub push or publishing a Vercel deployment, and never claim success without a verified tool result.";
-    const history = (chat()?.messages || []).filter((m) => m.role === "user" && !m.auto).slice(-6).map((m) => m.content || "").join("\n");
     const brain = F.brain.compose({ text: text || history.split("\n").slice(-20).join("\n"), history, files: p.files, mode: state.mode });
     return [
       brain.text,
@@ -603,11 +603,12 @@
   const estimateTokens = (text) => Math.ceil(String(text || "").length / 3.6);
   function contextUse() {
     const c = chat();
-    const sys = systemPrompt([]);
-    const msgs = (c?.messages || []).reduce((n, m) => n + estimateTokens(m.content) + (m.attachments || []).reduce((k, a) => k + (a.type === "image" ? 1500 : estimateTokens(a.text)), 0), 0);
-    const used = estimateTokens(sys) + msgs;
-    const max = Number(data.settings.contextWindow) || 128_000;
-    return { used, max, pct: Math.min(100, Math.round((used / max) * 100)) };
+    const contextWindow = Math.max(8_000, Math.min(1_000_000, Number(data.settings.contextWindow) || 128_000));
+    const contextShare = state.mode === "do" ? 0.18 : 0.28;
+    const projectBudgetChars = Math.min(144_000, Math.max(18_000, Math.floor(contextWindow * contextShare) * 3.5));
+    const messageChars = (c?.messages || []).reduce((n, m) => n + String(m.content || "").length + (m.attachments || []).reduce((k, a) => k + (a.type === "image" ? 5_400 : String(a.text || "").length), 0), 0);
+    const used = estimateTokens(projectBudgetChars + messageChars + 4_000);
+    return { used, max: contextWindow, pct: Math.min(100, Math.round((used / contextWindow) * 100)) };
   }
 
   /** Replaces older messages with a summary so long chats keep fitting in the model's context. */
