@@ -24,7 +24,7 @@ export async function POST(req) {
       if (!(await quotaCounter()(`${today()}/sandbox/${who.userId}`, Number(env("FIZZ_SANDBOX_LIMIT") || 60)))) return error(429, "You've reached today's sandbox limit. Try again tomorrow.", "quota");
       return json(await run({ ...args, files: body.files || {}, cmd, background: Boolean(body.background) }));
     }
-    if (body.action === "wait") return json(await wait({ ...args, cmdId: String(body.cmdId || "") }));
+    if (body.action === "wait") return json(await wait({ ...args, cmdId: String(body.cmdId || ""), runId: body.runId ? String(body.runId) : null }));
     if (body.action === "stop") return json(await stop(args));
     return error(400, "Unknown action.");
   } catch (e) {
