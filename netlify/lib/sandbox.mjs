@@ -109,8 +109,8 @@ async function changedFiles(sbx) {
 
 async function deletedFiles(sbx) {
   const listBuf = await sbx.readFileToBuffer({ path: "/tmp/fizz-deleted" });
-  return String(listBuf || "").split("\\n")
-    .map((line) => line.replace(/^\\.\\//, "").trim())
+  return String(listBuf || "").split("\n")
+    .map((line) => (line.startsWith("./") ? line.slice(2) : line).trim())
     .filter((path) => safeProjectPath(path))
     .slice(0, 100);
 }
