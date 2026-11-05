@@ -526,10 +526,39 @@
       path,
       SECRET_FILE.test(path) && typeof value === "string" && !isBinary(value) ? maskEnv(value) : value,
     ]));
-    const retrieved = F.agentContext?.buildProjectContext
-      ? F.agentContext.buildProjectContext(safeFiles, { mentions, query: text || history, budgetChars: projectBudgetChars, maxFiles: 80 })
-      : { text: "", files: [] };
+    let retrieved;
+    try {
+      if (typeof F.agentContext?.buildProjectContext === "function") {
+        retrieved = F.agentContext.buildProjectContext(safeFiles, { mentions, query: text || history, budgetChars: projectBudgetChars, maxFiles: 80 });
+      } else {
+        throw new Error("The task-aware context module is unavailable.");
+      }
+    } catch (error) {
+      // Preserve the pre-indexing behavior as a safe fallback if the retrieval module fails to load.
+      console.warn("[FIZZ DEV] Context retrieval fallback:", error);
+      const blocks = [], selected = [];
+      let remaining = projectBudgetChars;
+      const order = [...new Set([...mentions, "FIZZ.md", ...Object.keys(safeFiles)])].filter((path) => safeFiles[path] !== undefined);
+      for (const path of order) {
+        if (remaining < 500) break;
+        const value = safeFiles[path];
+        const tagPath = esc(path);
+        if (isBinary(value)) {
+          const block = `<fizz-file path="${tagPath}" binary="true">[binary file; content not sent]</fizz-file>`;
+          if (block.length <= remaining) { blocks.push(block); selected.push(path); remaining -= block.length; }
+          continue;
+        }
+        const cap = mentions.includes(path) ? 60_000 : 14_000;
+        const body = String(value || "").slice(0, Math.max(0, Math.min(cap, remaining - 100)));
+        if (!body) continue;
+        const block = `<fizz-file path="${tagPath}">\\n${body}${body.length < String(value || "").length ? "\\n[truncated]" : ""}\\n</fizz-file>`;
+        if (block.length > remaining) continue;
+        blocks.push(block); selected.push(path); remaining -= block.length;
+      }
+      retrieved = { text: blocks.join("\\n"), files: selected, usedChars: projectBudgetChars - remaining };
+    }
     state.contextFiles = retrieved.files;
+    state.contextChars = retrieved.usedChars || retrieved.text.length;
     const ctx = retrieved.text;
     const mode = state.mode;
     const memory = typeof p.files["FIZZ.md"] === "string" && !isBinary(p.files["FIZZ.md"]) ? p.files["FIZZ.md"].slice(0, 8000) : "";
