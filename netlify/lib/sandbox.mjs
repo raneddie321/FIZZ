@@ -168,7 +168,7 @@ async function changedFiles(sbx, runId = null) {
     }
     totalBytes += b.length;
     const text = b.toString("utf8");
-    const isBinary = !Buffer.from(text, "utf8").equals(b) || /[\\u0000-\\u0008\\u000E-\\u001F]/.test(text.slice(0, 2000));
+    const isBinary = !Buffer.from(text, "utf8").equals(b) || /[\u0000-\u0008\u000E-\u001F]/.test(text.slice(0, 2000));
     out[p] = isBinary ? { base64: b.toString("base64") } : text;
   }
   return { files: out, warnings };
