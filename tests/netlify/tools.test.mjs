@@ -150,6 +150,7 @@ class FakeSandbox {
       this.fs["/vercel/sandbox/app/dist/out.txt"] = Buffer.from("hello");
       this.fs["/vercel/sandbox/app/dist/app.bin"] = Buffer.from([0, 1, 2, 3]);
       this.fs["/tmp/fizz-changed"] = Buffer.from("./dist/out.txt\n./dist/app.bin\n");
+      this.fs["/tmp/fizz-deleted"] = Buffer.from("./src/old.txt\n");
     }
     this.commands[id] = c;
     assert.equal(detached, true);
@@ -167,6 +168,7 @@ assert.equal(j.running, false);
 assert.equal(j.exitCode, 0);
 assert.equal(j.text, "built ok\n");
 assert.deepEqual(j.files, { "dist/out.txt": "hello", "dist/app.bin": { base64: "AAECAw==" } }, "changed files come back; binary ones as base64");
+assert.deepEqual(j.deleted, ["src/old.txt"], "deleted files are reported back to the project");
 const sbx = Object.values(FakeSandbox.byName)[0];
 assert.ok(sbx.fs["/vercel/sandbox/app/src/a.js"], "project files are copied in");
 assert.ok(!sbx.fs["/vercel/sandbox/app/node_modules/x/i.js"], "node_modules isn't copied");

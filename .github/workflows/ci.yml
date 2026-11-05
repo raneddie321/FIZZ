@@ -24,10 +24,15 @@ jobs:
           node --check static-site/assets/core.js
           node --check static-site/assets/chat.js
           node --check static-site/assets/dev.js
+          node --check static-site/assets/agent-context.js
+          node --check static-site/assets/cloud-tools.js
+          node --check netlify/lib/sandbox.mjs
           node --check static-site/assets/settings.js
           node --check netlify/lib/ai-chat-core.mjs
           node --check api/ai/chat.mjs
           node --check tests/netlify/functions.test.mjs
+      - name: Test FIZZ DEV task-aware context retrieval
+        run: node tests/client/agent-context.test.mjs
       - name: Test server routes and AI fallback behaviour
         run: node tests/netlify/functions.test.mjs
       - name: Test web, sync, sandbox and tool routes
