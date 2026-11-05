@@ -137,20 +137,29 @@ class FakeSandbox {
   constructor(opts) { this.opts = opts; this.fs = {}; this.commands = {}; this.stopped = false; }
   async writeFiles(list) { for (const f of list) this.fs[f.path] = Buffer.from(f.content); }
   async runCommand({ cmd, args, detached }) {
-    if (cmd === "mkdir") return { exitCode: 0 };
+    if (cmd === "mkdir" || cmd === "rm") return { exitCode: 0 };
     const script = args[1];
+    if (!detached) return { exitCode: 0 };
+    const runId = /\\/tmp\\/fizz-([0-9a-f-]{36})-changed/.exec(script)?.[1];
+    assert.ok(runId, "each sandbox execution gets unique tracking paths");
     const id = `cmd_${Object.keys(this.commands).length + 1}`;
     const slow = script.includes("sleep 100");
     const c = {
       cmdId: id,
-      wait: () => (slow ? new Promise(() => {}) : Promise.resolve({ exitCode: script.includes("exit 3") ? 3 : 0, output: async () => "built ok\n" })),
+      wait: () => (slow ? new Promise(() => {}) : Promise.resolve({ exitCode: script.includes("exit 3") ? 3 : 0, output: async () => "built ok\\n" })),
       output: async () => "partial output",
+      runId,
     };
-    if (!slow) {
+    if (!slow && script.includes("make-overflow")) {
+      const paths = Array.from({ length: 201 }, (_, i) => `dist/overflow-${i}.txt`);
+      for (const path of paths) this.fs[`/vercel/sandbox/app/${path}`] = Buffer.from("x");
+      this.fs[`/tmp/fizz-${runId}-changed`] = Buffer.from(paths.map((path) => "./" + path).join("\\n") + "\\n");
+      this.fs[`/tmp/fizz-${runId}-deleted`] = Buffer.from("");
+    } else if (!slow) {
       this.fs["/vercel/sandbox/app/dist/out.txt"] = Buffer.from("hello");
       this.fs["/vercel/sandbox/app/dist/app.bin"] = Buffer.from([0, 1, 2, 3]);
-      this.fs["/tmp/fizz-changed"] = Buffer.from("./dist/out.txt\n./dist/app.bin\n");
-      this.fs["/tmp/fizz-deleted"] = Buffer.from("./src/old.txt\n");
+      this.fs[`/tmp/fizz-${runId}-changed`] = Buffer.from("./dist/out.txt\\n./dist/app.bin\\n");
+      this.fs[`/tmp/fizz-${runId}-deleted`] = Buffer.from("./src/old.txt\\n");
     }
     this.commands[id] = c;
     assert.equal(detached, true);
@@ -164,12 +173,16 @@ class FakeSandbox {
 FakeSandbox.byName = {};
 sandbox.setSandboxModule({ Sandbox: FakeSandbox });
 j = await sandbox.run({ userId: "user_alice", projectId: "p1", files: { "package.json": "{}", "src/a.js": "x", "node_modules/x/i.js": "skip" }, cmd: "npm run build" });
+const initialRun = j;
+assert.match(initialRun.runId, /^[0-9a-f-]{36}$/i, "completed runs expose their tracking id");
 assert.equal(j.running, false);
 assert.equal(j.exitCode, 0);
-assert.equal(j.text, "built ok\n");
+assert.equal(j.text, "built ok\\n");
 assert.deepEqual(j.files, { "dist/out.txt": "hello", "dist/app.bin": { base64: "AAECAw==" } }, "changed files come back; binary ones as base64");
 assert.deepEqual(j.deleted, ["src/old.txt"], "deleted files are reported back to the project");
+assert.deepEqual(j.syncWarnings, [], "complete file sync has no warnings");
 const sbx = Object.values(FakeSandbox.byName)[0];
+assert.ok(sbx.fs[Object.keys(sbx.fs).find((path) => path.endsWith("-manifest.json"))], "the sandbox keeps a text-file sync manifest");
 assert.ok(sbx.fs["/vercel/sandbox/app/src/a.js"], "project files are copied in");
 assert.ok(!sbx.fs["/vercel/sandbox/app/node_modules/x/i.js"], "node_modules isn't copied");
 assert.match(created[0].name, /^fizz-[0-9a-f]{24}$/, "sandbox names don't reveal the user id");
@@ -177,10 +190,15 @@ await sandbox.run({ userId: "user_bob", projectId: "p1", cmd: "ls" });
 assert.notEqual(created[0].name, created[1].name, "each user gets their own sandbox");
 j = await sandbox.run({ userId: "user_alice", projectId: "p1", cmd: "sleep 100", waitMs: 20 });
 assert.deepEqual([j.running, j.text], [true, "partial output"], "long commands keep running");
+assert.notEqual(j.runId, initialRun.runId, "successive runs never share tracking files");
 j = await sandbox.run({ userId: "user_alice", projectId: "p1", cmd: "npm run dev", background: true });
 assert.equal(j.url, "https://sb-3000.example");
-j = await sandbox.wait({ userId: "user_alice", projectId: "p1", cmdId: "cmd_1" });
+j = await sandbox.wait({ userId: "user_alice", projectId: "p1", cmdId: "cmd_1", runId: initialRun.runId });
 assert.equal(j.exitCode, 0);
+j = await sandbox.run({ userId: "user_alice", projectId: "p1", files: {}, cmd: "make-overflow" });
+assert.equal(Object.keys(j.files).length, 200, "sandbox sync is bounded to 200 changed files");
+assert.ok(j.syncWarnings.some((warning) => warning.includes("1 more")), "truncated file sync is reported instead of silently losing changes");
+await assert.rejects(sandbox.wait({ userId: "user_alice", projectId: "p1", cmdId: "cmd_1", runId: "not-a-run-id" }), /run id is invalid/);
 await assert.rejects(sandbox.run({ userId: "u", projectId: "p", files: { "a.txt": "x".repeat(3_200_000) }, cmd: "ls" }), /too large/);
 await assert.rejects(
   sandbox.run({ userId: "user_alice", projectId: "p1", files: { "../outside.txt": "nope" }, cmd: "ls" }),
