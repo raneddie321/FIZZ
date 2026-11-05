@@ -22,6 +22,8 @@ jobs:
       - name: Syntax-check the changed AI code
         run: |
           node --check static-site/assets/core.js
+          node --check static-site/assets/chat.js
+          node --check static-site/assets/dev.js
           node --check static-site/assets/settings.js
           node --check netlify/lib/ai-chat-core.mjs
           node --check api/ai/chat.mjs
