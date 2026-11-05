@@ -146,6 +146,14 @@
     return { text: blocks.join("\n"), files: selected, terms, budgetChars, usedChars: budgetChars - remaining };
   }
 
+  function fileChangedSinceSnapshot(snapshot, current, path) {
+    const before = snapshot || {};
+    const after = current || {};
+    const hadBefore = Object.prototype.hasOwnProperty.call(before, path);
+    const hasNow = Object.prototype.hasOwnProperty.call(after, path);
+    return hadBefore !== hasNow || (hadBefore && before[path] !== after[path]);
+  }
+
   root.FIZZ ||= {};
-  root.FIZZ.agentContext = { taskTerms, dependencies, excerpt, buildProjectContext };
+  root.FIZZ.agentContext = { taskTerms, dependencies, excerpt, buildProjectContext, fileChangedSinceSnapshot };
 })(window);
