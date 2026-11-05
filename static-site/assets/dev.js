@@ -2473,22 +2473,40 @@
     });
   };
 
-  // Recover unfinished replies after a browser restore/discard. Only persisted output is retained.
+  // Recover unfinished replies and tool calls after a browser restore/discard.
+  // A running tool may already have caused a side effect; never replay it automatically.
   for (const p of data.projects) {
     for (const c of p.chats || []) {
+      let interruptedTask = false;
       for (const m of c.messages || []) {
-        if (m.role === "assistant" && m.pending) {
+        if (m.role !== "assistant") continue;
+        if (m.pending) {
           m.pending = false;
           m.interrupted = true;
           m.error = "";
           m.content = String(m.content || "");
           m.doneAt = Date.now();
+          interruptedTask = true;
+        }
+        for (const tool of m.tools || []) {
+          if (tool.status === "running") {
+            tool.status = "failed";
+            tool.finishedAt = Date.now();
+            tool.result = { ok: false, text: "The browser stopped waiting while this tool was running. Its final side-effect status is unknown. Inspect the current project or service state before deciding whether to retry; FIZZ will not replay it automatically." };
+            m.interrupted = true;
+            interruptedTask = true;
+          }
         }
       }
+      if (c.agentTask && (c.agentTask.status === "running" || c.agentTask.status === "stopping")) {
+        c.agentTask.status = "interrupted";
+        c.agentTask.updatedAt = Date.now();
+        interruptedTask = true;
+      }
+      if (interruptedTask && c.agentTask) c.agentTask.interruptedAt = Date.now();
     }
   }
   save();
-
   // ---------- boot ----------
   app.dataset.panel = ui.panel === "closed" ? "closed" : "open";
   F.settings.handleRedirects(settingsCtx);
