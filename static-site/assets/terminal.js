@@ -697,6 +697,9 @@
         if (stopped) { io.err("^C (the command keeps running in the sandbox)"); return 130; }
         if (r.text) io.out(r.text.endsWith("\n") ? r.text : r.text + "\n");
         if (r.changed?.length) io.err(`${C.dim}updated ${r.changed.length} file${r.changed.length === 1 ? "" : "s"} in the project${C.reset}`);
+        if (r.conflicts?.length) io.err(`${C.yellow}preserved newer edits; sandbox output was not synced for: ${r.conflicts.join(", ")}${C.reset}`);
+        if (r.syncWarnings?.length) io.err(`${C.yellow}sandbox sync warnings: ${r.syncWarnings.join(" · ")}${C.reset}`);
+        if (r.skippedDeleted?.length) io.err(`${C.yellow}couldn't sync deletions: ${r.skippedDeleted.join(", ")}${C.reset}`);
         if (background && r.url) io.err(`${C.dim}running in the background — ${r.url}${C.reset}`);
         return background ? 0 : Number(r.exitCode ?? 0);
       } catch (e) { io.err(`cloud: ${e.message}`); return 1; } finally { busy = () => {}; }
