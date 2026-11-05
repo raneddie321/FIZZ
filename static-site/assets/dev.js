@@ -377,7 +377,6 @@
       const body = m.error
         ? `<div class="notice ${m.soft ? "warn" : ""}"><span>${esc(m.error)}</span>${m.soft ? `<button class="btn btn-sm" data-act="settings-ai">Open AI settings</button>` : last ? `<button class="btn btn-outline btn-sm" data-regen>Retry</button>` : ""}</div>`
         : prose ? `<div class="md">${F.markdown(prose)}</div>` : "";
-      const interruptedNotice = m.interrupted ? '<div class="notice warn">This task was interrupted by the browser or operating system. Saved text and file changes were kept; inspect any tool marked failed before retrying because its final side effect may be unknown.</div>' : "";
       const askHtml = asks.map((q, k) => {
         const answered = m.answers?.[k];
         if (answered) return `<div class="ask done"><b>${esc(q.attrs.question || "Question")}</b><span class="ask-answer">${esc(answered)}</span></div>`;
@@ -390,7 +389,7 @@
       }).join("");
       const next = c.messages[i + 1];
       const turnEnd = !next || (next.role === "user" && !next.auto);
-      if (!turnEnd && !m.pending) return `<div class="a-msg mid">${html}${thinking}${body}${interruptedNotice}${cards}${askHtml}</div>`;
+      if (!turnEnd && !m.pending) return `<div class="a-msg mid">${html}${thinking}${body}${cards}${askHtml}</div>`;
       const reverted = m.changes?.length && m.reverted;
       const canRestore = !last && !m.pending && project().history.some((h) => !h.reverted && h.at > (m.doneAt || m.at));
       const actions = m.pending ? "" : `<div class="a-actions">${m.content ? `<button data-copy="${i}">Copy</button>` : ""}${m.mode === "plan" && last && !m.error ? `<button data-approve-plan="${m.id}" class="primary">Approve plan &amp; build</button>` : ""}${m.changes?.length && !m.reverted ? `<button data-revert="${m.id}">Revert ${m.changes.length} change${m.changes.length === 1 ? "" : "s"}</button>` : ""}${reverted ? `<span style="padding:4px 8px">Changes reverted</span>` : ""}${canRestore ? `<button data-restore="${m.id}" title="Put every file back the way it was right after this reply">Restore to here</button>` : ""}${last && !m.error ? `<button data-regen>Regenerate</button>` : ""}${m.changes?.length ? `<button data-act="preview">Open preview</button><button data-push="${m.id}" class="${m.pushAsked ? "primary" : ""}">Push to GitHub</button>` : ""}${m.loopStopped && last ? `<button data-continue="${m.id}" class="primary">Keep going</button>` : ""}<span style="padding:4px 8px">${t} · ${esc(m.model || "")}${m.step > 1 ? ` · step ${m.step}` : ""}</span></div>`;
@@ -517,49 +516,17 @@
   }
   function systemPrompt(skills = [], { mentions = [], mcpMentions = [], selection = null, text = "" } = {}) {
     const p = project();
-    const history = (chat()?.messages || []).filter((m) => m.role === "user" && !m.auto).slice(-6).map((m) => m.content || "").join("\n");
-    const contextWindow = Math.max(8_000, Math.min(1_000_000, Number(data.settings.contextWindow) || 128_000));
-    const contextShare = state.mode === "do" ? 0.18 : 0.28;
-    const projectBudgetChars = Math.min(144_000, Math.max(18_000, Math.floor(contextWindow * contextShare) * 3.5));
-    // Keep .env variable names but never send their values to the model.
-    const safeFiles = Object.fromEntries(Object.entries(p.files).map(([path, value]) => [
-      path,
-      SECRET_FILE.test(path) && typeof value === "string" && !isBinary(value) ? maskEnv(value) : value,
-    ]));
-    let retrieved;
-    try {
-      if (typeof F.agentContext?.buildProjectContext === "function") {
-        retrieved = F.agentContext.buildProjectContext(safeFiles, { mentions, query: text || history, budgetChars: projectBudgetChars, maxFiles: 80 });
-      } else {
-        throw new Error("The task-aware context module is unavailable.");
-      }
-    } catch (error) {
-      // Preserve the pre-indexing behavior as a safe fallback if the retrieval module fails to load.
-      console.warn("[FIZZ DEV] Context retrieval fallback:", error);
-      const blocks = [], selected = [];
-      let remaining = projectBudgetChars;
-      const order = [...new Set([...mentions, "FIZZ.md", ...Object.keys(safeFiles)])].filter((path) => safeFiles[path] !== undefined);
-      for (const path of order) {
-        if (remaining < 500) break;
-        const value = safeFiles[path];
-        const tagPath = esc(path);
-        if (isBinary(value)) {
-          const block = `<fizz-file path="${tagPath}" binary="true">[binary file; content not sent]</fizz-file>`;
-          if (block.length <= remaining) { blocks.push(block); selected.push(path); remaining -= block.length; }
-          continue;
-        }
-        const cap = mentions.includes(path) ? 60_000 : 14_000;
-        const body = String(value || "").slice(0, Math.max(0, Math.min(cap, remaining - 100)));
-        if (!body) continue;
-        const block = `<fizz-file path="${tagPath}">\\n${body}${body.length < String(value || "").length ? "\\n[truncated]" : ""}\\n</fizz-file>`;
-        if (block.length > remaining) continue;
-        blocks.push(block); selected.push(path); remaining -= block.length;
-      }
-      retrieved = { text: blocks.join("\\n"), files: selected, usedChars: projectBudgetChars - remaining };
-    }
-    state.contextFiles = retrieved.files;
-    state.contextChars = retrieved.usedChars || retrieved.text.length;
-    const ctx = retrieved.text;
+    let budget = state.mode === "do" ? 30_000 : 160_000;
+    const order = [...new Set([...mentions.filter((f) => p.files[f] !== undefined), "FIZZ.md", ...Object.keys(p.files)])].filter((f) => p.files[f] !== undefined);
+    const ctx = order.map((path) => {
+      const content = p.files[path];
+      if (isBinary(content)) return `<fizz-file path="${path}" binary="true">[binary file, ${F.blobs?.describe?.(content) || "not shown"}]</fizz-file>`;
+      // Secrets in .env never go to the AI: it sees the names, not the values.
+      if (SECRET_FILE.test(path)) return `<fizz-file path="${path}" secret="true">\n${maskEnv(content)}\n</fizz-file>`;
+      const chunk = content.slice(0, Math.max(mentions.includes(path) ? 60_000 : 0, budget));
+      budget -= chunk.length;
+      return `<fizz-file path="${path}">\n${chunk}${chunk.length < content.length ? "\n[truncated]" : ""}\n</fizz-file>`;
+    }).join("\n");
     const mode = state.mode;
     const memory = typeof p.files["FIZZ.md"] === "string" && !isBinary(p.files["FIZZ.md"]) ? p.files["FIZZ.md"].slice(0, 8000) : "";
     const tools = Object.entries(F.agentTools.registry).filter(([, d]) => d.prompt && (!d.available || d.available())).map(([, d]) => `- ${d.prompt}`)
@@ -584,6 +551,7 @@
     const autoActionsContext = data.settings.autoActions
       ? "PUBLISHING PERMISSION: automatic publish preference is enabled. You may skip an extra confirmation only after the user explicitly requests a GitHub push or Vercel deployment. Respect all tool-level safety/approval checks and verify the actual result."
       : "PUBLISHING PERMISSION: automatic publish preference is disabled. Request confirmation before writing through a GitHub push or publishing a Vercel deployment, and never claim success without a verified tool result.";
+    const history = (chat()?.messages || []).filter((m) => m.role === "user" && !m.auto).slice(-6).map((m) => m.content || "").join("\n");
     const brain = F.brain.compose({ text: text || history.split("\n").slice(-20).join("\n"), history, files: p.files, mode: state.mode });
     return [
       brain.text,
@@ -594,7 +562,7 @@
         ? "DO MODE (personal agent). The user wants you to get something done for them, not to write code. Follow the DO MODE handbook above: plan briefly, then use the tools (browser, Google, connected services, MCP servers, search, terminal) step by step until the task is really done, verify, and report with links. You may still write files with <fizz-file> when the task needs one (a saved result, a .env value, a document to export), using the same file format as build mode."
         : mode === "ask"
         ? "ASK MODE. Answer questions and explain code. Do NOT write <fizz-file> or <fizz-edit> blocks unless the user explicitly asks for a file; show short snippets in Markdown code blocks instead."
-        : "BUILD MODE. Your output is executed by FIZZ DEV, not merely displayed as chat. For a simple, focused fix or one-file change, skip the visible plan and implement it directly. For a new application, multi-file feature, or task with dependencies, begin with a concise task list of 3–10 steps naming files:\n<fizz-plan>\n- [ ] create index.html\n- [ ] add styles\n</fizz-plan>\nThen write the actual files immediately. CRITICAL: never say you are about to create a file and then stop; every file you intend to create MUST be emitted as a complete, closed block in the same response whenever possible:\n<fizz-file path=\"relative/path.ext\">\ncomplete file content\n</fizz-file>\nText outside a file block is not saved as code. Do not use ordinary Markdown fences for files unless the opening fence includes the file path. For existing files, patch with:\n<fizz-edit path=\"relative/path.ext\">\n<<<<<<< SEARCH\nexact existing lines\n=======\nreplacement lines\n>>>>>>> REPLACE\n</fizz-edit>\nYou may put several SEARCH/REPLACE blocks in one <fizz-edit>. Never use placeholders such as '// rest unchanged'. For new projects, create index.html first and every required CSS/JS/data file in dependency order. Keep replies to a few complete files at a time to avoid output truncation. When complete, repeat the plan with finished tasks marked [x], then summarize. Do not claim success until you inspect the result.",
+        : "BUILD MODE. Your output is executed by FIZZ DEV, not merely displayed as chat. Start with a task list in this exact format (3–10 tasks naming files):\n<fizz-plan>\n- [ ] create index.html\n- [ ] add styles\n</fizz-plan>\nThen write the actual files immediately. CRITICAL: never say you are about to create a file and then stop; every file you intend to create MUST be emitted as a complete, closed block in the same response whenever possible:\n<fizz-file path=\"relative/path.ext\">\ncomplete file content\n</fizz-file>\nText outside a file block is not saved as code. Do not use ordinary Markdown fences for files unless the opening fence includes the file path. For existing files, patch with:\n<fizz-edit path=\"relative/path.ext\">\n<<<<<<< SEARCH\nexact existing lines\n=======\nreplacement lines\n>>>>>>> REPLACE\n</fizz-edit>\nYou may put several SEARCH/REPLACE blocks in one <fizz-edit>. Never use placeholders such as '// rest unchanged'. For new projects, create index.html first and every required CSS/JS/data file in dependency order. Keep replies to a few complete files at a time to avoid output truncation. When complete, repeat the plan with finished tasks marked [x], then summarize. Do not claim success until you inspect the result.",
       "THE PREVIEW. Projects run in a browser preview with index.html as the entry point. Linked .css files and classic scripts are loaded from the project. ES modules work across files: <script type=\"module\" src=\"js/main.js\"></script> and import { x } from \"./state.js\" between project files (always with the .js extension). fetch(\"data/items.json\") returns project files. Bare imports (import confetti from \"canvas-confetti\") load from esm.sh automatically. Links between project pages work. Servers, build tools and npm scripts need the cloud sandbox.",
       `TOOLS. You can use these tags; FIZZ DEV runs them after your files are written, shows each as a step, and sends you the results in the next message so you can continue:\n${tools}\nUse tools to check your own work (run the script, take a screenshot of the preview) before you say it's done. Work in small steps. When everything works, finish without any tool tags.`,
       githubContext,
@@ -619,27 +587,16 @@
   const MAX_STEPS = () => Math.min(40, Math.max(1, Number(data.settings.agentSteps) || 20));
   let stopLoop = false;
   // Per turn: how many times a cut-off reply was continued and how many self-checks ran.
-  let turn = { id: null, step: 0, maxSteps: MAX_STEPS(), continues: 0, verifies: 0, emptyBuildRetries: 0, failedTools: [], status: "idle" };
-  const fileSnapshots = new Map();
+  let turn = { continues: 0, verifies: 0, emptyBuildRetries: 0 };
   const MAX_CONTINUES = 4, MAX_VERIFIES = 2;
-  const maxTurnSteps = () => Number(turn.maxSteps) || MAX_STEPS();
-  function persistTurn(status = turn.status) {
-    const c = chat();
-    if (!c) return;
-    turn.status = status;
-    c.agentTask = { ...turn, status, updatedAt: Date.now() };
-    save();
-  }
   const estimateTokens = (text) => Math.ceil(String(text || "").length / 3.6);
   function contextUse() {
     const c = chat();
-    const contextWindow = Math.max(8_000, Math.min(1_000_000, Number(data.settings.contextWindow) || 128_000));
-    const contextShare = state.mode === "do" ? 0.18 : 0.28;
-    const projectBudgetChars = Math.min(144_000, Math.max(18_000, Math.floor(contextWindow * contextShare) * 3.5));
-    const messageChars = (c?.messages || []).reduce((n, m) => n + String(m.content || "").length + (m.attachments || []).reduce((k, a) => k + (a.type === "image" ? 5_400 : String(a.text || "").length), 0), 0);
-    const projectChars = Object.values(project().files).reduce((n, value) => n + (typeof value === "string" ? value.length : 0), 0);
-    const used = estimateTokens(Math.min(projectBudgetChars, projectChars) + messageChars + 4_000);
-    return { used, max: contextWindow, pct: Math.min(100, Math.round((used / contextWindow) * 100)) };
+    const sys = systemPrompt([]);
+    const msgs = (c?.messages || []).reduce((n, m) => n + estimateTokens(m.content) + (m.attachments || []).reduce((k, a) => k + (a.type === "image" ? 1500 : estimateTokens(a.text)), 0), 0);
+    const used = estimateTokens(sys) + msgs;
+    const max = Number(data.settings.contextWindow) || 128_000;
+    return { used, max, pct: Math.min(100, Math.round((used / max) * 100)) };
   }
 
   /** Replaces older messages with a summary so long chats keep fitting in the model's context. */
@@ -669,40 +626,28 @@
   async function generate({ step = 1 } = {}) {
     const p = project();
     const c = chat();
-    if (step === 1 || !turn.id || turn.status !== "running") {
-      stopLoop = false;
-      turn = { id: F.uid(), startedAt: Date.now(), step: 0, maxSteps: MAX_STEPS(), continues: 0, verifies: 0, emptyBuildRetries: 0, failedTools: [], status: "running" };
-    }
-    turn.step = step;
-    persistTurn("running");
+    if (step === 1) { stopLoop = false; turn = { continues: 0, verifies: 0, emptyBuildRetries: 0 }; }
     if (contextUse().pct >= 85) await compactChat({ quiet: true });
     const lastUser = [...c.messages].reverse().find((m) => m.role === "user" && !m.auto) || {};
     const skills = F.skills.forMessage(data, p.skills || [], lastUser.content || "");
-    const reply = { id: F.uid(), role: "assistant", content: "", pending: true, mode: state.mode, step, model: F.providerLabel(data.settings, "dev"), at: Date.now(), readCount: 0, skills: step === 1 ? skills.map(({ id, name, icon, auto }) => ({ id, name, icon, auto })) : [] };
-    const fileSnapshot = Object.create(null);
-    for (const [path, value] of Object.entries(p.files)) fileSnapshot[path] = value;
-    fileSnapshots.set(reply.id, fileSnapshot);
+    const reply = { id: F.uid(), role: "assistant", content: "", pending: true, mode: state.mode, step, model: F.providerLabel(data.settings, "dev"), at: Date.now(), readCount: step === 1 ? Object.keys(p.files).length : 0, skills: step === 1 ? skills.map(({ id, name, icon, auto }) => ({ id, name, icon, auto })) : [] };
     c.messages.push(reply);
-    const controller = new AbortController();
-    state.controller = controller;
+    state.controller = new AbortController();
     renderSidebar();
     renderThread();
     renderComposer();
     const tick = setInterval(() => { const el = $(`#thread .thinking .t`); if (el) el.textContent = `${Math.round((Date.now() - reply.at) / 1000)}s`; }, 1000);
     let last = 0;
     try {
-      const prompt = systemPrompt(skills, { mentions: lastUser.mentions || [], mcpMentions: lastUser.mcpMentions || [], selection: lastUser.selection || null, text: lastUser.content || "" });
-      if (step === 1) reply.readCount = state.contextFiles?.length || 0;
       const r = await F.aiStream(data.settings, {
-        system: prompt,
-        messages: c.messages.slice(0, -1).map((m) => (m.summary ? { ...m, role: "user" } : m)), signal: controller.signal,
+        system: systemPrompt(skills, { mentions: lastUser.mentions || [], mcpMentions: lastUser.mcpMentions || [], selection: lastUser.selection || null, text: lastUser.content || "" }),
+        messages: c.messages.slice(0, -1).map((m) => (m.summary ? { ...m, role: "user" } : m)), signal: state.controller.signal,
         onText: (_d, full) => {
           reply.content = full;
           const now = Date.now();
           if (now - last > 350) {
             last = now;
             // Persist checkpoints because mobile browsers may freeze background tabs.
-            persistTurn("running");
             save();
             if (active()) renderThread();
           }
@@ -718,9 +663,8 @@
     } finally {
       clearInterval(tick);
       reply.pending = false;
-      const snapshot = fileSnapshots.get(reply.id);
-      fileSnapshots.delete(reply.id);
-      if (reply.content && !reply.error) applyReply(reply, snapshot);
+      state.controller = null;
+      if (reply.content && !reply.error) applyReply(reply);
       reply.doneAt = Date.now() + 1;
       if (c.title === "New chat") {
         const first = c.messages.find((m) => m.role === "user" && !m.auto)?.content || "New chat";
@@ -730,26 +674,17 @@
       renderAll();
       if (reply.changes?.length) refreshPreview();
     }
-    try {
-      if (reply.error) return finishLoop(reply);
-      if (controller.signal.aborted) { stopLoop = true; return finishLoop(reply, "stopped"); }
-      if ((reply.staged || []).some((x) => !x.decided)) return finishLoop(reply, "review");
-      await runTools(reply);
-      if (controller.signal.aborted || stopLoop) return finishLoop(reply, "stopped");
-      return await continueIfNeeded(reply);
-    } finally {
-      if (state.controller === controller) {
-        state.controller = null;
-        renderComposer();
-      }
-    }
+    if (reply.error) return finishLoop(reply);
+    if ((reply.staged || []).some((x) => !x.decided)) return finishLoop(reply, "review");
+    await runTools(reply);
+    return continueIfNeeded(reply);
   }
 
   /** After the tools ran: send the results back and keep going, or stop and tell the user. */
   async function continueIfNeeded(reply) {
     const asked = parseAssistant(reply.content).tools.some((t) => t.type === "ask");
     const waiting = (reply.tools || []).some((t) => t.status === "waiting");
-    const results = (reply.tools || []).filter((t) => (t.status === "done" || t.status === "failed") && (F.agentTools.registry[t.type]?.feedback || !F.agentTools.registry[t.type]));
+    const results = (reply.tools || []).filter((t) => (t.status === "done" || t.status === "failed") && F.agentTools.registry[t.type]?.feedback);
     const editErrors = Object.entries(reply.editErrors || {});
     if (asked || waiting || stopLoop) return finishLoop(reply, asked ? "question" : waiting ? "approval" : "stopped");
     // A common failure mode is a model narrating that it will create a file, then ending
@@ -758,7 +693,7 @@
     const hasArtifacts = Boolean((reply.changes || []).length || parsedNow.files.some((x) => x.closed) || parsedNow.edits.length || parsedNow.tools.length);
     const narratedIntent = /\b(?:i(?:'| a)m going to|i(?:'| a)ll|now i|let me|i will|creating|writing|going to create|going to write)\b/i.test(parsedNow.prose || "")
       && /\b(?:file|index\.html|\.css|\.js|component|implement|create|write|run|execute)\b/i.test(parsedNow.prose || "");
-    if (reply.mode === "build" && !hasArtifacts && narratedIntent && turn.emptyBuildRetries < 1 && reply.step < maxTurnSteps()) {
+    if (reply.mode === "build" && !hasArtifacts && narratedIntent && turn.emptyBuildRetries < 1 && reply.step < MAX_STEPS()) {
       turn.emptyBuildRetries++;
       chat().messages.push({
         id: F.uid(), role: "user", auto: true, autoLabel: "Asked Fizz Code to apply the work instead of narrating",
@@ -772,20 +707,19 @@
       reply.error = "Fizz Code described the work but still did not create a file or run a tool. Try asking it to create the files directly, or check that the selected model supports the requested output format.";
     }
     const cut = reply.cutOff && reply.mode === "build";
-    if (cut && (turn.continues >= MAX_CONTINUES || reply.step >= maxTurnSteps())) {
+    if (cut && (turn.continues >= MAX_CONTINUES || reply.step >= MAX_STEPS())) {
       reply.content += "\n\n*The reply reached its maximum length — ask Fizz Code to continue.*";
       reply.loopStopped = true; save(); renderThread();
       return finishLoop(reply, "limit");
     }
     if (!cut && !results.length && !editErrors.length) return (await selfCheck(reply)) ? undefined : finishLoop(reply, "done");
-    if (reply.step >= maxTurnSteps()) { reply.loopStopped = true; save(); renderThread(); return finishLoop(reply, "limit"); }
+    if (reply.step >= MAX_STEPS()) { reply.loopStopped = true; save(); renderThread(); return finishLoop(reply, "limit"); }
     const parts = results.map((t) => `<tool-result tool="${t.type}" request="${esc(toolLabel(t)).slice(0, 200)}" ok="${t.status === "done"}">\n${scrubSecrets(String(t.result?.text || "").slice(0, 12_000))}\n</tool-result>`);
     for (const [path, err] of editErrors) parts.push(`<tool-result tool="edit" request="${esc(path)}" ok="false">\n${err}\nThe file was not changed. Send the edit again with SEARCH text copied exactly from the current file, or rewrite the whole file with <fizz-file>.\n</tool-result>`);
     const images = results.filter((t) => t.result?.sendImages !== false).flatMap((t) => (t.result?.images || []).slice(0, 2)).slice(0, 3).map((src, k) => ({ type: "image", name: `screenshot-${k + 1}.jpg`, mime: src.slice(5, src.indexOf(";")), data: src.split(",")[1] }));
-    let tail = "Continue the task from here. Diagnose failures from their exact output, inspect affected files and logs, and choose a materially different fix. Do not repeat the same failed command or tool call unchanged. If a tool outcome is unknown, inspect the current state before any retry. If everything works, finish with the updated <fizz-plan> and a short summary, without tool tags.";
+    let tail = "Continue the task from here. Fix anything that failed. If everything works, finish with the updated <fizz-plan> and a short summary, without tool tags.";
     if (cut) {
       turn.continues++;
-      persistTurn("running");
       const parsed = parseAssistant(reply.content);
       const open = [...parsed.files, ...parsed.edits].filter((f) => !f.closed).map((f) => f.path);
       const saved = (reply.changes || []).map((c) => c.path);
@@ -826,10 +760,9 @@
     const issues = Array.isArray(result?.issues) ? result.issues : [];
     const warnings = Array.isArray(result?.warnings) ? result.warnings : [];
     const skipped = Array.isArray(result?.skipped) ? result.skipped : [];
-    const canFix = issues.length && turn.verifies < MAX_VERIFIES && reply.step < maxTurnSteps() && !stopLoop;
+    const canFix = issues.length && turn.verifies < MAX_VERIFIES && reply.step < MAX_STEPS() && !stopLoop;
     if (canFix) {
       turn.verifies++;
-      persistTurn("running");
       reply.verified = { ok: false, count: issues.length, fixing: true, warnings: warnings.length, skipped };
       const notice = `Checked the project and found ${issues.length} problem${issues.length === 1 ? "" : "s"} — Fizz Code is fixing ${issues.length === 1 ? "it" : "them"}`;
       chat().messages.push({
@@ -855,8 +788,6 @@
   }
 
   function finishLoop(reply, why = "done") {
-    const status = reply.error ? "failed" : why === "done" ? "completed" : ["question", "approval", "review"].includes(why) ? "waiting" : why === "limit" ? "paused" : why;
-    persistTurn(status);
     renderAll();
     const c = chat();
     // Telegram updates (Settings → Tools): only for real work, not for plain answers.
@@ -885,25 +816,9 @@
     const ctx = toolContext(reply);
     const before = { ...project().files };
     for (const [idx, t] of reply.tools.entries()) {
-      if (stopLoop || ctx.signal?.aborted) break;
-      if (["done", "failed", "denied"].includes(t.status)) continue;
-      const fingerprint = String(t.type) + ":" + JSON.stringify(t.attrs || {}) + ":" + String(t.body || "").trim().replace(/\\s+/g, " ");
-      if ((turn.failedTools || []).includes(fingerprint)) {
-        t.status = "failed";
-        t.result = { ok: false, text: "This exact tool request already failed earlier in the current task. FIZZ DEV did not execute it again. Inspect the previous error and current project state, then choose a different command, parameters, or repair approach." };
-        save(); renderThread();
-        continue;
-      }
+      if (stopLoop) break;
       const def = F.agentTools.registry[t.type];
-      if (!def?.run || (def.available && !def.available())) {
-        t.status = "failed";
-        t.result = { ok: false, text: !def?.run ? "No executor is registered for the " + t.type + " tool. Do not claim it ran; use a supported tool or explain the limitation." : (def.unavailable || "The " + t.type + " tool is not available in this deployment.") };
-        turn.failedTools ||= [];
-        if (!turn.failedTools.includes(fingerprint)) turn.failedTools.push(fingerprint);
-        persistTurn("running");
-        save(); renderThread();
-        continue;
-      }
+      if (!def?.run || t.status === "done" || t.status === "failed" || t.status === "denied") continue;
       if (t.status !== "approved" && def.needsApproval?.(t, ctx)) {
         t.status = "waiting";
         save();
@@ -913,8 +828,6 @@
         continue;
       }
       t.status = "running";
-      t.startedAt = Date.now();
-      save();
       renderThread();
       try {
         const res = await def.run(t, ctx);
@@ -933,15 +846,8 @@
         t.result = { ok: false, text: e.message || String(e) };
         t.status = "failed";
       }
-      t.finishedAt = Date.now();
-      if (t.status === "failed") {
-        turn.failedTools ||= [];
-        if (!turn.failedTools.includes(fingerprint)) turn.failedTools.push(fingerprint);
-        persistTurn("running");
-      }
       save();
       renderThread();
-      if (stopLoop || ctx.signal?.aborted) break;
       void idx;
     }
     // Documents and images made in this step are shown to the user as file cards.
@@ -954,10 +860,9 @@
   /** What tools get to work with: the project, the terminal, previews and a way to add files. */
   function toolContext(reply) {
     return {
-      F, data, user, reply, project, save, esc, signal: state.controller?.signal,
+      F, data, user, reply, project, save, esc,
       term: () => ensureTerm(),
       writeFile: (path, content, meta = {}) => { const r = writeFile(path, content, { source: meta.source || "agent", msgId: reply.id }); renderTree(); renderHeader(); return r; },
-      removeFile: (path) => { removeFile(path, { source: "agent", msgId: reply.id }); renderTree(); renderHeader(); return true; },
       openFile: (path) => openFile(path, { focus: false }),
       showTab, refreshPreview, buildPreview,
       previewFrame: () => $("#preview"),
@@ -1053,7 +958,7 @@
     },
   });
 
-  function applyReply(reply, snapshot = null) {
+  function applyReply(reply) {
     const { files, edits, push } = parseAssistant(reply.content, { fences: reply.mode === "build" });
     reply.pushAsked = Boolean(push);
     reply.pushMessage = push?.message || "";
@@ -1062,21 +967,12 @@
     if (reply.mode !== "build" && reply.mode !== "do") return;
     const p = project();
     const proposals = [];
-    const conflicted = (path) => snapshot && F.agentContext?.fileChangedSinceSnapshot(snapshot, p.files, path);
     for (const f of files) {
       if (!f.closed || !validPath(f.path)) continue;
-      if (conflicted(f.path)) {
-        reply.editErrors[f.path] = "Skipped " + f.path + ": the project file changed while Fizz Code was working. The newer edit was preserved; review it and ask Fizz Code to retry against the current version.";
-        continue;
-      }
       proposals.push({ path: f.path, after: f.content, kind: "file" });
     }
     for (const e of edits) {
       if (!e.closed || !validPath(e.path)) continue;
-      if (conflicted(e.path)) {
-        reply.editErrors[e.path] = "Skipped " + e.path + ": the project file changed while Fizz Code was working. The newer edit was preserved; review it and ask Fizz Code to retry against the current version.";
-        continue;
-      }
       const current = proposals.findLast((x) => x.path === e.path)?.after ?? p.files[e.path];
       if (typeof current !== "string" || isBinary(current)) { reply.editErrors[e.path] = `${e.path} doesn't exist yet (or is binary). Create it with <fizz-file>.`; continue; }
       const res = applyHunks(current, e.hunks);
@@ -1088,20 +984,10 @@
       if (reply.staged.length) F.toast(`${reply.staged.length} change${reply.staged.length === 1 ? "" : "s"} ready for review`);
       return;
     }
-    commitProposals(reply, proposals, snapshot);
+    commitProposals(reply, proposals);
   }
-  function commitProposals(reply, proposals, snapshot = null) {
+  function commitProposals(reply, proposals) {
     for (const x of proposals) {
-      const hasStagedBaseline = Object.prototype.hasOwnProperty.call(x, "before");
-      const hasSnapshotBaseline = snapshot && Object.prototype.hasOwnProperty.call(snapshot, x.path);
-      if (hasStagedBaseline || snapshot) {
-        const expected = hasStagedBaseline ? x.before : hasSnapshotBaseline ? snapshot[x.path] : null;
-        const current = p.files[x.path] ?? null;
-        if (current !== expected) {
-          reply.editErrors[x.path] = "Skipped " + x.path + ": the file changed after Fizz Code prepared this change. Your current version was preserved; review it and regenerate the patch.";
-          continue;
-        }
-      }
       const res = writeFile(x.path, x.after, { source: "agent", msgId: reply.id });
       if (res) {
         const prev = reply.changes.find((c) => c.path === x.path);
@@ -1231,7 +1117,7 @@
   }
 
   async function send() {
-    if (state.controller) { stopLoop = true; state.controller.abort(); renderComposer(); return; }
+    if (state.controller) { state.controller.abort(); return; }
     const input = $("#input");
     const text = input.value.trim();
     if (!text && !state.pending.length) return;
@@ -1333,12 +1219,7 @@
         projectName: () => project().name,
         userName: () => user.name || user.email?.split("@")[0] || "user",
         sandboxAvailable: () => Boolean(F.serverStatusCached?.()?.tools?.sandbox),
-        sandbox: (cmd, opts) => F.cloudTools.sandbox(cmd, {
-          ...opts,
-          project: project(),
-          write: (p, c) => { writeFile(p, c, { source: "terminal" }); save(); renderTree(); renderHeader(); if (p === state.file) renderEditor(); },
-          removeFile: (p) => { removeFile(p, { source: "terminal" }); save(); renderTree(); renderHeader(); renderEditor(); },
-        }),
+        sandbox: (cmd, opts) => F.cloudTools.sandbox(cmd, { ...opts, project: project(), write: (p, c) => { writeFile(p, c, { source: "terminal" }); save(); renderTree(); renderHeader(); if (p === state.file) renderEditor(); } }),
       });
       return term;
   }
@@ -2550,40 +2431,22 @@
     });
   };
 
-  // Recover unfinished replies and tool calls after a browser restore/discard.
-  // A running tool may already have caused a side effect; never replay it automatically.
+  // Recover unfinished replies after a browser restore/discard. Only persisted output is retained.
   for (const p of data.projects) {
     for (const c of p.chats || []) {
-      let interruptedTask = false;
       for (const m of c.messages || []) {
-        if (m.role !== "assistant") continue;
-        if (m.pending) {
+        if (m.role === "assistant" && m.pending) {
           m.pending = false;
           m.interrupted = true;
           m.error = "";
           m.content = String(m.content || "");
           m.doneAt = Date.now();
-          interruptedTask = true;
-        }
-        for (const tool of m.tools || []) {
-          if (tool.status === "running") {
-            tool.status = "failed";
-            tool.finishedAt = Date.now();
-            tool.result = { ok: false, text: "The browser stopped waiting while this tool was running. Its final side-effect status is unknown. Inspect the current project or service state before deciding whether to retry; FIZZ will not replay it automatically." };
-            m.interrupted = true;
-            interruptedTask = true;
-          }
         }
       }
-      if (c.agentTask && (c.agentTask.status === "running" || c.agentTask.status === "stopping")) {
-        c.agentTask.status = "interrupted";
-        c.agentTask.updatedAt = Date.now();
-        interruptedTask = true;
-      }
-      if (interruptedTask && c.agentTask) c.agentTask.interruptedAt = Date.now();
     }
   }
   save();
+
   // ---------- boot ----------
   app.dataset.panel = ui.panel === "closed" ? "closed" : "open";
   F.settings.handleRedirects(settingsCtx);
