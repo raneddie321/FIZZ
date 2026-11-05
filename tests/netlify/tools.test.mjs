@@ -145,7 +145,7 @@ class FakeSandbox {
     }
     const runId = /\/tmp\/fizz-([0-9a-f-]{36})-changed/.exec(script)?.[1];
     assert.ok(runId, "each sandbox execution gets unique tracking paths");
-    const id = \`cmd_\${Object.keys(this.commands).length + 1}\`;
+    const id = "cmd_" + (Object.keys(this.commands).length + 1);
     const slow = script.includes("sleep 100");
     const c = {
       cmdId: id,
@@ -154,15 +154,15 @@ class FakeSandbox {
       runId,
     };
     if (!slow && script.includes("make-overflow")) {
-      const paths = Array.from({ length: 201 }, (_, i) => \`dist/overflow-\${i}.txt\`);
-      for (const path of paths) this.fs[\`/vercel/sandbox/app/\${path}\`] = Buffer.from("x");
-      this.fs[\`/tmp/fizz-\${runId}-changed\`] = Buffer.from(paths.map((path) => "./" + path).join("\n") + "\n");
-      this.fs[\`/tmp/fizz-\${runId}-deleted\`] = Buffer.from("");
+      const paths = Array.from({ length: 201 }, (_, i) => "dist/overflow-" + i + ".txt");
+      for (const path of paths) this.fs["/vercel/sandbox/app/" + path] = Buffer.from("x");
+      this.fs["/tmp/fizz-" + runId + "-changed"] = Buffer.from(paths.map((path) => "./" + path).join("\n") + "\n");
+      this.fs["/tmp/fizz-" + runId + "-deleted"] = Buffer.from("");
     } else if (!slow) {
       this.fs["/vercel/sandbox/app/dist/out.txt"] = Buffer.from("hello");
       this.fs["/vercel/sandbox/app/dist/app.bin"] = Buffer.from([0, 1, 2, 3]);
-      this.fs[\`/tmp/fizz-\${runId}-changed\`] = Buffer.from("./dist/out.txt\n./dist/app.bin\n");
-      this.fs[\`/tmp/fizz-\${runId}-deleted\`] = Buffer.from("./src/old.txt\n");
+      this.fs["/tmp/fizz-" + runId + "-changed"] = Buffer.from("./dist/out.txt\n./dist/app.bin\n");
+      this.fs["/tmp/fizz-" + runId + "-deleted"] = Buffer.from("./src/old.txt\n");
     }
     this.commands[id] = c;
     assert.equal(detached, true);
