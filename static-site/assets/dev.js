@@ -642,7 +642,16 @@
       const r = await F.aiStream(data.settings, {
         system: systemPrompt(skills, { mentions: lastUser.mentions || [], mcpMentions: lastUser.mcpMentions || [], selection: lastUser.selection || null, text: lastUser.content || "" }),
         messages: c.messages.slice(0, -1).map((m) => (m.summary ? { ...m, role: "user" } : m)), signal: state.controller.signal,
-        onText: (_d, full) => { reply.content = full; if (Date.now() - last > 70) { last = Date.now(); renderThread(); } },
+        onText: (_d, full) => {
+          reply.content = full;
+          const now = Date.now();
+          if (now - last > 350) {
+            last = now;
+            // Persist checkpoints because mobile browsers may freeze background tabs.
+            save();
+            if (active()) renderThread();
+          }
+        },
       });
       reply.content = r.text;
       if (r.stop === "refusal" && !r.text) reply.error = "Fizz Code can't help with that request.";
@@ -2421,6 +2430,22 @@
       button.setAttribute("aria-current", String(button.dataset.mobileView === view));
     });
   };
+
+  // Recover unfinished replies after a browser restore/discard. Only persisted output is retained.
+  for (const p of data.projects) {
+    for (const c of p.chats || []) {
+      for (const m of c.messages || []) {
+        if (m.role === "assistant" && m.pending) {
+          m.pending = false;
+          m.interrupted = true;
+          m.error = "";
+          m.content = String(m.content || "");
+          m.doneAt = Date.now();
+        }
+      }
+    }
+  }
+  save();
 
   // ---------- boot ----------
   app.dataset.panel = ui.panel === "closed" ? "closed" : "open";
