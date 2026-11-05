@@ -742,7 +742,7 @@
       return finishLoop(reply, "limit");
     }
     if (!cut && !results.length && !editErrors.length) return (await selfCheck(reply)) ? undefined : finishLoop(reply, "done");
-    if (reply.step >= MAX_STEPS()) { reply.loopStopped = true; save(); renderThread(); return finishLoop(reply, "limit"); }
+    if (reply.step >= maxTurnSteps()) { reply.loopStopped = true; save(); renderThread(); return finishLoop(reply, "limit"); }
     const parts = results.map((t) => `<tool-result tool="${t.type}" request="${esc(toolLabel(t)).slice(0, 200)}" ok="${t.status === "done"}">\n${scrubSecrets(String(t.result?.text || "").slice(0, 12_000))}\n</tool-result>`);
     for (const [path, err] of editErrors) parts.push(`<tool-result tool="edit" request="${esc(path)}" ok="false">\n${err}\nThe file was not changed. Send the edit again with SEARCH text copied exactly from the current file, or rewrite the whole file with <fizz-file>.\n</tool-result>`);
     const images = results.filter((t) => t.result?.sendImages !== false).flatMap((t) => (t.result?.images || []).slice(0, 2)).slice(0, 3).map((src, k) => ({ type: "image", name: `screenshot-${k + 1}.jpg`, mime: src.slice(5, src.indexOf(";")), data: src.split(",")[1] }));
@@ -790,7 +790,7 @@
     const issues = Array.isArray(result?.issues) ? result.issues : [];
     const warnings = Array.isArray(result?.warnings) ? result.warnings : [];
     const skipped = Array.isArray(result?.skipped) ? result.skipped : [];
-    const canFix = issues.length && turn.verifies < MAX_VERIFIES && reply.step < MAX_STEPS() && !stopLoop;
+    const canFix = issues.length && turn.verifies < MAX_VERIFIES && reply.step < maxTurnSteps() && !stopLoop;
     if (canFix) {
       turn.verifies++;
       persistTurn("running");
