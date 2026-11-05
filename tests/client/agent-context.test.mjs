@@ -37,8 +37,6 @@ assert.ok(result.files.includes("src/main.tsx"), "entry-point imports are follow
 assert.ok(result.files.includes("src/App.tsx"), "transitive local imports are followed");
 assert.ok(result.files.includes("src/components/LoginPanel.tsx"), "second-level local imports are followed");
 assert.ok(result.text.includes('path="public/logo.png" binary="true"'), "binary files are represented without sending their contents");
-assert.ok(result.files.includes("src/components/LoginPanel.tsx"), "second-level local imports are followed");
-assert.ok(result.text.includes('path="public/logo.png" binary="true"'), "binary files are represented without sending their contents");
 assert.ok(result.files.includes("src/auth/session.ts"), "task-relevant files are retrieved");
 assert.ok(!result.files.some((path) => path.includes("node_modules") || path.startsWith(".git/")), "generated and VCS folders are excluded");
 assert.ok(result.usedChars <= result.budgetChars, "retrieved context stays within the requested character budget");
