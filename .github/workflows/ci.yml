@@ -26,6 +26,7 @@ jobs:
           node --check static-site/assets/dev.js
           node --check static-site/assets/agent-context.js
           node --check static-site/assets/cloud-tools.js
+          node --check static-site/assets/terminal.js
           node --check netlify/lib/sandbox.mjs
           node --check static-site/assets/settings.js
           node --check netlify/lib/ai-chat-core.mjs
