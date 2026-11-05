@@ -20,7 +20,7 @@ const files = {
   "src/aaa/unrelated.ts": "export const unrelated = true;",
   "node_modules/react/index.js": "must never be sent",
   ".git/config": "must never be sent",
-  "public/logo.png": "\\u0000blob:public/logo.png",
+  "public/logo.png": "\u0000blob:public/logo.png",
 };
 
 const result = context.buildProjectContext(files, {
@@ -41,7 +41,7 @@ assert.ok(result.usedChars <= result.budgetChars, "retrieved context stays withi
 assert.ok(result.text.includes("authentication login session flow"), "relevant implementation lines are included");
 assert.ok(!result.text.includes("must never be sent"), "ignored files never leak into context");
 
-const longFile = ["// header", ...Array.from({ length: 600 }, (_, i) => "const line" + i + " = \"unrelated\";"), "// AUTHENTICATION CHECKPOINT UNIQUE_MARKER", "export function verifyLogin(){ return true; }"].join("\\n");
+const longFile = ["// header", ...Array.from({ length: 600 }, (_, i) => "const line" + i + " = \"unrelated\";"), "// AUTHENTICATION CHECKPOINT UNIQUE_MARKER", "export function verifyLogin(){ return true; }"].join("\n");
 const excerpt = context.excerpt(longFile, ["authentication", "checkpoint", "verifyLogin"], 1_800);
 assert.ok(excerpt.includes("UNIQUE_MARKER"), "long files include matching sections beyond the beginning");
 assert.ok(excerpt.length <= 1_850, "long-file excerpts respect their bounded size with a small marker allowance");
