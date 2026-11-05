@@ -71,7 +71,7 @@ export async function run({ userId, projectId, files = {}, cmd, waitMs = 45000, 
   const boundedWaitMs = Number.isFinite(Number(waitMs)) ? Math.max(1000, Math.min(45000, Number(waitMs))) : 45000;
   await sbx.runCommand({ cmd: "mkdir", args: ["-p", APP] });
   if (list.length) await sbx.writeFiles(list.map(([projectPath, value]) => ({ path: `${APP}/${projectPath}`, content: Buffer.from(value) })));
-  const script = `cd ${APP} && touch /tmp/fizz-start && (${cmd}) 2>&1; code=$?; find . -newer /tmp/fizz-start -type f -not -path './node_modules/*' -not -path './.git/*' -not -path '*/__pycache__/*' -size -400k 2>/dev/null | head -100 > /tmp/fizz-changed; exit $code`;
+  const script = `cd ${APP} && find . -type f -not -path './node_modules/*' -not -path './.git/*' -not -path '*/__pycache__/*' 2>/dev/null | sort > /tmp/fizz-before && touch /tmp/fizz-start && (${cmd}) 2>&1; code=$?; find . -newer /tmp/fizz-start -type f -not -path './node_modules/*' -not -path './.git/*' -not -path '*/__pycache__/*' -size -400k 2>/dev/null | head -100 > /tmp/fizz-changed; find . -type f -not -path './node_modules/*' -not -path './.git/*' -not -path '*/__pycache__/*' 2>/dev/null | sort > /tmp/fizz-after; comm -23 /tmp/fizz-before /tmp/fizz-after | head -100 > /tmp/fizz-deleted; exit $code`;
   const command = await sbx.runCommand({ cmd: "bash", args: ["-lc", script], detached: true });
   if (background) return { running: true, cmdId: command.cmdId, url: sbx.domain(PORT), text: `Started in the background. If it serves on port ${PORT}, it's at ${sbx.domain(PORT)}` };
   return collect(sbx, command, boundedWaitMs);
@@ -89,7 +89,8 @@ async function collect(sbx, command, waitMs) {
   if (!done) return { running: true, cmdId: command.cmdId, text: (await safeOutput(command)).slice(-6000) };
   const text = (await done.output("both")).slice(-20000);
   const changed = await changedFiles(sbx);
-  return { running: false, exitCode: done.exitCode, text, files: changed, url: sbx.domain(PORT) };
+  const deleted = await deletedFiles(sbx);
+  return { running: false, exitCode: done.exitCode, text, files: changed, deleted, url: sbx.domain(PORT) };
 }
 const safeOutput = async (c) => { try { return await c.output("both"); } catch { return ""; } };
 
@@ -104,6 +105,14 @@ async function changedFiles(sbx) {
     out[p] = /[\u0000-\u0008\u000E-\u001F]/.test(text.slice(0, 2000)) ? { base64: b.toString("base64") } : text;
   }
   return out;
+}
+
+async function deletedFiles(sbx) {
+  const listBuf = await sbx.readFileToBuffer({ path: "/tmp/fizz-deleted" });
+  return String(listBuf || "").split("\\n")
+    .map((line) => line.replace(/^\\.\\//, "").trim())
+    .filter((path) => safeProjectPath(path))
+    .slice(0, 100);
 }
 
 /** Picks up a command that was still running. */
