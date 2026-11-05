@@ -42,10 +42,10 @@
 
   // ---------- the cloud sandbox ----------
   const textFiles = (files) => Object.fromEntries(Object.entries(files).filter(([p, v]) => typeof v === "string" && !F.blobs.isBlob(v) && !/^(node_modules|\.fizz-build|\.fizz-out)\//.test(p)));
-  async function bringBack(files, ctx) {
+  async function bringBack(files, ctx, deleted = []) {
     const changed = [];
     for (const [path, v] of Object.entries(files || {})) {
-      if (!path || path.split("/").some((s) => !s || s === "..")) continue;
+      if (!path || path.split("/").some((part) => !part || part === "." || part === "..")) continue;
       if (typeof v === "string") { if (ctx.project().files[path] !== v) { ctx.writeFile(path, v, { source: "agent" }); changed.push(path); } continue; }
       if (v?.base64) {
         const bin = atob(v.base64);
@@ -55,19 +55,27 @@
         changed.push(path);
       }
     }
-    return changed;
+    const removed = [];
+    const skippedDeleted = [];
+    for (const path of deleted || []) {
+      if (!path || path.split("/").some((part) => !part || part === "." || part === "..")) continue;
+      if (ctx.project().files[path] === undefined) continue;
+      if (typeof ctx.removeFile !== "function") { skippedDeleted.push(path); continue; }
+      ctx.removeFile(path);
+      removed.push(path);
+    }
+    return { changed, removed, skippedDeleted };
   }
 
-  /** Runs a command in the cloud sandbox for the terminal: { text, exitCode, changed, url }. */
-  async function sandbox(cmd, { project, write, background = false, isStopped = () => false }) {
+  /** Runs a command in the cloud sandbox for the terminal: { text, exitCode, changed, deleted, url }. */
+  async function sandbox(cmd, { project, write, removeFile, background = false, isStopped = () => false }) {
     let r = await F.conn.sandbox({ action: "run", projectId: project.id, cmd, background, files: textFiles(project.files) });
     const started = Date.now();
     while (r.running && !background && !isStopped() && Date.now() - started < 10 * 60_000) r = await F.conn.sandbox({ action: "wait", projectId: project.id, cmdId: r.cmdId });
-    const changed = await bringBack(r.files, { project: () => project, writeFile: (p, c) => write(p, c) });
-    return { text: String(r.text || ""), exitCode: r.running && !background ? 124 : r.exitCode, changed, url: r.url };
+    const sync = await bringBack(r.files, { project: () => project, writeFile: (p, c) => write(p, c), removeFile }, r.deleted);
+    return { text: String(r.text || ""), exitCode: r.running && !background ? 124 : r.exitCode, changed: sync.changed, deleted: sync.removed, skippedDeleted: sync.skippedDeleted, url: r.url };
   }
   F.cloudTools = { sandbox };
-
   F.agentTools.register("sandbox", {
     icon: "box", feedback: true,
     label: (t) => `${t.attrs.background === "true" ? "Started" : "Ran"} in the cloud: ${t.body.split("\n")[0].slice(0, 110)}`,
