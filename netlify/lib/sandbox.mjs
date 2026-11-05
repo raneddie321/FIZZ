@@ -78,7 +78,14 @@ export async function run({ userId, projectId, files = {}, cmd, waitMs = 45000, 
 }
 
 async function collect(sbx, command, waitMs) {
-  const done = await Promise.race([command.wait(), new Promise((r) => setTimeout(() => r(null), waitMs))]);
+  let timer;
+  let done;
+  try {
+    const timeout = new Promise((resolve) => { timer = setTimeout(() => resolve(null), waitMs); });
+    done = await Promise.race([command.wait(), timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
   if (!done) return { running: true, cmdId: command.cmdId, text: (await safeOutput(command)).slice(-6000) };
   const text = (await done.output("both")).slice(-20000);
   const changed = await changedFiles(sbx);
