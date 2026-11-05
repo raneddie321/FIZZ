@@ -40,6 +40,10 @@ assert.ok(result.text.includes('path="public/logo.png" binary="true"'), "binary 
 assert.ok(result.files.includes("src/auth/session.ts"), "task-relevant files are retrieved");
 assert.ok(!result.files.some((path) => path.includes("node_modules") || path.startsWith(".git/")), "generated and VCS folders are excluded");
 assert.ok(result.usedChars <= result.budgetChars, "retrieved context stays within the requested character budget");
+assert.equal(context.fileChangedSinceSnapshot({ "src/a.js": "before" }, { "src/a.js": "after" }, "src/a.js"), true, "edits made during generation are detected");
+assert.equal(context.fileChangedSinceSnapshot({ "src/a.js": "before" }, { "src/a.js": "before" }, "src/a.js"), false, "unchanged files can be safely updated");
+assert.equal(context.fileChangedSinceSnapshot({}, { "new.js": "created elsewhere" }, "new.js"), true, "a file created while generation is running is protected");
+assert.equal(context.fileChangedSinceSnapshot({ "old.js": "value" }, {}, "old.js"), true, "a file deleted while generation is running is protected");
 assert.ok(result.text.includes("authentication login session flow"), "relevant implementation lines are included");
 assert.ok(!result.text.includes("must never be sent"), "ignored files never leak into context");
 
