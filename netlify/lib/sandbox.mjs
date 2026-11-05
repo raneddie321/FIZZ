@@ -63,9 +63,10 @@ export async function run({ userId, projectId, files = {}, cmd, waitMs = 45000, 
   if (entries.length > FILE_LIMIT) throw Object.assign(new Error(`Too many project files (maximum ${FILE_LIMIT}).`), { status: 413 });
   const list = [];
   for (const [original, content] of entries) {
-    if (typeof content !== "string" || original.split("/").some((part) => part === "node_modules")) continue;
+    if (typeof content !== "string") continue;
     const projectPath = safeProjectPath(original);
     if (!projectPath) throw Object.assign(new Error(`Unsafe project file path: ${original.slice(0, 80)}`), { status: 400 });
+    if (projectPath.split("/").includes("node_modules")) continue;
     list.push([projectPath, content]);
   }
   const total = list.reduce((n, [, value]) => n + Buffer.byteLength(value, "utf8"), 0);
@@ -109,7 +110,7 @@ export async function run({ userId, projectId, files = {}, cmd, waitMs = 45000, 
   const deletedPath = meta + "-deleted";
   const script = [
     `cd ${APP} || exit $?`,
-    `find . -type f -not -path './node_modules/*' -not -path './.git/*' -not -path './.next/*' -not -path './dist/*' -not -path './build/*' -not -path '*/__pycache__/*' 2>/dev/null | sort > ${beforePath}`,
+    `find . -type f -not -path './node_modules/*' -not -path './.git/*' -not -path '*/__pycache__/*' 2>/dev/null | sort > ${beforePath}`,
     `touch ${startedPath}`,
     `(${cmd}) 2>&1`,
     "code=$?",
@@ -167,7 +168,8 @@ async function changedFiles(sbx, runId = null) {
     }
     totalBytes += b.length;
     const text = b.toString("utf8");
-    out[p] = /[\u0000-\u0008\u000E-\u001F]/.test(text.slice(0, 2000)) ? { base64: b.toString("base64") } : text;
+    const isBinary = !Buffer.from(text, "utf8").equals(b) || /[\\u0000-\\u0008\\u000E-\\u001F]/.test(text.slice(0, 2000));
+    out[p] = isBinary ? { base64: b.toString("base64") } : text;
   }
   return { files: out, warnings };
 }
