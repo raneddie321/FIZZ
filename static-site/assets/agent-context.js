@@ -81,6 +81,7 @@
     return out.join("\n") + "\n[…excerpt selected by task relevance…]";
   }
 
+  const attr = (value) => String(value).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   function buildProjectContext(files, options = {}) {
     const entries = Object.entries(files || {}).filter(([path]) => path && !IGNORE.test(path) && !path.includes("/node_modules/"));
     const known = new Set(entries.map(([path]) => path));
@@ -90,10 +91,17 @@
     const index = new Map(entries.map(([path, value]) => [path, value]));
     const dependencySet = new Set();
     const seed = [...mentions, ...entries.filter(([path]) => path === "FIZZ.md" || CONFIG.test(path) || ENTRY.test(path)).map(([path]) => path)].slice(0, 16);
-    for (const path of seed) {
-      const value = index.get(path);
-      if (typeof value === "string" && !BINARY.test(value)) {
-        for (const dep of dependencies(path, value.slice(0, 80_000), known)) dependencySet.add(dep);
+    const queue = seed.map((path) => ({ path, depth: 0 }));
+    const visited = new Set();
+    while (queue.length) {
+      const current = queue.shift();
+      if (visited.has(current.path)) continue;
+      visited.add(current.path);
+      const value = index.get(current.path);
+      if (typeof value !== "string" || BINARY.test(value)) continue;
+      for (const dep of dependencies(current.path, value.slice(0, 80_000), known)) {
+        dependencySet.add(dep);
+        if (current.depth < 2 && !visited.has(dep)) queue.push({ path: dep, depth: current.depth + 1 });
       }
     }
     const ranked = entries.map(([path, value], order) => {
@@ -122,7 +130,7 @@
       if (selected.length >= (Number(options.maxFiles) || 80) || remaining < 500) break;
       if (typeof item.value !== "string" || BINARY.test(item.value)) {
         const body = typeof item.value === "string" ? "[binary file; content not sent]" : "[non-text file; content not sent]";
-        const block = '<fizz-file path="' + item.path.replace(/[&<>"']/g, "") + '" binary="true">' + body + "</fizz-file>";
+        const block = '<fizz-file path="' + attr(item.path) + '" binary="true">' + body + "</fizz-file>";
         if (block.length > remaining) continue;
         blocks.push(block); selected.push(item.path); remaining -= block.length;
         continue;
