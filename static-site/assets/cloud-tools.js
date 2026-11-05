@@ -71,9 +71,18 @@
   async function sandbox(cmd, { project, write, removeFile, background = false, isStopped = () => false }) {
     let r = await F.conn.sandbox({ action: "run", projectId: project.id, cmd, background, files: textFiles(project.files) });
     const started = Date.now();
-    while (r.running && !background && !isStopped() && Date.now() - started < 10 * 60_000) r = await F.conn.sandbox({ action: "wait", projectId: project.id, cmdId: r.cmdId });
+    while (r.running && !background && !isStopped() && Date.now() - started < 10 * 60_000) r = await F.conn.sandbox({ action: "wait", projectId: project.id, cmdId: r.cmdId, runId: r.runId });
     const sync = await bringBack(r.files, { project: () => project, writeFile: (p, c) => write(p, c), removeFile }, r.deleted);
-    return { text: String(r.text || ""), exitCode: r.running && !background ? 124 : r.exitCode, changed: sync.changed, deleted: sync.removed, skippedDeleted: sync.skippedDeleted, url: r.url };
+    return {
+      text: String(r.text || ""),
+      exitCode: r.running && !background ? 124 : r.exitCode,
+      changed: sync.changed,
+      deleted: sync.removed,
+      skippedDeleted: sync.skippedDeleted,
+      syncWarnings: r.syncWarnings || [],
+      runId: r.runId,
+      url: r.url,
+    };
   }
   F.cloudTools = { sandbox };
   F.agentTools.register("sandbox", {
@@ -95,7 +104,7 @@
         ctx.rerender();
         try {
           // Polling is abortable. The detached Linux command may outlive this browser request.
-          r = await F.conn.sandbox({ action: "wait", projectId, cmdId: r.cmdId }, ctx.signal);
+          r = await F.conn.sandbox({ action: "wait", projectId, cmdId: r.cmdId, runId: r.runId }, ctx.signal);
         } catch (error) {
           if (!ctx.signal?.aborted) throw error;
           break;
@@ -115,7 +124,8 @@
       if (sync.changed.length) parts.push("Files updated in the project: " + sync.changed.slice(0, 40).join(", ") + (sync.changed.length > 40 ? " and " + (sync.changed.length - 40) + " more" : ""));
       if (sync.removed.length) parts.push("Files deleted from the project: " + sync.removed.slice(0, 40).join(", ") + (sync.removed.length > 40 ? " and " + (sync.removed.length - 40) + " more" : ""));
       if (sync.skippedDeleted.length) parts.push("Could not sync deletions because no delete handler was provided: " + sync.skippedDeleted.join(", "));
-      return { ok: background || (r.exitCode === 0 && sync.skippedDeleted.length === 0), text: parts.join("\\n"), files: changed, html: background && r.url ? '<div class="web-read"><a href="' + esc(r.url) + '" target="_blank" rel="noopener">Open ' + esc(host(r.url)) + "</a></div>" : undefined };
+      if (r.syncWarnings?.length) parts.push("SYNC WARNINGS — some sandbox file changes did not return to the project:\n" + r.syncWarnings.join("\n"));
+      return { ok: background || (r.exitCode === 0 && sync.skippedDeleted.length === 0 && !r.syncWarnings?.length), text: parts.join("\\n"), files: changed, html: background && r.url ? '<div class="web-read"><a href="' + esc(r.url) + '" target="_blank" rel="noopener">Open ' + esc(host(r.url)) + "</a></div>" : undefined };
     },
   });
 })();
