@@ -42,14 +42,10 @@
 
   // ---------- the cloud sandbox ----------
   const textFiles = (files) => Object.fromEntries(Object.entries(files).filter(([p, v]) => typeof v === "string" && !F.blobs.isBlob(v) && !/^(node_modules|\.fizz-build|\.fizz-out)\//.test(p)));
-  async function bringBack(files, ctx, deleted = [], baseline = null) {
+  async function bringBack(files, ctx) {
     const changed = [];
-    const conflicts = [];
-    const hasConflict = (path) => baseline
-      && F.agentContext?.fileChangedSinceSnapshot(baseline, ctx.project().files, path);
     for (const [path, v] of Object.entries(files || {})) {
-      if (!path || path.split("/").some((part) => !part || part === "." || part === "..")) continue;
-      if (hasConflict(path)) { conflicts.push(path); continue; }
+      if (!path || path.split("/").some((s) => !s || s === "..")) continue;
       if (typeof v === "string") { if (ctx.project().files[path] !== v) { ctx.writeFile(path, v, { source: "agent" }); changed.push(path); } continue; }
       if (v?.base64) {
         const bin = atob(v.base64);
@@ -59,39 +55,19 @@
         changed.push(path);
       }
     }
-    const removed = [];
-    const skippedDeleted = [];
-    for (const path of deleted || []) {
-      if (!path || path.split("/").some((part) => !part || part === "." || part === "..")) continue;
-      if (ctx.project().files[path] === undefined) continue;
-      if (hasConflict(path)) { conflicts.push(path); continue; }
-      if (typeof ctx.removeFile !== "function") { skippedDeleted.push(path); continue; }
-      ctx.removeFile(path);
-      removed.push(path);
-    }
-    return { changed, removed, skippedDeleted, conflicts: [...new Set(conflicts)] };
+    return changed;
   }
 
-  /** Runs a command in the cloud sandbox for the terminal: { text, exitCode, changed, deleted, url }. */
-  async function sandbox(cmd, { project, write, removeFile, background = false, isStopped = () => false }) {
-    const baseline = Object.assign(Object.create(null), project.files);
+  /** Runs a command in the cloud sandbox for the terminal: { text, exitCode, changed, url }. */
+  async function sandbox(cmd, { project, write, background = false, isStopped = () => false }) {
     let r = await F.conn.sandbox({ action: "run", projectId: project.id, cmd, background, files: textFiles(project.files) });
     const started = Date.now();
-    while (r.running && !background && !isStopped() && Date.now() - started < 10 * 60_000) r = await F.conn.sandbox({ action: "wait", projectId: project.id, cmdId: r.cmdId, runId: r.runId });
-    const sync = await bringBack(r.files, { project: () => project, writeFile: (p, c) => write(p, c), removeFile }, r.deleted, baseline);
-    return {
-      text: String(r.text || ""),
-      exitCode: r.running && !background ? 124 : r.exitCode,
-      changed: sync.changed,
-      deleted: sync.removed,
-      skippedDeleted: sync.skippedDeleted,
-      conflicts: sync.conflicts,
-      syncWarnings: r.syncWarnings || [],
-      runId: r.runId,
-      url: r.url,
-    };
+    while (r.running && !background && !isStopped() && Date.now() - started < 10 * 60_000) r = await F.conn.sandbox({ action: "wait", projectId: project.id, cmdId: r.cmdId });
+    const changed = await bringBack(r.files, { project: () => project, writeFile: (p, c) => write(p, c) });
+    return { text: String(r.text || ""), exitCode: r.running && !background ? 124 : r.exitCode, changed, url: r.url };
   }
   F.cloudTools = { sandbox };
+
   F.agentTools.register("sandbox", {
     icon: "box", feedback: true,
     label: (t) => `${t.attrs.background === "true" ? "Started" : "Ran"} in the cloud: ${t.body.split("\n")[0].slice(0, 110)}`,
@@ -104,37 +80,22 @@
       if (!cmd) return { ok: false, text: "The command was empty." };
       const projectId = ctx.project().id;
       const background = t.attrs.background === "true";
-      const baseline = Object.assign(Object.create(null), ctx.project().files);
       let r = await F.conn.sandbox({ action: "run", projectId, cmd, background, files: textFiles(ctx.project().files) });
       const started = Date.now();
-      while (r.running && !background && !ctx.signal?.aborted && Date.now() - started < 10 * 60_000) {
+      while (r.running && !background && Date.now() - started < 10 * 60_000) {
         t.progress = r.text;
         ctx.rerender();
-        try {
-          // Polling is abortable. The detached Linux command may outlive this browser request.
-          r = await F.conn.sandbox({ action: "wait", projectId, cmdId: r.cmdId, runId: r.runId }, ctx.signal);
-        } catch (error) {
-          if (!ctx.signal?.aborted) throw error;
-          break;
-        }
+        r = await F.conn.sandbox({ action: "wait", projectId, cmdId: r.cmdId });
       }
-      if (ctx.signal?.aborted && r.running) {
-        return { ok: false, text: "Stopped waiting for command " + (r.cmdId || "(command id unavailable)") + ". The detached Linux process may still be running; its final result is unknown. Inspect the project/process state before retrying. Last output:\n" + String(r.text || "").slice(-6000) };
-      }
-      if (r.running && !background) return { ok: false, text: "Still running after 10 minutes, so FIZZ stopped waiting. Command id: " + (r.cmdId || "unknown") + ". Output so far:\n" + r.text };
-      const sync = await bringBack(r.files, ctx, r.deleted, baseline);
-      const changed = [...sync.changed, ...sync.removed];
+      if (r.running && !background) return { ok: false, text: `Still running after 10 minutes, so FIZZ stopped waiting. Output so far:\n${r.text}` };
+      const changed = await bringBack(r.files, ctx);
       if (changed.length) ctx.rerender();
       const out = String(r.text || "").trim();
-      const parts = ["$ " + cmd, out || "(no output)"];
-      if (background) parts.push("Running in the background. Public link (port 3000): " + r.url);
-      else parts.push("[exit code " + r.exitCode + "]");
-      if (sync.changed.length) parts.push("Files updated in the project: " + sync.changed.slice(0, 40).join(", ") + (sync.changed.length > 40 ? " and " + (sync.changed.length - 40) + " more" : ""));
-      if (sync.removed.length) parts.push("Files deleted from the project: " + sync.removed.slice(0, 40).join(", ") + (sync.removed.length > 40 ? " and " + (sync.removed.length - 40) + " more" : ""));
-      if (sync.skippedDeleted.length) parts.push("Could not sync deletions because no delete handler was provided: " + sync.skippedDeleted.join(", "));
-      if (sync.conflicts.length) parts.push("FILE CONFLICTS — preserved newer project edits instead of overwriting: " + sync.conflicts.join(", "));
-      if (r.syncWarnings?.length) parts.push("SYNC WARNINGS — some sandbox file changes did not return to the project:\n" + r.syncWarnings.join("\n"));
-      return { ok: background || (r.exitCode === 0 && sync.skippedDeleted.length === 0 && sync.conflicts.length === 0 && !r.syncWarnings?.length), text: parts.join("\\n"), files: changed, html: background && r.url ? '<div class="web-read"><a href="' + esc(r.url) + '" target="_blank" rel="noopener">Open ' + esc(host(r.url)) + "</a></div>" : undefined };
+      const parts = [`$ ${cmd}`, out || "(no output)"];
+      if (background) parts.push(`Running in the background. Public link (port 3000): ${r.url}`);
+      else parts.push(`[exit code ${r.exitCode}]`);
+      if (changed.length) parts.push(`Files updated in the project: ${changed.slice(0, 40).join(", ")}${changed.length > 40 ? ` and ${changed.length - 40} more` : ""}`);
+      return { ok: background || r.exitCode === 0, text: parts.join("\n"), files: changed, html: background && r.url ? `<div class="web-read"><a href="${esc(r.url)}" target="_blank" rel="noopener">Open ${esc(host(r.url))}</a></div>` : undefined };
     },
   });
 })();
