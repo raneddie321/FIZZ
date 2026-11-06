@@ -666,3 +666,13 @@
   .mobile-view-menu { display: inline-flex; width: 34px; height: 34px; flex: none; }
   .dev-top .proj-title { flex: 1; }
 }
+
+
+/* Attachment/skills menu: stay inside the viewport and remain scrollable. */
+.menu { box-sizing: border-box; max-height: calc(100dvh - 16px); overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.menu-mobile-head { display: none; }
+@media (max-width: 760px) {
+  .menu-mobile-head { position: sticky; top: -5px; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 8px 10px; margin: -5px -5px 4px; background: var(--popover); border-bottom: 1px solid var(--border); }
+  .menu-mobile-head strong { font-size: 14px; font-weight: 600; }
+  .menu-mobile-head .menu-close { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-2); color: var(--fg); font-size: 22px; line-height: 1; }
+}
