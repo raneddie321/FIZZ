@@ -1745,13 +1745,28 @@
     const m = document.createElement("div");
     m.className = "menu";
     m.setAttribute("role", "menu");
-    m.innerHTML = items.map((it) => (it === "-" ? "<hr>" : it.label ? `<div class="label">${esc(it.label)}</div>` : `<button role="menuitem" class="${it.danger ? "danger" : ""}" data-k="${it.k}">${it.html}</button>`)).join("");
+    m.innerHTML = '<div class="menu-mobile-head"><strong>Attachments & skills</strong><button type="button" class="menu-close" aria-label="Close menu">×</button></div>' +
+      items.map((it) => (it === "-" ? "<hr>" : it.label ? `<div class="label">${esc(it.label)}</div>` : `<button role="menuitem" class="${it.danger ? "danger" : ""}" data-k="${it.k}">${it.html}</button>`)).join("");
     document.body.appendChild(m);
     const r = anchor.getBoundingClientRect();
-    m.style.left = Math.max(8, Math.min(r.left, innerWidth - m.offsetWidth - 8)) + "px";
-    m.style.top = (r.bottom + m.offsetHeight + 8 > innerHeight ? Math.max(8, r.top - m.offsetHeight - 6) : r.bottom + 6) + "px";
+    const gap = 6, edge = 8;
+    const maxHeight = Math.max(160, innerHeight - edge * 2);
+    m.style.maxHeight = maxHeight + "px";
+    m.style.overflowY = "auto";
+    m.style.overscrollBehavior = "contain";
+    const left = Math.max(edge, Math.min(r.left, innerWidth - m.offsetWidth - edge));
+    m.style.left = left + "px";
+    const availableBelow = innerHeight - r.bottom - gap - edge;
+    const availableAbove = r.top - gap - edge;
+    const placeBelow = availableBelow >= Math.min(m.scrollHeight, maxHeight) || availableBelow >= availableAbove;
+    const available = placeBelow ? availableBelow : availableAbove;
+    m.style.maxHeight = Math.max(120, Math.min(maxHeight, available)) + "px";
+    m.style.top = (placeBelow ? r.bottom + gap : Math.max(edge, r.top - Math.min(m.scrollHeight, maxHeight) - gap)) + "px";
     openMenu = m;
-    return new Promise((resolve) => { m.onclick = (e) => { const b = e.target.closest("[data-k]"); if (b) { closeMenu(); resolve(b.dataset.k); } }; });
+    return new Promise((resolve) => {
+      m.querySelector(".menu-close")?.addEventListener("click", () => { closeMenu(); resolve(null); });
+      m.onclick = (e) => { const b = e.target.closest("[data-k]"); if (b) { closeMenu(); resolve(b.dataset.k); } };
+    });
   }
   document.addEventListener("click", (e) => { if (openMenu && !openMenu.contains(e.target) && !e.target.closest("[aria-haspopup],[data-pmenu]")) closeMenu(); });
 
