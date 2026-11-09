@@ -647,10 +647,11 @@
           const now = Date.now();
           if (now - last > 350) {
             last = now;
-            // Persist checkpoints because mobile browsers may freeze background tabs.
-            save();
             if (active()) renderThread();
           }
+          // Persist checkpoints (mobile browsers may freeze background tabs), but not on every chunk:
+          // saving serialises every project, which is slow for big ones.
+          if (now - (reply.savedAt || 0) > 2500 || document.hidden) { reply.savedAt = now; save(); }
         },
       });
       reply.content = r.text;
@@ -2459,7 +2460,8 @@
   for (const p of data.projects) {
     for (const c of p.chats || []) {
       for (const m of c.messages || []) {
-        if (m.role === "assistant" && m.pending) {
+        // Only replies whose last checkpoint is old: a reply still streaming in another tab keeps going.
+        if (m.role === "assistant" && m.pending && Date.now() - (m.savedAt || m.at || 0) > 30_000) {
           m.pending = false;
           m.interrupted = true;
           m.error = "";

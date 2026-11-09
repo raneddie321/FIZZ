@@ -3,12 +3,16 @@
   "use strict";
   const F = window.FIZZ;
 
+  let memDevice = "";
   function deviceId() {
     try {
       let id = localStorage.getItem("fizz.device");
       if (!/^[a-f0-9]{32}$/.test(id || "")) { id = [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, "0")).join(""); localStorage.setItem("fizz.device", id); }
       return id;
-    } catch { return ""; }
+    } catch {
+      // Storage blocked (some private modes): keep an id for this page instead.
+      return (memDevice ||= [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, "0")).join(""));
+    }
   }
   async function api(path, opts = {}) {
     let res;
