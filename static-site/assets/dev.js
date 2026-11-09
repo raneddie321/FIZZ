@@ -2444,6 +2444,8 @@
     mobileViewMenu?.setAttribute("aria-expanded", "true");
   }
   mobileViewMenu?.addEventListener("click", openMobileViewMenu);
+  // Phone: the "Chat" button in the workspace views goes back to the conversation.
+  document.getElementById("mobile-back-chat")?.addEventListener("click", () => setView("chat"));
   window.addEventListener("keydown", (event) => { if (event.key === "Escape") closeMobileViewMenu(); });
   const originalSetView = setView;
   setView = function(view) {

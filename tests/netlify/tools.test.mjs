@@ -1,6 +1,9 @@
 // Run: node tests/netlify/tools.test.mjs  (fake credentials and fake services only)
 // Covers /api/web (search, read, SSRF guard, limits), /api/sync (cloud copies) and the sandbox library.
 import assert from "node:assert/strict";
+// Tests call the functions like a browser does: every request carries this browser's random device id.
+const NativeRequest = globalThis.Request;
+globalThis.Request = class extends NativeRequest { constructor(u, i = {}) { const h = new Headers(i.headers || {}); if (!h.has("x-fizz-device") && !i.noDevice) h.set("x-fizz-device", "a".repeat(32)); super(u, { ...i, headers: h }); } };
 import { generateKeyPairSync, sign } from "node:crypto";
 process.env.FIZZ_SECRET = "test-secret-test-secret-test-secret-123";
 const O = "https://fizz.example";

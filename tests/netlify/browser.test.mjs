@@ -110,8 +110,8 @@ if (process.env.AGENT_URL) {
   const { tokenFor } = await import("../../netlify/lib/sandbox-browser.mjs");
   const ran = [];
   setSandboxModule({ Sandbox: { getOrCreate: async (o) => ({ name: o.name, domain: () => process.env.AGENT_URL, writeFiles: async () => {}, runCommand: async (c) => { ran.push(c.args?.[1] || c.cmd); } }) } });
-  process.env.AGENT_TOKEN_EXPECT = tokenFor("local");
-  if (process.env.AGENT_TOKEN && process.env.AGENT_TOKEN !== tokenFor("local")) throw new Error(`start the agent with FIZZ_BR_TOKEN=${tokenFor("local")}`);
+  process.env.AGENT_TOKEN_EXPECT = tokenFor(process.env.TEST_UID || "local");
+  if (process.env.AGENT_TOKEN && process.env.AGENT_TOKEN !== tokenFor(process.env.TEST_UID || "local")) throw new Error(`start the agent with FIZZ_BR_TOKEN=${tokenFor(process.env.TEST_UID || "local")}`);
   cookie = "";
   res = await call({ action: "open", url: `${SITE}/index.html` });
   j = await res.json();

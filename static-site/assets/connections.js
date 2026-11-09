@@ -3,12 +3,22 @@
   "use strict";
   const F = window.FIZZ;
 
+  function deviceId() {
+    try {
+      let id = localStorage.getItem("fizz.device");
+      if (!/^[a-f0-9]{32}$/.test(id || "")) { id = [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, "0")).join(""); localStorage.setItem("fizz.device", id); }
+      return id;
+    } catch { return ""; }
+  }
   async function api(path, opts = {}) {
     let res;
     const headers = {};
     if (opts.body) headers["Content-Type"] = "application/json";
     // FIZZ's own tools (search, sandbox, sync) know who is calling from the RanEddie ID session.
     if (opts.auth) { const t = await F.rid?.token?.(); if (t) headers.Authorization = `Bearer ${t}`; }
+    // A random id for this browser: keeps each device's cloud browser and limits apart when the site runs without
+    // RanEddie ID on the server.
+    if (opts.auth) headers["X-Fizz-Device"] = deviceId();
     try {
       res = await fetch(path, {
         method: opts.method || (opts.body ? "POST" : "GET"),

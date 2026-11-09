@@ -1,5 +1,8 @@
 // Run: node tests/netlify/functions.test.mjs  (uses fake credentials only)
 import assert from "node:assert/strict";
+// Tests call the functions like a browser does: every request carries this browser's random device id.
+const NativeRequest = globalThis.Request;
+globalThis.Request = class extends NativeRequest { constructor(u, i = {}) { const h = new Headers(i.headers || {}); if (!h.has("x-fizz-device") && !i.noDevice) h.set("x-fizz-device", "a".repeat(32)); super(u, { ...i, headers: h }); } };
 process.env.FIZZ_SECRET = "test-secret-test-secret-test-secret-123";
 process.env.GITHUB_CLIENT_ID = "gh_fake_id";
 process.env.GITHUB_CLIENT_SECRET = "gh_fake_secret";
@@ -441,5 +444,16 @@ assert.equal(j.ai.model, "gemini-3.8-flash");
   assert.equal(r.status, 200, "on Vercel, /api/mcp/* is served by the shared web function");
   assert.ok(Array.isArray((await r.json()).servers));
   globalThis.fetch = realFetch;
+}
+// Without RanEddie ID on the server, each browser is its own user (never one shared "local" user)
+{
+  delete process.env.CLERK_SECRET_KEY;
+  const { requireUser } = await import("../../netlify/lib/auth.mjs");
+  const a = await requireUser(new Request(`${O}/api/x`, { headers: { "x-fizz-device": "1".repeat(32) } }));
+  const b = await requireUser(new Request(`${O}/api/x`, { headers: { "x-fizz-device": "2".repeat(32) } }));
+  assert.ok(a.userId && b.userId && a.userId !== b.userId, "different devices are different users");
+  assert.ok(!a.userId.includes("1111"), "the device id itself isn't used as the user id");
+  const none = await requireUser(new Request(`${O}/api/x`, { noDevice: true }));
+  assert.equal(none.response?.status, 400);
 }
 console.log("All Netlify and Vercel function tests passed");

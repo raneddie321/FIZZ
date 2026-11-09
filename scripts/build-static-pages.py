@@ -14,8 +14,8 @@ HEAD = """<!doctype html>
 <link rel="icon" href="icon.svg" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" />
-<link rel="stylesheet" href="assets/site.css" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" />
+<link rel="stylesheet" href="assets/site.css?v=20261103-roboto-font1" />
 <script>try{{var t=localStorage.getItem("fizz.theme");t=t?JSON.parse(t):"system";if(t==="dark"||(t!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}}catch(e){{}}</script>
 <script src="assets/core.js" defer></script>
 <script src="assets/raneddie-id.js" defer></script>
@@ -40,17 +40,38 @@ def features(items):
 
 # ---------------- home ----------------
 page("index.html", "FIZZ — AI by RANEDDIE", "FIZZ is RANEDDIE's AI assistant. FIZZ DEV is the AI workspace for building software, websites and games.", f"""
-<section class="section center" style="padding-bottom:30px">
-  <span class="pill-note"><span data-icon="spark" style="color:var(--primary)"></span> From RANEDDIE</span>
-  <h1 class="h1">Think it through with FIZZ.<br />Build it with FIZZ DEV.</h1>
-  <p class="lead">A friendly AI assistant for everyday questions and writing, and a development workspace that plans, codes, designs and previews software with you. One RanEddie ID for both.</p>
-  <div class="cta-row"><a class="btn btn-lg" href="signin.html?mode=signup&amp;redirect_url=%2Fchat.html">Get started free <span data-icon="arrow"></span></a><a class="btn btn-lg btn-outline" href="product.html">See how it works</a></div>
-  <div class="preview" aria-hidden="true"><div class="bar"><i></i><i></i><i></i></div><div class="body">
-    <div class="col"><div class="sk" style="width:70%"></div><div class="sk" style="width:55%;margin-left:12px"></div><div class="sk" style="width:80%;margin-left:12px"></div><div class="sk" style="width:60%"></div><div class="sk" style="width:45%;margin-left:12px"></div></div>
-    <div class="col"><div class="sk p" style="height:34px;width:75%;margin-left:auto;border-radius:12px;opacity:.6"></div><div class="sk" style="width:92%"></div><div class="sk" style="width:80%"></div><div class="sk" style="width:66%"></div><div class="sk-box"><div class="sk d" style="width:35%"></div><div class="sk" style="width:75%"></div></div></div>
-    <div class="col" style="font-family:var(--mono)"><div class="sk" style="width:40%"></div><div class="sk p" style="width:65%;margin-left:10px"></div><div class="sk" style="width:55%;margin-left:20px"></div><div class="sk" style="width:80%"></div><div class="sk p" style="width:35%;margin-left:10px"></div><div class="sk" style="width:60%"></div><div class="sk" style="width:72%;margin-left:20px"></div></div>
-  </div></div>
+
+<section class="landing-hero">
+  <div class="hero-glow hero-glow-a" aria-hidden="true"></div><div class="hero-glow hero-glow-b" aria-hidden="true"></div>
+  <div class="hero-copy">
+    <span class="hero-kicker"><span class="hero-kicker-dot"></span> MEET YOUR NEW CREATIVE WORKSPACE</span>
+    <h1 class="hero-title">Think bigger.<br><span>Make it with FIZZ.</span></h1>
+    <p class="hero-description">One AI workspace for thinking, creating and building. Explore ideas with FIZZ, then bring websites, apps and games to life with FIZZ DEV.</p>
+    <div class="hero-actions">
+      <a class="btn btn-lg hero-primary" href="signin.html?mode=signup&amp;redirect_url=%2Fchat.html">Get started for free <span data-icon="arrow"></span></a>
+      <a class="btn btn-lg hero-secondary" href="product.html">Meet FIZZ DEV</a>
+    </div>
+    <div class="hero-proof"><span><span data-icon="check"></span> One RanEddie ID</span><span><span data-icon="check"></span> Ideas to working projects</span><span><span data-icon="check"></span> Built for every screen</span></div>
+  </div>
+  <div class="hero-visual" aria-label="Preview of the FIZZ and FIZZ DEV workspace">
+    <div class="visual-orbit orbit-one"></div><div class="visual-orbit orbit-two"></div>
+    <div class="workspace-window">
+      <div class="workspace-top"><div class="window-dots"><i></i><i></i><i></i></div><div class="workspace-label"><span class="mini-brand">f.</span> Your creative workspace</div><span class="live-pill"><i></i> Ready to build</span></div>
+      <div class="workspace-content">
+        <aside class="workspace-rail"><span class="rail-logo">f.</span><span class="rail-icon active"><span data-icon="chat"></span></span><span class="rail-icon"><span data-icon="folder"></span></span><span class="rail-icon"><span data-icon="layers"></span></span><span class="rail-bottom"><span data-icon="gear"></span></span></aside>
+        <div class="workspace-main">
+          <div class="workspace-greeting">Your next project starts here.</div><div class="workspace-subtitle">Go from a blank page to a real result.</div>
+          <div class="prompt-card"><span class="prompt-spark" data-icon="spark"></span><span>Build a modern landing page for my new idea...</span><span class="prompt-send" data-icon="arrow"></span></div>
+          <div class="workspace-options"><div class="workspace-option"><span class="option-icon purple" data-icon="chat"></span><span><b>Explore an idea</b><small>Think it through with FIZZ</small></span><span data-icon="chevron"></span></div><div class="workspace-option"><span class="option-icon orange" data-icon="code"></span><span><b>Build something real</b><small>Code, preview and refine with FIZZ DEV</small></span><span data-icon="chevron"></span></div></div>
+          <div class="mini-preview"><div class="mini-preview-top"><span>LIVE PREVIEW</span><span class="preview-dots">•••</span></div><div class="mini-site"><div class="mini-site-nav"><b>northstar</b><span>Work&nbsp;&nbsp; About&nbsp;&nbsp; Contact</span></div><div class="mini-site-copy"><small>MADE FOR WHAT'S NEXT</small><strong>Make room<br>for possibility.</strong><span class="mini-site-button">Discover more ↗</span></div><div class="mini-art"><div class="art-ring"></div><div class="art-card"></div><div class="art-orb"></div></div></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="float-note note-top"><span class="float-check" data-icon="check"></span><span><b>From idea to interface</b><small>One simple workflow</small></span></div>
+    <div class="float-note note-bottom"><span class="float-code" data-icon="code"></span><span><b>Built with FIZZ DEV</b><small>Code · Preview · Improve</small></span></div>
+  </div>
 </section>
+<section class="hero-trust-strip"><span>MADE FOR CURIOUS MINDS</span><i></i><span>WRITING & IDEAS</span><i></i><span>WEBSITES & APPS</span><i></i><span>GAMES & EXPERIMENTS</span></section>
 <section class="section" style="padding-top:40px">
   <div class="grid-2">
     <a class="product-card" href="fizz.html"><div style="display:flex;gap:12px;align-items:center"><span data-mark></span><div><b>FIZZ</b><div style="color:var(--muted);font-size:14px">The everyday AI assistant</div></div></div>
@@ -64,14 +85,7 @@ page("index.html", "FIZZ — AI by RANEDDIE", "FIZZ is RANEDDIE's AI assistant. 
 <section class="section">
   <p class="eyebrow">Capabilities</p><h2 class="h2">Everything in one place, controlled from a single conversation</h2>
   <p class="lead">FIZZ keeps the tools you need close at hand, and never pretends to do something it didn't.</p>
-  {features([
-    ("chat", "Natural conversation", "Clear answers that stream as they're written, with the ability to stop, regenerate or edit your message.", ""),
-    ("file", "Documents & images", "Attach text, code and images. FIZZ reads them and answers with the context you provide.", ""),
-    ("pen", "Writing & editing", "Draft, rewrite, summarize and translate — with formatting that holds up when you paste it elsewhere.", ""),
-    ("code", "Multi-file coding", "FIZZ DEV writes complete files into your project and you can edit every one of them.", ""),
-    ("eye", "Live preview", "See websites and games run instantly at desktop, tablet and phone sizes.", ""),
-    ("folder", "Projects that persist", "Websites, apps, games and dashboards are saved with their chats and files.", ""),
-  ])}
+  <div class="feature-grid"><div class="feature"><span data-icon="chat"></span><h3>Natural conversation</h3><p>Clear answers that stream as they're written, with the ability to stop, regenerate or edit your message.</p></div><div class="feature"><span data-icon="file"></span><h3>Documents & images</h3><p>Attach text, code and images. FIZZ reads them and answers with the context you provide.</p></div><div class="feature"><span data-icon="pen"></span><h3>Writing & editing</h3><p>Draft, rewrite, summarize and translate — with formatting that holds up when you paste it elsewhere.</p></div><div class="feature"><span data-icon="code"></span><h3>Multi-file coding</h3><p>FIZZ DEV writes complete files into your project and you can edit every one of them.</p></div><div class="feature"><span data-icon="eye"></span><h3>Live preview</h3><p>See websites and games run instantly at desktop, tablet and phone sizes.</p></div><div class="feature"><span data-icon="folder"></span><h3>Projects that persist</h3><p>Websites, apps, games and dashboards are saved with their chats and files.</p></div></div>
 </section>
 <section class="section"><div class="grid-2" style="align-items:start">
   <div><p class="eyebrow">Trust & control</p><h2 class="h2">Powerful tools, with you in charge</h2><p class="lead">Your projects stay yours. Content from files and websites is treated as data — it can never change what FIZZ is allowed to do.</p></div>
@@ -226,7 +240,7 @@ RID_HEAD = """<!doctype html>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&family=Sora:wght@600..800&display=swap" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" />
 <link rel="stylesheet" href="assets/site.css" />
 <link rel="stylesheet" href="assets/rid.css" />
 <script src="assets/core.js" defer></script>

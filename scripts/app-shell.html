@@ -7,11 +7,11 @@
 <link rel="icon" href="icon.svg" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" />
-<link rel="stylesheet" href="assets/site.css?v=20261029-fizzdev-fix1" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" />
+<link rel="stylesheet" href="assets/site.css?v=20261103-roboto-font1" />
 <link rel="stylesheet" href="vendor/codemirror/codemirror.css" />
 <link rel="stylesheet" href="vendor/xterm/xterm.css" />
-<link rel="stylesheet" href="assets/dev.css?v=20261029-fizzdev-fix1" />
+<link rel="stylesheet" href="assets/dev.css?v=20261103-mobile-chat-fix1" />
 <script>document.documentElement.dataset.app=/\/dev(\.html)?$/.test(location.pathname)?"dev":"chat";try{var t=localStorage.getItem("fizz.theme");t=t?JSON.parse(t):"system";if(t==="dark"||(t!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}</script>
 <script src="vendor/marked.min.js"></script>
 <script src="vendor/purify.min.js"></script>
@@ -84,10 +84,10 @@
           <div class="chips" id="pending"></div>
           <textarea id="input" rows="1" placeholder="Message FIZZ" aria-label="Message"></textarea>
           <div class="row">
-            <button type="button" class="icon-btn" id="attach" title="Attach files" aria-label="Attach files"><span data-icon="clip"></span></button>
+            <button type="button" class="icon-btn attach-plus" id="attach" title="Attach files" aria-label="Attach files"><span aria-hidden="true">+</span></button>
             <input type="file" id="file" multiple hidden accept="image/png,image/jpeg,image/gif,image/webp,.txt,.md,.csv,.json,.xml,.html,.css,.js,.ts,.tsx,.jsx,.py,.java,.c,.cpp,.go,.rs,.rb,.php,.sh,.yaml,.yml,.sql,.log" />
-            <button type="button" class="model-btn" id="model-btn" aria-haspopup="menu"></button>
-            <button type="submit" class="send" id="send" aria-label="Send"><svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+            <button type="button" class="model-btn" id="model-btn" aria-haspopup="menu">FIZZ 1.0</button>
+            <button type="button" class="send" id="send" aria-label="Send"><svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
           </div>
         </form>
         <p class="disclaimer">FIZZ can make mistakes. Check important information.</p>
@@ -123,6 +123,7 @@
   <main class="dev-main" id="main">
     <header class="dev-top">
       <button class="icon-btn only-narrow" id="open-side" aria-label="Open projects"><span data-icon="menu"></span></button>
+      <button class="icon-btn mobile-view-menu" id="mobile-view-menu" type="button" aria-label="Open workspace views" aria-haspopup="dialog" aria-expanded="false" title="Open workspace views"><span data-icon="layout"></span></button>
       <button class="proj-title" id="proj-title" title="Rename project"></button>
       <div class="top-actions">
         <button class="icon-btn" id="new-chat" title="New chat" aria-label="New chat"><span data-icon="pen"></span></button>
@@ -148,10 +149,10 @@
             <div class="mode" role="radiogroup" aria-label="Mode">
               <button type="button" role="radio" data-mode="build" title="Fizz Code builds and runs things">Build</button><button type="button" role="radio" data-mode="plan" title="Plan first; build after you approve">Plan</button><button type="button" role="radio" data-mode="ask" title="Questions only, no file changes">Ask</button><button type="button" role="radio" data-mode="do" title="Your personal agent: Fizz does tasks for you on websites, in Google and your connected apps">Do</button>
             </div>
+            <button type="button" class="model-btn" id="model-btn">Choose AI model</button>
             <button type="button" class="ctx-ring" id="ctx"><span></span></button>
-            <button type="button" class="model-btn" id="model-btn"></button>
             <button type="button" class="icon-btn mic" id="mic" aria-label="Dictate" title="Dictate"><svg class="i" viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
-            <button type="submit" class="send" id="send" aria-label="Send"><svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+            <button type="button" class="send" id="send" aria-label="Send"><svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
           </div>
         </form>
         <p class="disclaimer">Fizz Code can make mistakes. Review changes before you ship · <kbd>Ctrl K</kbd> for everything · / for commands</p>
@@ -163,6 +164,7 @@
   <div class="resizer" id="resizer" role="separator" aria-orientation="vertical" aria-label="Resize panel" tabindex="0"></div>
   <section class="panel" id="panel" aria-label="Workspace">
     <div class="panel-tabs" role="tablist">
+      <button class="mobile-back-chat" id="mobile-back-chat" type="button" aria-label="Back to chat"><span data-icon="back"></span><span>Chat</span></button>
       <button role="tab" data-tab="code">Code</button><button role="tab" data-tab="terminal">Terminal</button><button role="tab" data-tab="browser">Browser</button><button role="tab" data-tab="activity">Activity</button>
       <span class="spacer"></span>
       <button class="icon-btn" id="panel-close" aria-label="Close panel"><span data-icon="x"></span></button>
@@ -207,20 +209,12 @@
     </div>
   </section>
 
-  <!-- Phone tab bar -->
-  <nav class="tabbar" aria-label="Views">
-    <button data-goto="chat"><span data-icon="chat"></span>Chat</button>
-    <button data-goto="code"><span data-icon="code"></span>Code</button>
-    <button data-goto="terminal"><span data-icon="terminal"></span>Terminal</button>
-    <button data-goto="browser"><span data-icon="globe"></span>Browser</button>
-    <button data-goto="activity"><span data-icon="history"></span>Activity</button>
-  </nav>
 
 <dialog class="dlg" id="prompt-dlg"><form method="dialog" class="dlg-body" id="prompt-form"></form></dialog>
 <dialog class="dlg" id="quick-open"><div class="dlg-body"><input class="input mono" id="qo-input" placeholder="Go to file…" aria-label="Go to file" /><div class="qo-list" id="qo-list"></div></div></dialog>
 </div>
 
-<script src="assets/chat.js?v=20261029-fizzdev-fix1"></script>
-<script src="assets/dev.js?v=20261029-provider-picker-fix1"></script>
+<script src="assets/chat.js?v=20261029-context-init-fix1"></script>
+<script src="assets/dev.js?v=20261109-audit1"></script>
 </body>
 </html>
