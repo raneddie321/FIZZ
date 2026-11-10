@@ -393,10 +393,11 @@
       const reverted = m.changes?.length && m.reverted;
       const canRestore = !last && !m.pending && project().history.some((h) => !h.reverted && h.at > (m.doneAt || m.at));
       const actions = m.pending ? "" : `<div class="a-actions">${m.content ? `<button data-copy="${i}">Copy</button>` : ""}${m.mode === "plan" && last && !m.error ? `<button data-approve-plan="${m.id}" class="primary">Approve plan &amp; build</button>` : ""}${m.changes?.length && !m.reverted ? `<button data-revert="${m.id}">Revert ${m.changes.length} change${m.changes.length === 1 ? "" : "s"}</button>` : ""}${reverted ? `<span style="padding:4px 8px">Changes reverted</span>` : ""}${canRestore ? `<button data-restore="${m.id}" title="Put every file back the way it was right after this reply">Restore to here</button>` : ""}${last && !m.error ? `<button data-regen>Regenerate</button>` : ""}${m.changes?.length ? `<button data-act="preview">Open preview</button><button data-push="${m.id}" class="${m.pushAsked ? "primary" : ""}">Push to GitHub</button>` : ""}${m.loopStopped && last ? `<button data-continue="${m.id}" class="primary">Keep going</button>` : ""}<span style="padding:4px 8px">${t} · ${esc(m.model || "")}${m.step > 1 ? ` · step ${m.step}` : ""}</span></div>`;
+      const checkList = (m.checks || []).length ? `<ol class="check-list">${m.checks.map((c) => `<li class="${c.status}"><span class="ck">${c.status === "running" ? '<span class="st run"></span>' : c.status === "ok" ? F.icon("check") : c.status === "issues" ? F.icon("alert") : c.status === "na" ? "–" : c.status === "skipped" ? "!" : ""}</span><span>${esc(c.name)}</span><small>${c.status === "issues" ? `${c.found} problem${c.found === 1 ? "" : "s"}` : c.status === "na" ? "not needed" : c.status === "skipped" ? "couldn't run" : c.ms ? `${(c.ms / 1000).toFixed(1)}s` : ""}</small></li>`).join("")}</ol>` : "";
       const check = m.verifying
-        ? `<div class="verify-note run"><span class="st run"></span><span>Checking the project…</span></div>`
+        ? `<div class="verify-note run"><span class="st run"></span><span>Running 5 checks on the project…</span>${checkList}</div>`
         : m.verified && !m.verified.fixing
-        ? `<div class="verify-note ${m.verified.ok ? "ok" : "warn"}">${F.icon(m.verified.ok ? "check" : "alert")}<span>${m.verified.ok ? `Checked ${m.verified.files} changed file${m.verified.files === 1 ? "" : "s"} — no errors found` : m.verified.count ? `${m.verified.count} problem${m.verified.count === 1 ? "" : "s"} still open` : "Verification incomplete — not all checks passed"}</span>${m.verified.list?.length ? `<ul>${m.verified.list.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}${m.verified.warnings?.length ? `<ul class="verify-warnings">${m.verified.warnings.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}${m.verified.skipped?.length ? `<p class="verify-skipped">Skipped checks: ${esc(m.verified.skipped.join(", "))}</p>` : ""}</div>` : "";
+        ? `<div class="verify-note ${m.verified.ok ? "ok" : "warn"}">${F.icon(m.verified.ok ? "check" : "alert")}${checkList}<span>${m.verified.ok ? `5 checks passed on ${m.verified.files} changed file${m.verified.files === 1 ? "" : "s"}` : m.verified.count ? `${m.verified.count} problem${m.verified.count === 1 ? "" : "s"} still open` : "Verification incomplete — not all checks passed"}</span>${m.verified.list?.length ? `<ul>${m.verified.list.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}${m.verified.warnings?.length ? `<ul class="verify-warnings">${m.verified.warnings.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}${m.verified.skipped?.length ? `<p class="verify-skipped">Skipped checks: ${esc(m.verified.skipped.join(", "))}</p>` : ""}</div>` : "";
       return `<div class="a-msg">${html}${thinking}${body}${cards}${askHtml}${check}${actions}</div>`;
     }).join("");
     for (const [key, value, focused] of drafts) {
@@ -588,7 +589,7 @@
   let stopLoop = false;
   // Per turn: how many times a cut-off reply was continued and how many self-checks ran.
   let turn = { continues: 0, verifies: 0, emptyBuildRetries: 0 };
-  const MAX_CONTINUES = 4, MAX_VERIFIES = 2;
+  const MAX_CONTINUES = 4, MAX_VERIFIES = 3;
   const estimateTokens = (text) => Math.ceil(String(text || "").length / 3.6);
   function contextUse() {
     const c = chat();
@@ -751,6 +752,97 @@
    * When Fizz Code says it's done: check the files it wrote (syntax, imports, links, JSON, CSS, runtime errors).
    * Problems go straight back to it to fix; returns true when it's working on them.
    */
+  /** The five checks FIZZ DEV runs after Fizz Code changes a project. Each reports issues (bugs to fix). */
+  const CHECKS = [
+    { id: "code", name: "Code: syntax, imports, links, JSON, CSS" },
+    { id: "pages", name: "Every page loads without errors" },
+    { id: "phone", name: "Phone layout (390px)" },
+    { id: "clicks", name: "Buttons and controls work" },
+    { id: "review", name: "AI code review of the changes" },
+  ];
+  async function runChecks(reply, changed) {
+    const files = project().files;
+    const pages = Object.keys(files).filter((f) => /\.html?$/i.test(f) && !f.startsWith(".")).sort((a, b) => (a === "index.html" ? -1 : b === "index.html" ? 1 : a.localeCompare(b))).slice(0, 10);
+    const web = changed.some((p) => /\.(html?|m?js|css|json|svg)$/i.test(p)) && pages.length > 0;
+    reply.checks = CHECKS.map((c) => ({ ...c, status: "queued", found: 0 }));
+    const issues = [], warnings = [], skipped = [];
+    const step = async (id, fn) => {
+      const c = reply.checks.find((x) => x.id === id);
+      c.status = "running"; c.at = Date.now(); renderThread();
+      try {
+        const found = (await fn()) || [];
+        issues.push(...found);
+        c.found = found.length; c.status = found.length ? "issues" : "ok";
+      } catch (e) {
+        c.status = "skipped"; c.note = String(e?.message || e).slice(0, 160);
+        warnings.push({ path: "", text: `${c.name}: couldn't run (${c.note})` });
+      }
+      c.ms = Date.now() - c.at; renderThread();
+    };
+    await step("code", async () => {
+      const r = await F.verify.check(files, { changed, preview: null });
+      warnings.push(...(r.warnings || []));
+      skipped.push(...(r.skipped || []).filter((x) => x !== "preview-runtime-check"));
+      return r.issues || [];
+    });
+    if (!web) for (const id of ["pages", "phone", "clicks"]) { const c = reply.checks.find((x) => x.id === id); c.status = "na"; }
+    else {
+      const desktop = {};
+      await step("pages", async () => {
+        const out = [];
+        for (const page of pages) {
+          const r = await offscreen(page, { wait: 800, probe: true }, ({ logs, report }) => ({ logs, report }));
+          desktop[page] = r?.report;
+          const errs = [...new Set([...(r?.logs || []).filter((l) => l.level === "error").map((l) => l.text), ...((r?.report?.errors) || [])])];
+          for (const e of errs.slice(0, 6)) out.push({ path: page, text: `error while the page loads: ${String(e).slice(0, 300)}` });
+          for (const src of (r?.report?.broken || []).slice(0, 4)) out.push({ path: page, text: `image "${src}" doesn't load` });
+        }
+        return out;
+      });
+      await step("phone", async () => {
+        const out = [];
+        const targets = [...new Set([pages[0], ...changed.filter((p) => pages.includes(p))])].slice(0, 4);
+        for (const page of targets) {
+          const r = await offscreen(page, { w: 390, h: 844, wait: 800, probe: true }, ({ report }) => report);
+          if (r && r.overflow > 2) out.push({ path: page, text: `on a 390px phone the page scrolls sideways by ${r.overflow}px${r.offscreen?.length ? ` — too wide: ${r.offscreen.join("; ")}` : ""}` });
+          for (const e of (r?.clickErrors || []).slice(0, 4)) out.push({ path: page, text: `on a phone, pressing ${e}` });
+        }
+        return out;
+      });
+      await step("clicks", async () => {
+        const out = [];
+        for (const page of pages) for (const e of (desktop[page]?.clickErrors || []).slice(0, 6)) out.push({ path: page, text: `pressing ${e}` });
+        return out;
+      });
+    }
+    // The review costs an AI call, so it runs once per turn (later rounds re-run the four checks above).
+    if (data.settings.aiReview === false || turn.reviewed) { const c = reply.checks.find((x) => x.id === "review"); c.status = "na"; }
+    else await step("review", async () => { turn.reviewed = true; return aiReview(changed); });
+    return { issues, warnings, skipped };
+  }
+  /** A second look by the AI, as a strict reviewer: only real bugs and missing requested features. */
+  async function aiReview(changed) {
+    const files = project().files;
+    let budget = 70_000;
+    const body = changed.filter((p) => typeof files[p] === "string" && !isBinary(files[p]) && !SECRET_FILE.test(p)).map((p) => {
+      const text = files[p].slice(0, Math.max(0, budget));
+      budget -= text.length;
+      return text ? `<file path="${p}">\n${text}\n</file>` : "";
+    }).filter(Boolean).join("\n");
+    if (!body) return [];
+    const msgs = chat()?.messages || [];
+    const ask = [...msgs].reverse().find((m) => m.role === "user" && !m.auto)?.content || "";
+    const r = await F.aiStream(data.settings, {
+      system: "You are a strict senior code reviewer for a web project built in a browser preview (index.html entry, ES modules across files, localStorage available). Review ONLY for real problems that break what the user asked for: runtime errors, logic bugs, wrong wiring between files (ids, imports, function names), features the user explicitly asked for that are missing or don't work, and states that leave the UI broken. Ignore style, naming, formatting and minor suggestions. Answer ONLY with up to 8 lines, each exactly '- path:line — problem — fix', or the single line NO PROBLEMS.",
+      messages: [{ role: "user", content: `What the user asked for:\n${ask.slice(0, 4000)}\n\nFiles changed in this turn:\n${body}` }],
+      onText: () => {},
+    });
+    if (/^\s*NO PROBLEMS\s*$/i.test(r.text || "")) return [];
+    return String(r.text || "").split("\n").map((l) => /^\s*[-*]\s+(.+)$/.exec(l)?.[1]).filter(Boolean).slice(0, 8).map((t) => {
+      const m = /^([^\s:]+\.[\w]+)(?::(\d+))?\s*[—-]+\s*(.+)$/.exec(t);
+      return m ? { path: m[1], line: Number(m[2]) || undefined, text: `review: ${m[3]}` } : { path: "", text: `review: ${t}` };
+    });
+  }
   async function selfCheck(reply) {
     if (reply.mode !== "build" || reply.error || data.settings.autoVerify === false || !F.verify) return false;
     const changed = turnChanges();
@@ -759,16 +851,20 @@
     renderThread();
     let result;
     try {
-      result = await F.verify.check(project().files, { changed, preview: previewErrors });
+      result = await runChecks(reply, changed);
     } catch (e) {
       result = { issues: [], warnings: [{ path: "", text: `Verification failed unexpectedly: ${String(e?.message || e).slice(0, 240)}` }], skipped: ["verification-engine-failed"] };
     }
     reply.verifying = false;
     if (chat()?.messages.at(-1) !== reply) { renderThread(); return false; }
+    // Same problems as the last round: fixing isn't working, so stop instead of going in circles.
+    const sig = (result.issues || []).map((x) => `${x.path}|${x.text}`).sort().join("\n");
+    const repeating = sig && sig === turn.lastIssues;
+    turn.lastIssues = sig;
     const issues = Array.isArray(result?.issues) ? result.issues : [];
     const warnings = Array.isArray(result?.warnings) ? result.warnings : [];
     const skipped = Array.isArray(result?.skipped) ? result.skipped : [];
-    const canFix = issues.length && turn.verifies < MAX_VERIFIES && reply.step < MAX_STEPS() && !stopLoop;
+    const canFix = issues.length && !repeating && turn.verifies < MAX_VERIFIES && reply.step < MAX_STEPS() && !stopLoop;
     if (canFix) {
       turn.verifies++;
       reply.verified = { ok: false, count: issues.length, fixing: true, warnings: warnings.length, skipped };
@@ -927,27 +1023,40 @@
     },
   });
   /** Renders a project page off-screen, waits for its scripts, and hands the frame and its console to `fn`. */
-  async function offscreen(path, { w = 1280, h = 800, wait = 1500 } = {}, fn) {
+  async function offscreen(path, { w = 1280, h = 800, wait = 1500, probe = false } = {}, fn) {
     await F.blobs.warmData(project().files);
-    const { html, entry } = buildPreview(path);
+    const { html, entry } = buildPreview(path, { probe });
     if (!entry) return null;
     const frame = document.createElement("iframe");
     frame.setAttribute("sandbox", "allow-scripts allow-forms allow-modals");
     frame.style.cssText = `position:fixed;left:-10000px;top:0;width:${w}px;height:${h}px;border:0;background:#fff`;
     const logs = [];
-    const onLog = (e) => { if (e.source === frame.contentWindow && e.data?.fizz === "console" && /error|warn/.test(e.data.level)) logs.push({ level: e.data.level, text: String(e.data.text).replaceAll(VIRTUAL, "").slice(0, 300) }); };
+    let report = null;
+    const onLog = (e) => {
+      if (e.source !== frame.contentWindow) return;
+      if (e.data?.fizz === "probe") report = e.data.data;
+      if (e.data?.fizz === "console" && /error|warn/.test(e.data.level)) logs.push({ level: e.data.level, text: String(e.data.text).replaceAll(VIRTUAL, "").slice(0, 300) });
+    };
     addEventListener("message", onLog);
     document.body.appendChild(frame);
     try {
       await new Promise((r) => { frame.onload = r; frame.srcdoc = html; });
       await new Promise((r) => setTimeout(r, wait));
-      return await fn({ frame, entry, logs });
+      // The probe reports once it has measured the page and tried its controls (at most ~15 s).
+      if (probe) for (let t = 0; !report && t < 75; t++) await new Promise((r) => setTimeout(r, 200));
+      return await fn({ frame, entry, logs, report });
     } finally {
       removeEventListener("message", onLog);
       frame.remove();
     }
   }
   const previewErrors = (path) => offscreen(path, { wait: 1800 }, ({ logs }) => logs.filter((l) => l.level === "error").map((l) => l.text));
+  /**
+   * Runs inside a page under test: measures the layout (sideways scrolling, elements past the edge, broken
+   * images), then presses each visible control and records any error it causes. Dialogs are stubbed and
+   * form submits are held so the page can't block or navigate away.
+   */
+  const PROBE = `<script>(function(){var P=parent,errs=[],out={overflow:0,offscreen:[],broken:[],clicked:0,clickErrors:[],errors:[]};window.alert=function(){};window.confirm=function(){return true};window.prompt=function(){return ""};window.open=function(){return null};addEventListener("error",function(e){errs.push(String(e.message||"Error"))});addEventListener("unhandledrejection",function(e){errs.push("Unhandled rejection: "+(e.reason&&e.reason.message||e.reason))});document.addEventListener("submit",function(e){e.preventDefault()},true);function d(el){var t=(el.innerText||el.value||el.getAttribute("aria-label")||el.getAttribute("title")||"").trim().replace(/\\s+/g," ").slice(0,30);return el.tagName.toLowerCase()+(el.id?"#"+el.id:"")+(t?' "'+t+'"':"")}function done(){out.errors=errs.slice(0,12);try{P.postMessage({fizz:"probe",data:out},"*")}catch(e){}}setTimeout(function(){try{var w=innerWidth;out.overflow=Math.max(0,document.documentElement.scrollWidth-w);[].forEach.call(document.images,function(i){if(i.complete&&i.naturalWidth===0&&i.getAttribute("src"))out.broken.push(i.getAttribute("src").slice(0,80))});if(out.overflow>2){var all=document.body?document.body.getElementsByTagName("*"):[];for(var k=0;k<all.length&&k<4000&&out.offscreen.length<5;k++){var r=all[k].getBoundingClientRect();if(r.width>0&&r.right>w+2&&r.left<w)out.offscreen.push(d(all[k])+" ends at "+Math.round(r.right)+"px")}}var list=[].slice.call(document.querySelectorAll("button,[role=button],a[href^='#'],summary,input[type=checkbox],input[type=radio],[onclick],[data-action]"),0,40);var i=0;(function next(){if(i>=list.length)return done();var el=list[i++],before=errs.length;try{if(el.offsetParent!==null&&!el.disabled){el.click();out.clicked++}}catch(e){errs.push(String(e.message||e))}setTimeout(function(){if(errs.length>before&&out.clickErrors.length<8)out.clickErrors.push(d(el)+": "+errs[errs.length-1]);next()},120)})()}catch(e){errs.push(String(e.message||e));done()}},1200)})();<\/script>`;
   F.agentTools.register("screenshot", {
     icon: "image", feedback: true,
     label: (t) => `Screenshot ${t.attrs.path || "the preview"}${t.attrs.device ? ` (${t.attrs.device})` : ""}`,
@@ -1450,7 +1559,7 @@
     for (const s of href.split("#")[0].split("?")[0].split("/")) { if (!s || s === ".") continue; if (s === "..") parts.pop(); else parts.push(s); }
     return parts.join("/");
   }
-  function buildPreview(path, { bridge = true } = {}) {
+  function buildPreview(path, { bridge = true, probe = false } = {}) {
     const p = project();
     const files = p.files;
     const entry = path && files[path] !== undefined ? path : files["index.html"] !== undefined ? "index.html" : Object.keys(files).find((f) => /\.html?$/.test(f));
@@ -1466,6 +1575,7 @@
     const shim = storageShim() + fetchShim(files, entry);
     if (shim) html = /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (m) => m + shim) : shim + html;
     if (bridge) html = /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (m) => m + BRIDGE) : BRIDGE + html;
+    if (probe) html = /<\/body>/i.test(html) ? html.replace(/<\/body>(?![\s\S]*<\/body>)/i, PROBE + "</body>") : html + PROBE;
     return { entry, html };
   }
   async function refreshPreview() {

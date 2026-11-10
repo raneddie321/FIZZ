@@ -676,3 +676,14 @@
   .menu-mobile-head strong { font-size: 14px; font-weight: 600; }
   .menu-mobile-head .menu-close { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-2); color: var(--fg); font-size: 22px; line-height: 1; }
 }
+
+.check-list { flex-basis: 100%; list-style: none; margin: 4px 0 6px; padding: 0; display: grid; gap: 4px; font-size: 12.5px; }
+.check-list li { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+.check-list li > span:nth-child(2) { flex: 1; min-width: 0; }
+.check-list .ck { width: 16px; display: inline-flex; justify-content: center; flex: none; }
+.check-list .ck .i { width: 14px; height: 14px; }
+.check-list li.ok .ck { color: var(--success); }
+.check-list li.issues { color: var(--fg); }
+.check-list li.issues .ck { color: var(--warning); }
+.check-list li.running { color: var(--fg); }
+.check-list small { font-variant-numeric: tabular-nums; }

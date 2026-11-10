@@ -102,7 +102,8 @@
         <label class="check"><input type="checkbox" name="cloudSync" /><span>Sync chats and projects to my RanEddie ID<small>Use them on every device. Images and PDFs stay in the browser that made them.</small></span></label>
         <label class="check"><input type="checkbox" name="autoFixBuilds" /><span>Fix failed app builds automatically<small>When an APK, AAB or desktop build fails, Fizz Code reads the log on GitHub, fixes the project and builds again (up to 6 attempts). Keep FIZZ DEV open while it works.</small></span></label>
         <div class="conn" data-tg-row><div class="conn-body"><b>Telegram updates</b><small>Get a Telegram message when Fizz finishes a task or needs you. Connect your Telegram bot (Connections → Apps), send it any message, then press Link.</small><small class="conn-state" data-tg-state></small></div><button type="button" class="btn btn-outline btn-sm" data-tg-link>Link</button></div>
-        <label class="check"><input type="checkbox" name="autoVerify" /><span>Check Fizz Code's work automatically<small>When it finishes, FIZZ DEV checks the files it wrote (syntax, imports, links, errors in the preview) and has it fix what it finds.</small></span></label>
+        <label class="check"><input type="checkbox" name="autoVerify" /><span>Check Fizz Code's work automatically<small>After every change FIZZ DEV runs 5 checks — code, every page, phone layout, pressing every button, and an AI code review — and has Fizz Code fix what they find.</small></span></label>
+        <label class="check"><input type="checkbox" name="aiReview" /><span>Include the AI code review<small>The fifth check: a second AI pass that reads the changed files for real bugs. Uses one extra AI message per task.</small></span></label>
         <label class="field"><span>Steps per task</span><input class="input" type="number" name="agentSteps" min="5" max="40" step="1" /><small class="muted-sm">How many rounds Fizz Code may work on its own before it asks you to keep going (5–40).</small></label>
         <label class="check"><input type="checkbox" name="reviewChanges" /><span>Review file changes before they're applied</span></label>
         <label class="check"><input type="checkbox" name="askBeforeRun" /><span>Ask before Fizz Code runs commands<small>Off: it runs commands in its sandbox without pausing.</small></span></label>
@@ -245,6 +246,7 @@
     f.reviewChanges.checked = Boolean(s.reviewChanges);
     f.autoFixBuilds.checked = s.autoFixBuilds !== false;
     f.autoVerify.checked = s.autoVerify !== false;
+    f.aiReview.checked = s.aiReview !== false;
     f.agentSteps.value = String(Math.min(40, Math.max(5, Number(s.agentSteps) || 20)));
     f.askBeforeRun.checked = Boolean(s.askBeforeRun);
     f.autoActions.checked = Boolean(s.autoActions);
@@ -427,6 +429,7 @@
         reviewChanges: f.reviewChanges.checked,
         autoFixBuilds: f.autoFixBuilds.checked,
         autoVerify: f.autoVerify.checked,
+        aiReview: f.aiReview.checked,
         agentSteps: Math.min(40, Math.max(5, Number(f.agentSteps.value) || 20)),
         askBeforeRun: f.askBeforeRun.checked,
         autoActions: f.autoActions.checked,

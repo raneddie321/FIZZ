@@ -131,6 +131,18 @@
   }
   const saveData = (user, d) => store.set(`fizz.data.${user.id}`, d);
 
+  // A stream that goes silent (a dropped connection the browser never notices) must not hang FIZZ forever.
+  const IDLE_MS = 90_000;
+  function readIdle(reader) {
+    let timer;
+    const idle = new Promise((_, reject) => {
+      timer = setTimeout(() => {
+        reader.cancel().catch(() => {});
+        reject(Object.assign(new Error("The AI stopped responding for 90 seconds. Press Retry to try again."), { status: 504 }));
+      }, IDLE_MS);
+    });
+    return Promise.race([reader.read(), idle]).finally(() => clearTimeout(timer));
+  }
   // Retry transient provider outages once, before streaming starts. Never retry an in-flight stream.
   const RETRYABLE_HTTP = new Set([408, 429, 500, 502, 503, 504, 529]);
   function retryDelay(ms, signal) {
@@ -197,7 +209,7 @@
     const dec = new TextDecoder();
     let buf = "", text = "", stop = null;
     for (;;) {
-      const { done, value } = await reader.read();
+      const { done, value } = await readIdle(reader);
       if (done) break;
       buf += dec.decode(value, { stream: true });
       let i;
@@ -270,7 +282,7 @@
     const dec = new TextDecoder();
     let buf = "", text = "", stop = null;
     for (;;) {
-      const { done, value } = await reader.read();
+      const { done, value } = await readIdle(reader);
       if (done) break;
       buf += dec.decode(value, { stream: true });
       let i;

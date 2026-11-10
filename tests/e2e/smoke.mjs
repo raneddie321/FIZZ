@@ -102,6 +102,29 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
   await ctx.close();
 }
 
+// ---------- FIZZ DEV: the five checks catch a crashing button, a too-wide phone page and a review finding ----------
+{
+  const { ctx, p, errs, bodies, script } = await open({ width: 1440, height: 900 });
+  await p.goto(B + "dev.html"); await p.waitForTimeout(900);
+  const F = (path, body) => `<fizz-file path="${path}">\n${body}\n</fizz-file>\n`;
+  script.push(
+    F("index.html", `<!doctype html><html><head><meta name="viewport" content="width=device-width"></head><body><div style="width:900px">wide</div><button id="b">Go</button><script>document.getElementById("b").onclick = () => { missingFn(); };</script></body></html>`) + "Built.",
+    "- index.html:1 — the Go button calls missingFn, which doesn't exist — define it",
+    F("index.html", `<!doctype html><html><head><meta name="viewport" content="width=device-width"></head><body><div style="max-width:100%">ok</div><button id="b">Go</button><script>document.getElementById("b").onclick = () => { document.body.dataset.ok = "1"; };</script></body></html>`) + "Fixed.",
+  );
+  await p.fill("#dev-app #input", "make a page with a Go button"); await p.keyboard.press("Enter");
+  await p.waitForFunction(() => document.querySelector("#dev-app")?.innerText.includes("Fixed."), null, { timeout: 90000 }).catch(() => {});
+  const fed = JSON.stringify(bodies.find((b) => JSON.stringify(b.messages?.at(-1)?.content || "").includes("FIZZ DEV checked"))?.messages.at(-1).content || "");
+  check("checks: crashing button found", /pressing button#b/.test(fed), fed.slice(0, 200));
+  check("checks: too wide on a phone found", /scrolls sideways/.test(fed));
+  check("checks: AI review finding sent back", /review: the Go button calls missingFn/.test(fed));
+  await p.waitForSelector("#dev-app .verify-note.ok", { timeout: 60000 }).then(() => check("checks: pass after the fix", true)).catch(async () => check("checks: pass after the fix", false, (await p.locator("#dev-app .verify-note").allInnerTexts()).join(" | ")));
+  check("checks: shows the 5-check list", (await p.locator("#dev-app .verify-note.ok .check-list li").count()) === 5);
+  const real = errs.filter((e) => !/missingFn/.test(e)); // the planted bug, thrown inside the tested page
+  check("checks: no script errors in FIZZ DEV", !real.length, real.join(" | "));
+  await ctx.close();
+}
+
 // ---------- FIZZ DEV: Do mode, approval, memory ----------
 {
   const { ctx, p, errs, bodies, script } = await open({ width: 1280, height: 800 });
