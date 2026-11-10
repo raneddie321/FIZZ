@@ -129,7 +129,12 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
 {
   const { ctx, p, errs, bodies, script } = await open({ width: 1280, height: 800 });
   await p.goto(B + "dev.html"); await p.waitForTimeout(900);
-  await p.click('#dev-app .mode [data-mode="do"]');
+  // Do mode is pinned from the + menu (there are no mode buttons any more).
+  await p.click("#dev-app #attach");
+  await p.click('.plus-sheet [data-ps-go="mode"]');
+  await p.click('.plus-sheet [data-ps-mode="do"]');
+  check("+ menu: mode shows Do", (await p.locator(".plus-sheet").innerText()).includes("Do"));
+  await p.click('.plus-sheet [data-ps="close"]');
   script.push(`<fizz-remember>Prefers short answers</fizz-remember>\n<fizz-api service="telegram" method="POST" path="/sendMessage">{"chat_id":1,"text":"hi"}</fizz-api>`, "Sent it.");
   await p.fill("#dev-app #input", "remember I like short answers and message me on telegram"); await p.keyboard.press("Enter");
   await p.waitForSelector("#dev-app .stage-bar [data-approve]", { timeout: 15000 }).then(() => check("do: sending waits for approval", true)).catch(() => check("do: sending waits for approval", false));
@@ -192,6 +197,40 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
   check("connector: confirms after sign-in", (await p.locator("#fizz-toast, .toast").allInnerTexts().catch(() => [])).join(" ").includes("Composio is connected") || (await p.evaluate(() => document.body.innerText.includes("Composio is connected"))));
   check("connector: cleans the URL", !p.url().includes("mcp_connected"));
   check("connector: no script errors", !errs.length, errs.join(" | "));
+  await ctx.close();
+}
+
+// ---------- Automatic mode: questions are answered, builds are built, connectors are listed ----------
+{
+  const { ctx, p, errs, bodies, script } = await open({ width: 1280, height: 800 });
+  await ctx.route("**/api/mcp/list", (r) => r.fulfill({ json: { servers: [{ id: "composio", name: "Composio", url: "https://connect.composio.dev/mcp", toolCount: 3, auth: "oauth", tools: [{ name: "COMPOSIO_MANAGE_CONNECTIONS" }, { name: "COMPOSIO_SEARCH_TOOLS" }, { name: "COMPOSIO_MULTI_EXECUTE_TOOL" }] }] } }));
+  await p.goto(B + "dev.html"); await p.waitForTimeout(900);
+  check("no mode buttons in the composer", (await p.locator("#dev-app .mode").count()) === 0);
+  script.push("You're connected to Composio.");
+  await p.fill("#dev-app #input", "למה אני מחובר מהconnectors?"); await p.keyboard.press("Enter");
+  await lastReply(p, "#dev-app", "connected to Composio");
+  const sys = bodies[0]?.system || "";
+  check("auto: a Hebrew question is answered (Ask)", sys.includes("ASK MODE") && !sys.includes("BUILD MODE"));
+  check("auto: connections are in the prompt", sys.includes("CONNECTIONS") && sys.includes("Composio (custom connector / MCP server)"));
+  check("auto: gateway connectors are explained", /call COMPOSIO_MANAGE_CONNECTIONS.*first/.test(sys));
+  check("auto: no checks or files for a question", (await p.locator("#dev-app .verify-note").count()) === 0);
+  script.push('<fizz-file path="index.html">\n<!doctype html><html><head><meta name="viewport" content="width=device-width"></head><body><h1>Snake</h1></body></html>\n</fizz-file>\nBuilt.');
+  await p.fill("#dev-app #input", "תבנה לי משחק נחש"); await p.keyboard.press("Enter");
+  await lastReply(p, "#dev-app", "Built.");
+  check("auto: a build request builds", (bodies.at(-1)?.system || bodies.find((b) => b.system?.includes("BUILD MODE"))?.system || "").includes("BUILD MODE"));
+  // The + menu
+  await p.click("#dev-app #attach");
+  const sheet = await p.locator(".plus-sheet").innerText();
+  check("+ menu: files, photos, camera, drive", ["Files", "Photos", "Camera", "Drive"].every((x) => sheet.includes(x)));
+  check("+ menu: mode, connectors, skills, permissions, research", ["Mode", "Connectors", "Skills", "Permissions", "Research"].every((x) => sheet.includes(x)));
+  await p.click('.plus-sheet [data-ps-go="connectors"]');
+  check("+ menu: connectors list Composio", (await p.locator(".plus-sheet").innerText()).includes("Composio"));
+  await p.click('.plus-sheet [data-ps="back"]');
+  await p.click('.plus-sheet [data-ps-opt="research"]');
+  check("+ menu: research toggles on", await p.evaluate(() => JSON.parse(localStorage.getItem(Object.keys(localStorage).find((k) => k.startsWith("fizz.data.")))).settings.research === true));
+  await p.keyboard.press("Escape");
+  check("+ menu closes with Escape", (await p.locator(".plus-sheet").count()) === 0);
+  check("auto: no script errors", !errs.length, errs.join(" | "));
   await ctx.close();
 }
 

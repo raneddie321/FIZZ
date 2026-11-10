@@ -92,7 +92,7 @@
     get unavailable() {
       // While the list is still loading, say nothing (the prompt line simply doesn't appear yet).
       if (cache === null) return "";
-      return "MCP servers (Model Context Protocol) aren't connected yet. The user can add any MCP server in Settings → Connections → MCP servers — its URL, plus an Authorization header if it needs one. If what they're asking for could be done through one, say so in one sentence.";
+      return "MCP servers (Model Context Protocol) aren't connected yet. The user can add any MCP server in Settings → Connections → Add custom connector (just a name and the MCP URL). If what they're asking for could be done through one, say so in one sentence.";
     },
     needsApproval: (t) => {
       if (t.attrs.action === "tools" || t.attrs.action === "list") return false; // reading tool lists is harmless
@@ -116,7 +116,7 @@
       other.type === "mcp" && settings().mcpAsk !== true && find(approved.attrs.server)?.id === find(other.attrs.server)?.id && !risky(toolOf(other)),
     async run(t, ctx) {
       const list = servers();
-      if (!list.length) return { ok: false, text: "No MCP servers are connected. Ask the user to add one in Settings → Connections → MCP servers." };
+      if (!list.length) return { ok: false, text: "No MCP servers are connected. Ask the user to add one: + → Connectors → Add custom connector." };
       if (t.attrs.action === "list") {
         const text = list.map((s) => `${s.name} (${s.toolCount || (s.tools || []).length} tools) — ${s.url}`).join("\n");
         return { ok: true, text: `Connected MCP servers:\n${text}` };
