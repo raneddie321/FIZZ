@@ -142,6 +142,59 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
   await ctx.close();
 }
 
+// ---------- Custom connectors: Claude-style two-step dialog, OAuth sign-in and No sign-in ----------
+{
+  const { ctx, p, errs } = await open({ width: 1280, height: 900 });
+  let servers = [];
+  let started = null;
+  await ctx.route("**/api/mcp/list", (r) => r.fulfill({ json: { servers } }));
+  await ctx.route("**/api/mcp/discover", (r) => { const u = r.request().postDataJSON().url; r.fulfill({ json: u.includes("composio") ? { auth: "oauth", dcr: true, cimd: false, scopes: ["tools"] } : { auth: "none", dcr: false } }); });
+  await ctx.route("**/api/mcp/oauth-start", (r) => { started = r.request().postDataJSON(); r.fulfill({ json: { authorizeUrl: "https://auth.example.test/authorize?client_id=cid" } }); });
+  await ctx.route("https://auth.example.test/**", (r) => r.fulfill({ status: 200, contentType: "text/html", body: "<h1>Sign in to Composio</h1>" }));
+  await ctx.route("**/api/mcp/add", (r) => { const b = r.request().postDataJSON(); servers = [{ id: "docs", name: b.name, url: b.url, toolCount: 3, tools: [], auth: "none" }]; r.fulfill({ json: { ok: true, server: servers[0] } }); });
+  await p.goto(B + "dev.html"); await p.waitForTimeout(900);
+  await p.locator("#dev-app #model-btn").first().click().catch(() => {});
+  const openConnections = async () => {
+    if (!(await p.locator("dialog[open] [data-tab=connections]").count())) await p.evaluate(() => window.FIZZ.settings?.open ? 0 : 0);
+    await p.locator("dialog[open] [data-tab=connections]").click();
+    await p.waitForSelector("dialog[open] [data-cc-open]", { timeout: 10000 });
+  };
+  await openConnections();
+  // No sign-in path
+  await p.click("dialog[open] [data-cc-open]");
+  await p.fill(".cc-dlg [name=name]", "Docs");
+  await p.fill(".cc-dlg [name=url]", "https://docs.example.test/mcp");
+  await p.click('.cc-dlg [data-cc="continue"]');
+  await p.waitForSelector('.cc-dlg input[name=auth][value=none]:checked', { timeout: 10000 }).then(() => check("connector: open server detected as No sign-in", true)).catch(() => check("connector: open server detected as No sign-in", false));
+  check("connector: no OAuth client section without sign-in", (await p.locator(".cc-dlg input[name=client]").count()) === 0);
+  await p.click('.cc-dlg [data-cc="add"]');
+  await p.waitForFunction(() => !document.querySelector(".cc-dlg[open]"), null, { timeout: 10000 }).then(() => check("connector: added without sign-in", true)).catch(() => check("connector: added without sign-in", false));
+  await p.waitForFunction(() => document.querySelector("dialog[open] [data-cc-list]")?.innerText.includes("Docs"), null, { timeout: 8000 }).then(() => check("connector: listed under Custom connectors", true)).catch(() => check("connector: listed under Custom connectors", false));
+  // OAuth path (like Composio)
+  await p.click("dialog[open] [data-cc-open]");
+  await p.fill(".cc-dlg [name=name]", "Composio");
+  await p.fill(".cc-dlg [name=url]", "https://connect.composio.test/mcp");
+  await p.click('.cc-dlg [data-cc="continue"]');
+  await p.waitForSelector('.cc-dlg input[name=auth][value=now]:checked', { timeout: 10000 });
+  const step2 = await p.locator(".cc-dlg").innerText();
+  check("connector: sign-in detected and pre-selected", /Sign in now\s*Detected/.test(step2), step2.slice(0, 160));
+  check("connector: automatic registration detected", /Register automatically\s*Detected/.test(step2));
+  await p.click('.cc-dlg [data-cc="header"]');
+  await p.fill('.cc-dlg [data-hk="0"]', "X-Team");
+  await p.fill('.cc-dlg [data-hv="0"]', "abc");
+  await p.locator(".cc-dlg summary").click();
+  await p.fill(".cc-dlg [name=scope]", "tools");
+  await p.click('.cc-dlg [data-cc="add"]');
+  await p.waitForURL(/auth\.example\.test/, { timeout: 10000 }).then(() => check("connector: Add opens the server's sign-in page", true)).catch(() => check("connector: Add opens the server's sign-in page", false));
+  check("connector: sends name, URL, headers and scope", started?.name === "Composio" && started?.headers?.["X-Team"] === "abc" && started?.scope === "tools" && started?.returnTo === "/dev.html", JSON.stringify(started));
+  // Back from sign-in
+  await p.goto(B + "dev.html?mcp_connected=Composio"); await p.waitForTimeout(1500);
+  check("connector: confirms after sign-in", (await p.locator("#fizz-toast, .toast").allInnerTexts().catch(() => [])).join(" ").includes("Composio is connected") || (await p.evaluate(() => document.body.innerText.includes("Composio is connected"))));
+  check("connector: cleans the URL", !p.url().includes("mcp_connected"));
+  check("connector: no script errors", !errs.length, errs.join(" | "));
+  await ctx.close();
+}
+
 // ---------- app switch keeps one page ----------
 {
   const { ctx, p, errs } = await open({ width: 1280, height: 800 });

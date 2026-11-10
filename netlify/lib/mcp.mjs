@@ -4,11 +4,13 @@
 // browser never sees the server's Authorization header. The URL and headers come from the user, so
 // every hop is checked against private/internal addresses the same way page reading does.
 import { assertPublic } from "./web.mjs";
-import { getCookie, seal, setCookie, unseal } from "./util.mjs";
+import { clearCookie, getCookie, seal, setCookie, unseal } from "./util.mjs";
 import { kvConfigured, redis } from "./kv.mjs";
 
 const PROTOCOL = "2025-06-18";
 const COOKIE = "fizz_mcp";
+/** Without Redis the list is sealed into at most CHUNKS cookies of CHUNK characters each. */
+const CHUNK = 3500, CHUNKS = 4;
 const MAX_SERVERS = 50;
 const MAX_TOOLS = 200;
 /** Handshake/listing are quick; a tool call may legitimately take longer (capped below 60s on Vercel). */
@@ -32,7 +34,10 @@ export async function loadServers(req, userId) {
       return [];
     }
   }
-  const list = unseal(getCookie(req, COOKIE))?.list;
+  // The sealed list may span a few cookies (OAuth tokens are long): fizz_mcp, fizz_mcp_1, …
+  let raw = getCookie(req, COOKIE) || "";
+  for (let i = 1; i < CHUNKS && raw; i++) { const part = getCookie(req, `${COOKIE}_${i}`); if (!part) break; raw += part; }
+  const list = unseal(raw)?.list;
   return Array.isArray(list) ? list : [];
 }
 
@@ -42,10 +47,15 @@ export async function storeServers(headers, userId, list) {
     return;
   }
   const value = seal({ list, exp: Date.now() + 90 * 86400_000 });
-  if (value.length > 3400) {
-    throw bad("This deployment keeps MCP servers in a secure cookie, which has a size limit. Add Upstash Redis (Vercel → Storage → Upstash Redis) to keep more.", 507, "no_room");
+  if (value.length > CHUNK * CHUNKS) {
+    throw bad("This deployment keeps MCP servers in secure cookies, which have a size limit. Remove a connector, or add Upstash Redis (Vercel → Storage → Upstash Redis) to keep more.", 507, "no_room");
   }
-  setCookie(headers, COOKIE, value, { maxAge: 90 * 86400 });
+  for (let i = 0; i < CHUNKS; i++) {
+    const part = value.slice(i * CHUNK, (i + 1) * CHUNK);
+    const name = i ? `${COOKIE}_${i}` : COOKIE;
+    if (part) setCookie(headers, name, part, { maxAge: 90 * 86400 });
+    else clearCookie(headers, name);
+  }
 }
 
 /** What the UI and the model get to see: never the headers. */
@@ -56,6 +66,7 @@ export const publicServer = (s) => ({
   added: s.added || null,
   tools: Array.isArray(s.tools) ? s.tools : [],
   toolCount: (Array.isArray(s.tools) ? s.tools : []).length,
+  auth: s.oauth ? "oauth" : Object.keys(s.headers || {}).length ? "headers" : "none",
 });
 
 /** Validates what the user typed: a public http(s) URL and optional headers. */
@@ -99,7 +110,7 @@ const rpc = (id, method, params) => ({ jsonrpc: "2.0", id, method, params: param
 const notify = (method, params) => ({ jsonrpc: "2.0", method, params: params || {} });
 
 /** POST/GET/DELETE to the server, following at most 3 redirects, re-checking every address. */
-async function send(url, init, ms) {
+export async function send(url, init, ms) {
   let u = new URL(url);
   for (let hop = 0; hop < 4; hop++) {
     await assertPublic(u);
@@ -304,6 +315,11 @@ async function openSession(server, ms) {
     if (e.code === "unreachable" && e.status !== 504) return legacySession(server, ms);
     throw e;
   }
+  // The server wants the user to sign in (OAuth): say so clearly, with what it told us about where.
+  if (res.status === 401 || (res.status === 403 && res.headers.get("www-authenticate"))) {
+    res.body?.cancel?.().catch(() => {});
+    throw Object.assign(bad(server.oauth ? "Your sign-in to this MCP server has expired. Sign in again in Settings → Connections." : "This MCP server needs you to sign in.", 401, "auth_required"), { wwwAuthenticate: res.headers.get("www-authenticate") || "" });
+  }
   if (legacyStatus(res.status)) {
     res.body?.cancel?.().catch(() => {});
     return legacySession(server, ms);
@@ -503,7 +519,7 @@ export const redact = (text, server) => {
   return out;
 };
 
-export const MCP_LIMITS = { add: 30, remove: 120, list: 600, tools: 60, call: 400 };
+export const MCP_LIMITS = { add: 30, remove: 120, list: 600, tools: 60, call: 400, discover: 60, "oauth-start": 30 };
 export const MCP_COOKIE = COOKIE;
 export const MAX_MCP_SERVERS = MAX_SERVERS;
 export { slug };

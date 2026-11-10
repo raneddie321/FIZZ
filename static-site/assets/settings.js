@@ -197,10 +197,12 @@
     };
     const apps = (st.apps || []).map((a) => `<div class="conn">${appLogo(a)}<div class="conn-body"><b>${esc(a.name)}</b><small>${esc(a.desc)}</small><small class="conn-state">${a.connected ? `Connected · ${esc(a.account || "")}` : "Not connected"}</small>
       ${a.connected ? "" : `<div class="vtoken"><input class="input mono" type="password" data-app-token="${a.id}" placeholder="Paste your ${esc(a.name)} token" autocomplete="off" spellcheck="false" /><button type="button" class="btn btn-sm" data-app-save="${a.id}">Connect</button></div><small><a href="${esc(a.help)}" target="_blank" rel="noopener">Get a token</a> — ${esc(a.how)}</small>`}</div>${a.connected ? `<button type="button" class="btn btn-outline btn-sm" data-app-off="${a.id}">Disconnect</button>` : ""}</div>`).join("");
-    box.innerHTML = (st.server ? "" : `<div class="alert alert-info"><div><strong>Connections need the FIZZ server</strong><p>Deploy this site from GitHub to Netlify (with the environment variables from the README) to enable GitHub, Vercel, Canva and Google.</p></div></div>`) + CONN.map((c) => connCard(c, st)).join("") + (apps ? `<h3 class="conn-group">Apps Fizz can use</h3><p class="muted-sm">Connect an app with your own token. FIZZ only uses connected apps when you ask. Actions that send, publish, or delete should be reviewed before they happen.</p>${apps}` : "");
+    box.innerHTML = (st.server ? "" : `<div class="alert alert-info"><div><strong>Connections need the FIZZ server</strong><p>Deploy this site from GitHub to Netlify (with the environment variables from the README) to enable GitHub, Vercel, Canva and Google.</p></div></div>`) + CONN.map((c) => connCard(c, st)).join("") + (F.customConnectors ? `<div data-cc-list><p class="muted-sm">Loading custom connectors…</p></div>` : "") + (apps ? `<h3 class="conn-group">Apps Fizz can use</h3><p class="muted-sm">Connect an app with your own token. FIZZ only uses connected apps when you ask. Actions that send, publish, or delete should be reviewed before they happen.</p>${apps}` : "");
+    const cc = box.querySelector("[data-cc-list]");
+    if (cc) F.customConnectors.listHtml().then((html) => { cc.innerHTML = html; });
   }
 
-  // MCP connections are temporarily hidden from Settings while the feature is being refined.
+  // Custom connectors (MCP servers): assets/custom-connectors.js draws the list and the Add dialog.
 
   /**
    * Opens Settings. ctx = { user, data, save, onSaved(changed) }.
@@ -260,6 +262,7 @@
     d.onclick = async (e) => {
       const t = e.target.closest("button,input");
       if (!t) return;
+      if (F.customConnectors && (await F.customConnectors.handleListClick(t, () => renderConnections(d)))) return;
       if (t.dataset.tab) setTab(t.dataset.tab);
       if (t.hasAttribute("data-settings-close")) { d.close("cancel"); return; }
       if (t.name === "provider") sub();

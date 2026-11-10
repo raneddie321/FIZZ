@@ -456,4 +456,79 @@ assert.equal(j.ai.model, "gemini-3.8-flash");
   const none = await requireUser(new Request(`${O}/api/x`, { noDevice: true }));
   assert.equal(none.response?.status, 400);
 }
+// MCP custom connector with OAuth: discovery → automatic registration → PKCE sign-in → tokens → refresh
+{
+  const { createHash } = await import("node:crypto");
+  const mcpFn = (await import("../../netlify/functions/mcp.mjs")).default;
+  delete process.env.CLERK_SECRET_KEY;
+  const realFetch = globalThis.fetch;
+  const H = "https://203.0.113.20";
+  let challenge = "", issued = 0, refreshed = 0, registered = null;
+  const jr = (m, extra = {}, status = 200) => new Response(JSON.stringify(m), { status, headers: { "content-type": "application/json", ...extra } });
+  globalThis.fetch = async (url, init = {}) => {
+    const u = String(url);
+    const auth = init.headers?.Authorization || "";
+    if (u === `${H}/mcp`) {
+      const body = init.body ? JSON.parse(init.body) : null;
+      if (!/^Bearer at-/.test(auth)) return jr({ error: "unauthorized" }, { "www-authenticate": `Bearer resource_metadata="${H}/.well-known/oauth-protected-resource/mcp", scope="tools"` }, 401);
+      if (body?.method === "initialize") return jr({ jsonrpc: "2.0", id: body.id, result: { protocolVersion: "2025-06-18", serverInfo: { name: "Composio Test" }, capabilities: { tools: {} } } });
+      if (body?.method === "tools/list") return jr({ jsonrpc: "2.0", id: body.id, result: { tools: [{ name: "gmail_send", description: "Send mail" }] } });
+      if (body?.method === "tools/call") return jr({ jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: `called with ${auth}` }] } });
+      return new Response(null, { status: 202 });
+    }
+    if (u === `${H}/.well-known/oauth-protected-resource/mcp`) return jr({ resource: `${H}/mcp`, authorization_servers: [H], scopes_supported: ["tools"] });
+    if (u === `${H}/.well-known/oauth-authorization-server`) return jr({ issuer: H, authorization_endpoint: `${H}/authorize`, token_endpoint: `${H}/token`, registration_endpoint: `${H}/register`, code_challenge_methods_supported: ["S256"] });
+    if (u === `${H}/register`) { registered = JSON.parse(init.body); return jr({ client_id: "cid-1" }, {}, 201); }
+    if (u === `${H}/token`) {
+      const f = new URLSearchParams(init.body);
+      assert.equal(f.get("client_id"), "cid-1");
+      assert.equal(f.get("resource"), `${H}/mcp`, "the MCP server is named as the resource");
+      if (f.get("grant_type") === "authorization_code") {
+        assert.equal(f.get("code"), "code-xyz");
+        assert.equal(createHash("sha256").update(f.get("code_verifier")).digest("base64url"), challenge, "PKCE verifier matches the challenge");
+        issued++;
+        return jr({ access_token: "at-1", refresh_token: "rt-1", expires_in: 1, token_type: "Bearer" });
+      }
+      if (f.get("grant_type") === "refresh_token") { assert.equal(f.get("refresh_token"), "rt-1"); refreshed++; return jr({ access_token: "at-2", expires_in: 3600, token_type: "Bearer" }); }
+    }
+    return realFetch(url, init);
+  };
+  const post = (action, body, cookie) => mcpFn(new Request(`${O}/api/mcp/${action}`, { method: "POST", headers: { origin: O, "content-type": "application/json", ...(cookie ? { cookie } : {}) }, body: JSON.stringify(body) }), { params: { action } });
+  const cookiesOf = (res) => (res.headers.getSetCookie?.() || [res.headers.get("set-cookie")]).filter(Boolean).map((c) => c.split(";")[0]).filter((c) => !c.endsWith("=")).join("; ");
+
+  r = await post("discover", { url: `${H}/mcp` });
+  j = await r.json();
+  assert.equal(j.auth, "oauth", "sign-in detected");
+  assert.equal(j.dcr, true, "automatic registration detected");
+  r = await post("oauth-start", { url: `${H}/mcp`, name: "Composio", returnTo: "/dev.html" });
+  j = await r.json();
+  assert.equal(r.status, 200, JSON.stringify(j));
+  const a = new URL(j.authorizeUrl);
+  assert.equal(a.origin + a.pathname, `${H}/authorize`);
+  assert.equal(a.searchParams.get("code_challenge_method"), "S256");
+  assert.equal(registered.token_endpoint_auth_method, "none");
+  assert.equal(registered.redirect_uris[0], `${O}/api/mcp/oauth-callback`);
+  challenge = a.searchParams.get("code_challenge");
+  const pendingCookie = cookiesOf(r);
+  // A wrong state is refused.
+  r = await mcpFn(new Request(`${O}/api/mcp/oauth-callback?code=code-xyz&state=wrong`, { headers: { cookie: pendingCookie } }), { params: { action: "oauth-callback" } });
+  assert.match(r.headers.get("location"), /mcp_error=/);
+  r = await mcpFn(new Request(`${O}/api/mcp/oauth-callback?code=code-xyz&state=${a.searchParams.get("state")}`, { headers: { cookie: pendingCookie } }), { params: { action: "oauth-callback" } });
+  assert.equal(r.status, 302);
+  assert.match(r.headers.get("location"), /\/dev\.html\?mcp_connected=Composio/);
+  assert.equal(issued, 1);
+  const ck = cookiesOf(r);
+  assert.ok(ck.includes("fizz_mcp="), "connector saved");
+  r = await post("list", {}, ck);
+  j = await r.json();
+  assert.equal(j.servers[0].auth, "oauth");
+  assert.equal(j.servers[0].tools[0].name, "gmail_send");
+  assert.ok(!JSON.stringify(j).includes("at-1") && !JSON.stringify(j).includes("rt-1"), "tokens never reach the browser");
+  // The access token expired (expires_in: 1): the next call refreshes it first.
+  r = await post("call", { id: j.servers[0].id, tool: "gmail_send", arguments: {} }, ck);
+  j = await r.json();
+  assert.equal(refreshed, 1, "token refreshed");
+  assert.match(j.text, /called with ••••|called with Bearer at-2/);
+  globalThis.fetch = realFetch;
+}
 console.log("All Netlify and Vercel function tests passed");

@@ -674,3 +674,31 @@ svg.dots3 { stroke-width: 3; }
 .conn .app-mark { padding:3px;background:#fff;border:1px solid var(--border); }
 .conn .conn-body small { line-height:1.55; }
 .conn .conn-state { overflow-wrap:anywhere; }
+
+/* Custom connectors */
+.cc-dlg { width: min(560px, calc(100vw - 24px)); }
+.cc { gap: 14px; }
+.cc .field { display: grid; gap: 6px; margin: 0; }
+.cc-head { display: grid; gap: 2px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+.cc-head code { font-family: var(--mono); font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.cc-group { border: 0; padding: 0; margin: 0; display: grid; gap: 10px; }
+.cc-group legend { font-weight: 600; font-size: 15px; margin-bottom: 6px; padding: 0; }
+.cc-opt { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+.cc-opt input { margin-top: 3px; accent-color: var(--primary); flex: none; }
+.cc-opt > span { display: grid; gap: 2px; }
+.cc-opt b { font-weight: 500; }
+.cc-opt small { color: var(--muted); font-size: 13px; line-height: 1.45; }
+.cc-opt.off { opacity: .5; }
+.cc-badge { display: inline-block; font-size: 11px; font-weight: 500; padding: 1px 7px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); margin-inline-start: 6px; vertical-align: 1px; }
+.cc-own { display: grid; gap: 8px; padding-inline-start: 26px; }
+.cc-own code { font-family: var(--mono); font-size: 12px; overflow-wrap: anywhere; }
+.cc-hdr { display: grid; grid-template-columns: 1fr 1fr auto; gap: 6px; }
+.cc-add { justify-self: start; display: inline-flex; gap: 6px; align-items: center; }
+.cc-add .i, [data-cc-open] .i { width: 14px; height: 14px; }
+[data-cc-open] { display: inline-flex; gap: 6px; align-items: center; margin-top: 6px; }
+.cc-adv summary { cursor: pointer; color: var(--muted); font-size: 14px; }
+.cc-adv .field { margin-top: 10px; }
+.cc-warn { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.cc-err { margin: 0; color: var(--danger); font-size: 13.5px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (max-width: 520px) { .cc-hdr { grid-template-columns: 1fr; } }

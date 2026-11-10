@@ -203,3 +203,15 @@ cd static-site && python3 -m http.server  # preview the static site locally
 
 The full Next.js platform: `npm install`, create `.env` (`DATABASE_URL`, `SESSION_SECRET`,
 `ENCRYPTION_KEY`, `ANTHROPIC_API_KEY`), `npx prisma migrate deploy && npm run db:seed`, `npm run dev`.
+
+### Custom connectors (MCP)
+Settings → Connections → **Add custom connector**, like Claude: a name and the server's MCP URL, then FIZZ asks the
+server how it wants to be signed in to and pre-selects it — *Sign in now* (OAuth), *Sign in when needed*, or
+*No sign-in* (API keys go in up to four request headers). OAuth uses the MCP authorization spec: protected-resource
+and authorization-server metadata, automatic client registration (DCR) or your own client ID, PKCE, the server as
+the token's resource, and refresh before expiry. Tokens stay on FIZZ's server (`netlify/lib/mcp-oauth.mjs`).
+
+### The five checks
+After Fizz Code changes a project, FIZZ DEV runs five checks and sends what they find back to fix (up to 3 rounds,
+stopping early if the same problems come back): code (syntax, imports, links, JSON, CSS), every page loads, phone
+layout at 390px, pressing every button and control, and an AI code review of the changed files (Settings → Tools).
