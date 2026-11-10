@@ -70,7 +70,10 @@
     if (!t || t.kind === "preview") { newTab(input); return; }
     const q = String(input || "").trim();
     if (!q) return;
-    const url = toUrl(q);
+    let url = toUrl(q);
+    // With the cloud browser, a search is a real search engine in real Chrome (DuckDuckGo: Google
+    // often answers cloud servers with a CAPTCHA). Without it, FIZZ shows its own results page.
+    if (!url && (cloudOn() || t.kind === "cloud")) url = `https://duckduckgo.com/?q=${encodeURIComponent(q)}`;
     if (!url) { push(t, { kind: "search", q }); return show(t); }
 
     // Prefer real Chromium for every website so cookies, JS, redirects and forms work and FIZZ DEV

@@ -34,3 +34,5 @@ jobs:
         run: node tests/netlify/tools.test.mjs
       - name: Check browser automation test can start
         run: node tests/netlify/browser.test.mjs
+      - name: Test the cloud browser start path
+        run: node tests/netlify/sandbox-browser.test.mjs

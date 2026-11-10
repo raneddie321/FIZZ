@@ -14,37 +14,68 @@ export const sandboxBrowserEnabled = () => sandboxEnabled() && Boolean(env("VERC
 export const tokenFor = (uid) => createHmac("sha256", env("FIZZ_SECRET") || "fizz").update(`browser:${uid}`).digest("hex").slice(0, 40);
 const nameFor = (uid) => `fizz-br-${createHash("sha256").update(`browser:${uid}`).digest("hex").slice(0, 24)}`;
 
-async function healthy(base, token) {
-  try { const r = await fetch(`${base}/health?token=${token}`, { signal: AbortSignal.timeout(4000) }); return r.ok; } catch { return false; }
+/** 200 when the browser is ready, 401 when an agent with another token answers, 0 when nothing answers. */
+async function health(base, token) {
+  try { const r = await fetch(`${base}/health?token=${token}`, { signal: AbortSignal.timeout(6000) }); return r.status; } catch { return 0; }
+}
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Is the agent listening inside the sandbox? (Any answer counts — without the token it's a quick 401.)
+// This asks from inside the VM, so it works even before the public route answers.
+const PROBE = `fetch("http://127.0.0.1:${PORT}/ping",{signal:AbortSignal.timeout(2500)}).then(()=>process.exit(0),()=>process.exit(1))`;
+async function listening(sbx) {
+  try { return (await sbx.runCommand({ cmd: "node", args: ["-e", PROBE] })).exitCode === 0; } catch { return false; }
+}
+async function logTail(sbx) {
+  try { const r = await sbx.runCommand({ cmd: "bash", args: ["-c", "tail -c 1500 /tmp/fizz-br.log 2>/dev/null; tail -c 800 /tmp/fizz-br-install.log 2>/dev/null"] }); return (await r.stdout()).trim(); } catch { return ""; }
+}
+function publicBase(sbx) {
+  try { return String(sbx.domain(PORT)).replace(/\/$/, ""); } catch { return ""; }
 }
 
 /** Makes sure the user's browser is running. Returns { base, token } or { starting: true } while it installs (first time ~1 minute). */
 export async function ensureBrowser(uid, { waitMs = 35000 } = {}) {
   const { Sandbox } = await sdk();
   const sbx = await Sandbox.getOrCreate({ name: nameFor(uid), runtime: "node22", timeout: 45 * 60 * 1000, ports: [PORT], resources: { vcpus: 2 } });
-  const base = String(sbx.domain(PORT)).replace(/\/$/, "");
   const token = tokenFor(uid);
-  if (await healthy(base, token)) return { base, token };
-  await sbx.writeFiles([
-    { path: `${DIR}/agent.mjs`, content: Buffer.from(AGENT_JS) },
-    { path: `${DIR}/package.json`, content: Buffer.from(AGENT_PKG) },
-  ]);
-  // One starter at a time (a lock older than 4 minutes is stale).
-  const script = [
-    `find /tmp/fizz-br-lock -maxdepth 0 -mmin +4 -exec rm -rf {} + 2>/dev/null`,
-    `mkdir /tmp/fizz-br-lock 2>/dev/null || exit 0`,
-    `cd ${DIR}`,
-    `(test -d node_modules/@sparticuz/chromium || npm install --no-audit --no-fund >/tmp/fizz-br-install.log 2>&1)`,
-    // Do not use pkill -f here: it can match the shell command that contains this script
-    // and terminate startup itself. Keep an already-running agent and start only when absent.
-    `if ! pgrep -f '[n]ode agent.mjs' >/dev/null; then FIZZ_BR_TOKEN=${token} FIZZ_BR_PORT=${PORT} AWS_EXECUTION_ENV=AWS_Lambda_nodejs22.x nohup node agent.mjs >/tmp/fizz-br.log 2>&1 & fi`,
-    `sleep 1; rm -rf /tmp/fizz-br-lock`,
-  ].join("; ");
-  await sbx.runCommand({ cmd: "bash", args: ["-lc", script], detached: true });
+  let base = publicBase(sbx);
+  // A sandbox made before the port was exposed: expose it now.
+  if (!base && typeof sbx.update === "function") { await sbx.update({ ports: [PORT] }).catch(() => {}); base = publicBase(sbx); }
+  if (!base) throw new Error("the sandbox has no public address for the browser");
+  let st = await health(base, token);
+  if (st === 200) return { base, token };
+  // An old agent started with a different token: stop it and start a fresh one.
+  if (st === 401) { await sbx.runCommand({ cmd: "pkill", args: ["-f", "node agent.mjs"] }).catch(() => {}); await sleep(500); }
+
+  if (!(await listening(sbx))) {
+    await sbx.writeFiles([
+      { path: `${DIR}/agent.mjs`, content: Buffer.from(AGENT_JS) },
+      { path: `${DIR}/package.json`, content: Buffer.from(AGENT_PKG) },
+    ]);
+    // Install Chromium once (a lock keeps two requests from installing at the same time).
+    const install = `cd ${DIR} && (test -d node_modules/@sparticuz/chromium || { if command -v flock >/dev/null; then flock /tmp/fizz-br-install.lock sh -c 'test -d node_modules/@sparticuz/chromium || npm install --no-audit --no-fund'; else npm install --no-audit --no-fund; fi; } >/tmp/fizz-br-install.log 2>&1)`;
+    const done = await sbx.runCommand({ cmd: "bash", args: ["-c", install] });
+    if (done.exitCode !== 0) throw new Error(`installing the browser failed: ${(await logTail(sbx)).slice(-500) || `exit ${done.exitCode}`}`);
+    // The agent is its own long-running command (not a child of a shell that exits), so it stays up.
+    // Another request may have started it a moment ago: a second copy just fails to bind and exits.
+    if (!(await listening(sbx))) {
+      await sbx.runCommand({
+        cmd: "bash", args: ["-c", "exec node agent.mjs >>/tmp/fizz-br.log 2>&1"], cwd: DIR, detached: true,
+        env: { FIZZ_BR_TOKEN: token, FIZZ_BR_PORT: String(PORT), AWS_EXECUTION_ENV: "AWS_Lambda_nodejs22.x" },
+      });
+    }
+  }
   const until = Date.now() + waitMs;
+  let checks = 0;
   while (Date.now() < until) {
-    await new Promise((r) => setTimeout(r, 1500));
-    if (await healthy(base, token)) return { base, token };
+    await sleep(1500);
+    st = await health(base, token);
+    if (st === 200) return { base, token };
+    // If the agent isn't even listening after a few seconds, it crashed: say why instead of "starting" forever.
+    if (++checks === 4 && !(await listening(sbx))) {
+      await sleep(1500);
+      if (!(await listening(sbx))) throw new Error(`the browser agent stopped: ${(await logTail(sbx)).slice(-600) || "no log"}`);
+    }
   }
   return { starting: true };
 }
