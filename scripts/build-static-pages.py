@@ -17,8 +17,8 @@ HEAD = """<!doctype html>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" />
 <link rel="stylesheet" href="assets/site.css?v=20261103-roboto-font1" />
 <script>try{{var t=localStorage.getItem("fizz.theme");t=t?JSON.parse(t):"system";if(t==="dark"||(t!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}}catch(e){{}}</script>
-<script src="assets/core.js" defer></script>
-<script src="assets/raneddie-id.js" defer></script>
+<script src="assets/core.js?v=20261110-console1" defer></script>
+<script src="assets/raneddie-id.js?v=20261110-console1" defer></script>
 <script src="assets/site.js" defer></script>
 </head>
 <body>
@@ -243,8 +243,8 @@ RID_HEAD = """<!doctype html>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" />
 <link rel="stylesheet" href="assets/site.css" />
 <link rel="stylesheet" href="assets/rid.css" />
-<script src="assets/core.js" defer></script>
-<script src="assets/raneddie-id.js" defer></script>
+<script src="assets/core.js?v=20261110-console1" defer></script>
+<script src="assets/raneddie-id.js?v=20261110-console1" defer></script>
 <script src="assets/rid-auth.js" defer></script>
 </head>
 <body class="rid-page">

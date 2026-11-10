@@ -294,6 +294,31 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
   await ctx.close();
 }
 
+// ---------- Gemini: a model Google retired switches to one the key has ----------
+{
+  const { ctx, p, errs } = await open({ width: 1280, height: 800 });
+  const asked = [];
+  await ctx.route("https://generativelanguage.googleapis.com/v1beta/models?**", (r) => r.fulfill({ json: { models: [
+    { name: "models/gemini-2.0-flash", supportedGenerationMethods: ["generateContent"] },
+    { name: "models/gemini-9.9-flash", supportedGenerationMethods: ["generateContent"] },
+    { name: "models/gemini-9.9-flash-preview", supportedGenerationMethods: ["generateContent"] },
+    { name: "models/text-embedding-004", supportedGenerationMethods: ["embedContent"] },
+  ] } }));
+  await ctx.route("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", (r) => {
+    const m = r.request().postDataJSON().model; asked.push(m);
+    if (m === "gemini-old") return r.fulfill({ status: 404, json: { error: { message: "model not found" } } });
+    r.fulfill({ status: 200, headers: { "content-type": "text/event-stream" }, body: sse("Hello from the new model.") });
+  });
+  await p.goto(B + "chat.html"); await p.waitForTimeout(500);
+  await p.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.startsWith("fizz.data.")); const d = JSON.parse(localStorage.getItem(k) || "{}"); d.settings = { ...(d.settings || {}), provider: "gemini", geminiKey: "test-key", geminiModel: "gemini-old" }; localStorage.setItem(k, JSON.stringify(d)); });
+  await p.reload(); await p.waitForTimeout(600);
+  await p.locator("#chat-app #input, [data-app=chat] #input").first().fill("hi"); await p.keyboard.press("Enter");
+  await lastReply(p, "#chat-app", "Hello from the new model.").catch(() => {});
+  check("gemini: a retired model falls back to the newest Flash the key has", asked.join(",") === "gemini-old,gemini-9.9-flash", asked.join(","));
+  check("gemini: the reply arrives", (await p.locator("#chat-app").innerText()).includes("Hello from the new model."));
+  await ctx.close();
+}
+
 // ---------- app switch keeps one page ----------
 {
   const { ctx, p, errs } = await open({ width: 1280, height: 800 });

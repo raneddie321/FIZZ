@@ -70,12 +70,17 @@
   }
 
   // ---------- settings sync (privateMetadata.fizz, at most ~500 bytes on the server) ----------
+  // When the server has no RanEddie ID secret (503) it says so in /api/status (raneddieId.account: false);
+  // after that, settings stay in this browser and the page stops asking (it used to ask on every change).
+  let accountOff = false;
   async function api(method, body) {
+    if (accountOff || F.serverStatusCached?.()?.raneddieId?.account === false) throw Object.assign(new Error("not_configured"), { status: 503 });
     const clerk = await load();
     const token = await clerk?.session?.getToken();
     if (!token) throw new Error("signed_out");
     const res = await fetch("/api/account", { method, headers: { Authorization: `Bearer ${token}`, ...(body ? { "Content-Type": "application/json" } : {}) }, body: body && JSON.stringify(body) });
     const data = await res.json().catch(() => ({}));
+    if (res.status === 503) accountOff = true;
     if (!res.ok) throw Object.assign(new Error(data.error?.message || `Error ${res.status}`), { status: res.status });
     return data;
   }

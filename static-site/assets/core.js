@@ -11,6 +11,20 @@
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
 
+  /** The newest Gemini Flash model this API key can use (null when the list can't be read). */
+  async function geminiFallback(key, not) {
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=${encodeURIComponent(key)}`);
+    if (!r.ok) return null;
+    const names = ((await r.json()).models || [])
+      .filter((m) => (m.supportedGenerationMethods || []).includes("generateContent"))
+      .map((m) => String(m.name || "").replace(/^models\//, ""))
+      .filter((n) => /^gemini-/.test(n) && n !== not && !/(preview|exp|tts|image|embedding|live|audio)/.test(n));
+    const ver = (n) => parseFloat((/^gemini-(\d+(?:\.\d+)?)/.exec(n) || [])[1] || 0);
+    const rank = (n) => (/-flash$/.test(n) ? 3 : /-flash-lite$/.test(n) ? 2 : /flash/.test(n) ? 1 : 0);
+    names.sort((a, b) => rank(b) - rank(a) || ver(b) - ver(a));
+    return names[0] || null;
+  }
+
   // ---------- theme ----------
   function applyTheme(t) {
     const dark = t === "dark" || (t !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
@@ -325,7 +339,18 @@
     if (settings.provider === "gemini") {
       if (!settings.geminiKey) throw new Error("NO_KEY");
       // Google AI Studio's OpenAI-compatible endpoint, called straight from the browser with the user's key.
-      return streamOpenAI("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", { Authorization: `Bearer ${settings.geminiKey}` }, { model: settings.geminiModel || "gemini-3.8-flash", stream: true, messages: [{ role: "system", content: system }, ...history.map(toOpenAI)] }, signal, onText);
+      const ask = (m) => streamOpenAI("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", { Authorization: `Bearer ${settings.geminiKey}` }, { model: m, stream: true, messages: [{ role: "system", content: system }, ...history.map(toOpenAI)] }, signal, onText);
+      const wanted = settings.geminiModel || "gemini-3.8-flash";
+      try { return await ask(wanted); }
+      catch (e) {
+        // Google retires models: switch to the newest Flash this key can use, remember it, and try once more.
+        if (e.status !== 404) throw e;
+        const next = await geminiFallback(settings.geminiKey, wanted).catch(() => null);
+        if (!next) throw e;
+        settings.geminiModel = next; // the live settings object: saved with the next change
+        toast(`“${wanted}” isn't available on Google any more — using ${next}.`);
+        return ask(next);
+      }
     }
     if (settings.provider === "openrouter") {
       if (!settings.openrouterKey) throw new Error("NO_KEY");
