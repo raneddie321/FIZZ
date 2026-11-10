@@ -234,6 +234,51 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
   await ctx.close();
 }
 
+// ---------- Cloud browser: searches open in real Chrome, the screen reconnects after leaving ----------
+{
+  const { ctx, p, errs } = await open({ width: 1280, height: 800 });
+  await ctx.route("**/api/status", (r) => r.fulfill({ json: { server: true, apps: [], ai: { configured: true, model: "test-model", dailyLimit: 50 }, connections: {}, google: {}, tools: { search: "wikipedia", browser: true } } }));
+  const calls = [];
+  let asleep = false;
+  const tabsFor = (url) => [{ id: "T1", title: "Search", url, active: true, stream: "https://sb.test/stream?token=x&target=T1", input: "https://sb.test/input?token=x&target=T1" }];
+  await ctx.route("**/api/browser", (r) => {
+    const b = r.request().postDataJSON(); calls.push(b);
+    if (b.action === "warm") return r.fulfill({ json: { ready: true } });
+    if (b.action === "live") return r.fulfill({ json: asleep ? { starting: true } : { pages: tabsFor("https://duckduckgo.com/?q=snake"), engine: "sandbox" } });
+    r.fulfill({ json: { text: "ok", page: { url: b.url, title: "Search" }, elements: [], tabs: tabsFor(b.url), engine: "sandbox" } });
+  });
+  const shots = [];
+  await ctx.route("https://sb.test/**", (r) => { shots.push(r.request().url()); r.fulfill({ status: 200, contentType: "image/jpeg", body: Buffer.from("/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==", "base64") }); });
+  await p.goto(B + "dev.html"); await p.waitForTimeout(800);
+  await p.click('#dev-app [data-tab="browser"]');
+  await p.click("#br-new");
+  await p.waitForTimeout(300);
+  check("browser: opening the Browser tab wakes the cloud browser", calls.some((c) => c.action === "warm"));
+  await p.fill("#br-url", "snake game"); await p.keyboard.press("Enter");
+  await p.waitForFunction(() => !document.querySelector("#br-screen")?.hidden, null, { timeout: 8000 });
+  const open1 = calls.find((c) => c.action === "open");
+  check("browser: a search opens a real search engine in Chrome", open1?.url === "https://duckduckgo.com/?q=snake%20game", open1?.url);
+  // Leave (another pane, the app in the background) and come back: the screen reconnects.
+  const before = shots.length;
+  await p.click('#dev-app [data-tab="code"]'); await p.waitForTimeout(200);
+  await p.click('#dev-app [data-tab="browser"]');
+  for (let i = 0; i < 20 && shots.length <= before; i++) await p.waitForTimeout(150);
+  check("browser: coming back to the tab reconnects the screen", shots.length > before);
+  // The browser went to sleep while away: it shows "starting", then reconnects when it's back.
+  asleep = true;
+  const n = shots.length;
+  await p.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+  await p.waitForSelector(".br-starting", { timeout: 5000 }).catch(() => {});
+  check("browser: a sleeping cloud browser shows that it's starting", (await p.locator(".br-starting").count()) === 1);
+  asleep = false;
+  await p.waitForFunction(() => !document.querySelector(".br-starting"), null, { timeout: 8000 }).catch(() => {});
+  await p.waitForTimeout(300);
+  for (let i = 0; i < 20 && shots.length <= n + 1; i++) await p.waitForTimeout(150);
+  check("browser: after waking up the screen reconnects (no black screen)", (await p.locator(".br-starting").count()) === 0 && shots.length > n + 1);
+  check("browser: no script errors", !errs.length, errs.join(" | "));
+  await ctx.close();
+}
+
 // ---------- app switch keeps one page ----------
 {
   const { ctx, p, errs } = await open({ width: 1280, height: 800 });

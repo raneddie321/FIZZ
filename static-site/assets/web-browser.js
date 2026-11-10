@@ -156,20 +156,51 @@
     if (!tab()) active = "preview";
     render();
   }
+  let down = false, checking = false, warmed = 0;
+  /** Asks the cloud browser how it is now. If it went to sleep (the app was in the background or idle),
+   *  it's woken up and the screen reconnects instead of staying black. */
+  async function checkLive() {
+    if (checking || !tabs.some((t) => t.kind === "cloud")) return;
+    checking = true;
+    try {
+      const r = await F.conn.api("/api/browser", { body: { action: "live" }, auth: true });
+      if (r.ended) { for (const t of [...tabs]) if (t.kind === "cloud") tabs.splice(tabs.indexOf(t), 1); if (!tab()) active = "preview"; render(); F.toast("The cloud browser session ended"); return; }
+      if (r.starting) { down = true; if (!starting) { starting = true; render(); } return; }
+      const wasDown = down || starting;
+      down = false;
+      if (starting) { starting = false; }
+      syncCloud({ pages: r.pages });
+      if (wasDown) reconnectScreen();
+    } catch { down = true; }
+    finally { checking = false; }
+  }
   function pollLive() {
     clearTimeout(liveTimer);
     if (!tabs.some((t) => t.kind === "cloud")) return;
     liveTimer = setTimeout(async () => {
-      if (!document.hidden && tab()?.kind === "cloud" && $(".pane-browser.on")) {
-        try {
-          const r = await F.conn.api("/api/browser", { body: { action: "live" }, auth: true });
-          if (r.ended) { for (const t of [...tabs]) if (t.kind === "cloud") tabs.splice(tabs.indexOf(t), 1); if (!tab()) active = "preview"; render(); F.toast("The cloud browser session ended"); return; }
-          syncCloud({ pages: r.pages });
-        } catch {}
-      }
+      if (!document.hidden && tab()?.kind === "cloud" && $(".pane-browser.on")) await checkLive();
       pollLive();
-    }, 6000);
+    }, down || starting ? 2500 : 6000);
   }
+  /** Opens the live picture again (after the phone locked, the app was in the background, or the browser woke up). */
+  function reconnectScreen() {
+    const t = tab(), el = $("#br-screen");
+    if (!el || t?.kind !== "cloud" || !t.stream) return;
+    const img = el.querySelector("img");
+    img.dataset.mode = "stream";
+    img.dataset.src = t.stream;
+    img.dataset.fails = "0";
+    img.src = `${t.stream}&r=${Date.now()}`;
+  }
+  // Coming back to the app: check the browser right away and reconnect the picture.
+  const onBack = () => {
+    if (document.hidden || tab()?.kind !== "cloud" || !$(".pane-browser.on")) return;
+    reconnectScreen();
+    checkLive().then(pollLive);
+  };
+  document.addEventListener("visibilitychange", onBack);
+  addEventListener("pageshow", (e) => { if (e.persisted) onBack(); });
+  addEventListener("online", onBack);
   async function endCloud() {
     try { await F.conn.api("/api/browser", { body: { action: "release" }, auth: true }); } catch {}
     for (const t of [...tabs]) if (t.kind === "cloud") tabs.splice(tabs.indexOf(t), 1);
@@ -186,6 +217,7 @@
   const searchBox = (q = "") => `<form><input name="q" value="${esc(q)}" placeholder="Search the web or type a link"><button>Search</button></form>`;
 
   async function draw(t, entry) {
+    if (entry.kind === "start") warmUp(); // the first site then opens in seconds
     if (entry.kind === "start") return page(`<h1 class="logo">Browse the web</h1>${searchBox()}<div class="tiles">${QUICK.map(([n, d]) => `<a href="https://${d}"><img src="${favicon(d)}" alt="">${esc(n)}</a>`).join("")}</div><p class="muted" style="margin-top:22px;font-size:13px;text-align:center">${cloudOn() ? "Sites that can't be shown here open in the cloud browser — Fizz Code can use it too." : "Some sites can't be shown inside apps; those open as a reader view."}</p>`, "New tab");
     if (entry.kind === "search") {
       let results = "";
@@ -267,14 +299,29 @@
     el.setAttribute("aria-label", "Cloud browser — click to use it, then type");
     el.innerHTML = `<img alt="Cloud browser" draggable="false" /><div class="br-screen-hint">Click to use the browser. Typing goes to the page.</div>`;
     $("#br-stage").appendChild(el);
+    // Shown again after another pane, the chat on a phone, or a minimized panel: reconnect the live picture.
+    let away = false;
+    new IntersectionObserver((es) => {
+      const seen = es.some((e) => e.isIntersecting);
+      if (seen && away) reconnectScreen();
+      away = !seen;
+    }).observe(el);
     const img = el.querySelector("img");
     let poll = null;
     img.addEventListener("error", () => {
       // Some networks buffer live streams: fall back to fresh frames twice a second.
+      if (img.dataset.mode === "frames") {
+        // The browser stopped answering (it went to sleep): wake it and reconnect.
+        if (Number(img.dataset.fails = Number(img.dataset.fails || 0) + 1) === 4) { down = true; checkLive().then(pollLive); }
+        return;
+      }
       if (img.dataset.mode !== "stream" || !img.dataset.src) return;
       img.dataset.mode = "frames";
+      img.dataset.fails = "0";
       clearInterval(poll);
       poll = setInterval(() => { if (el.hidden || img.dataset.mode !== "frames") return clearInterval(poll); img.src = img.dataset.src.replace("/stream?", "/frame.jpg?") + "&t=" + Date.now(); }, 500);
+    });
+    img.addEventListener("load", () => { if (img.dataset.mode === "frames") img.dataset.fails = "0";
     });
     // Input goes out in order; quick typing is grouped into one message.
     let chain = Promise.resolve(), pendingText = "", textTimer = 0;
@@ -327,11 +374,12 @@
     // Cloud tabs show the live browser: Browserbase's live view (an iframe), or FIZZ's own browser's screen.
     let live = $("#br-live");
     const screen = ensureScreen();
+    const wasHidden = screen.hidden;
     screen.hidden = !(t.kind === "cloud" && t.stream);
     if (t.kind === "cloud" && t.stream) {
       if (live) live.hidden = true;
       const img = screen.querySelector("img");
-      if (img.dataset.src !== t.stream) { img.dataset.src = t.stream; img.dataset.mode = "stream"; img.src = t.stream; }
+      if (img.dataset.src !== t.stream || wasHidden) { img.dataset.src = t.stream; img.dataset.mode = "stream"; img.dataset.fails = "0"; img.src = `${t.stream}&r=${Date.now()}`; }
       screen.dataset.input = t.input || "";
     } else if (t.kind === "cloud") {
       if (!live) { live = document.createElement("iframe"); live.id = "br-live"; live.className = "web-frame"; live.setAttribute("sandbox", "allow-same-origin allow-scripts allow-forms allow-popups"); live.setAttribute("allow", "clipboard-read; clipboard-write; autoplay"); $("#br-stage").appendChild(live); }
@@ -551,12 +599,11 @@
     },
   });
 
-  /** Starts the cloud browser in the background (Do mode), so the first real step doesn't wait for the install. */
-  let warmed = 0;
+  /** Starts the cloud browser in the background (Do mode, or the Browser tab opening), so the first site doesn't wait. */
   function warmUp() {
-    if (!cloudOn() || Date.now() - warmed < 10 * 60_000) return;
+    if (!cloudOn() || Date.now() - warmed < 5 * 60_000) return;
     warmed = Date.now();
-    F.conn.api("/api/browser", { body: { action: "live" }, auth: true }).catch(() => {});
+    F.conn.api("/api/browser", { body: { action: "warm" }, auth: true }).catch(() => {});
   }
   F.web = {
     warmUp,

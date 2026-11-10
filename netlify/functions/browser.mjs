@@ -17,7 +17,7 @@ async function sandboxEngine(req, uid, body, headers) {
   if (action === "release") return json({ released: true });
   let b;
   // Short waits: each request returns well inside the function's time limit, and the page keeps asking while it starts.
-  try { b = await ensureBrowser(uid, { waitMs: action === "live" ? 5000 : 12000 }); }
+  try { b = await ensureBrowser(uid, { waitMs: action === "warm" ? 0 : action === "live" ? 5000 : 12000 }); }
   catch (e) {
     console.error("[browser:sandbox]", e);
     const m = String(e.message || e);
@@ -26,6 +26,7 @@ async function sandboxEngine(req, uid, body, headers) {
       : "";
     throw Object.assign(new Error(`The cloud browser couldn't start: ${m.slice(0, 300)}.${hint}`), { status: 502, code: "sandbox_failed" });
   }
+  if (action === "warm") return json({ ready: !b.starting });
   if (b.starting) return json({ starting: true, text: "The cloud browser is starting (the first time takes about a minute)." });
   if (action === "live") return json({ pages: await sandboxTabs(b.base, b.token), active: st.active, engine: "sandbox" });
   const out = await act({ connectUrl: cdpUrl(b.base, b.token), active: st.active }, body);
@@ -65,9 +66,10 @@ export default async (req) => {
     const body = await readJson(req, 20_000);
     const action = String(body.action || "");
     if (engine === "sandbox") {
-      if (action !== "live" && action !== "release" && !(await quotaCounter()(`${today()}/browser/${uid}`, Number(env("FIZZ_BROWSER_LIMIT") || 600)))) return error(429, "You've reached today's limit for the cloud browser. Try again tomorrow.", "quota");
+      if (!["live", "release", "warm"].includes(action) && !(await quotaCounter()(`${today()}/browser/${uid}`, Number(env("FIZZ_BROWSER_LIMIT") || 600)))) return error(429, "You've reached today's limit for the cloud browser. Try again tomorrow.", "quota");
       return await sandboxEngine(req, uid, body, headers);
     }
+    if (action === "warm") return json({ ready: true }); // Browserbase starts per session; nothing to wake
     let st = unseal(getCookie(req, COOKIE));
     if (st && st.uid !== uid) st = null;
 
