@@ -163,10 +163,10 @@
 
   /** The list for Settings → Connections. */
   async function listHtml() {
-    let servers = [];
-    try { servers = (await F.conn.mcp.list()).servers || []; } catch { return `<p class="muted-sm">Custom connectors are unavailable right now.</p>`; }
+    let servers = [], storage = "";
+    try { const r = await F.conn.mcp.list(); servers = r.servers || []; storage = r.storage || ""; } catch { return `<p class="muted-sm">Custom connectors are unavailable right now.</p>`; }
     const rows = servers.map((s) => `<div class="conn"><span class="app-ic" aria-hidden="true">${esc((s.name || "M").slice(0, 1).toUpperCase())}</span><div class="conn-body"><b>${esc(s.name)}</b><small class="mono">${esc(s.url)}</small><small class="conn-state">${s.toolCount} tool${s.toolCount === 1 ? "" : "s"} · ${s.auth === "oauth" ? "signed in" : s.auth === "headers" ? "API key / headers" : "no sign-in"}</small></div><div class="row-inline">${s.auth === "oauth" ? `<button type="button" class="btn btn-outline btn-sm" data-cc-reconnect="${esc(s.id)}" data-url="${esc(s.url)}" data-name="${esc(s.name)}">Reconnect</button>` : ""}<button type="button" class="btn btn-outline btn-sm" data-cc-remove="${esc(s.id)}">Remove</button></div></div>`).join("");
-    return `<h3 class="conn-group">Custom connectors</h3><p class="muted-sm">Connect any MCP server by its URL. Fizz uses its tools when you ask; tools that send, post or delete ask you first.</p>${rows}<button type="button" class="btn btn-outline btn-sm" data-cc-open>${F.icon("plus")}Add custom connector</button>`;
+    return `<h3 class="conn-group">Custom connectors</h3><p class="muted-sm">Connect any MCP server by its URL. Fizz uses its tools when you ask; tools that send, post or delete ask you first.</p>${rows}${storage === "vault" ? '<p class="muted-sm">Saved encrypted in this browser. When the site owner connects a database (Neon), they follow you to every device.</p>' : storage === "neon" || storage === "redis" ? '<p class="muted-sm">Saved encrypted on FIZZ\'s server for your account — no limit on how many.</p>' : ""}<button type="button" class="btn btn-outline btn-sm" data-cc-open>${F.icon("plus")}Add custom connector</button>`;
   }
   /** Handles the list's buttons; returns true when it handled the click. */
   async function handleListClick(t, rerender) {

@@ -17,7 +17,7 @@ async function sandboxEngine(req, uid, body, headers) {
   if (action === "release") return json({ released: true });
   let b;
   // Short waits: each request returns well inside the function's time limit, and the page keeps asking while it starts.
-  try { b = await ensureBrowser(uid, { waitMs: action === "warm" ? 0 : action === "live" ? 5000 : 12000 }); }
+  try { b = await ensureBrowser(uid, { waitMs: action === "warm" ? 0 : action === "live" ? 5000 : 12000, base: st.base }); }
   catch (e) {
     console.error("[browser:sandbox]", e);
     const m = String(e.message || e);
@@ -26,9 +26,23 @@ async function sandboxEngine(req, uid, body, headers) {
       : "";
     throw Object.assign(new Error(`The cloud browser couldn't start: ${m.slice(0, 300)}.${hint}`), { status: 502, code: "sandbox_failed" });
   }
-  if (action === "warm") return json({ ready: !b.starting });
+  // Remember where the browser answers, so the next request skips the Sandbox API (see ensureBrowser).
+  const remember = () => { if (b.base && st.base !== b.base) { st.base = b.base; setCookie(headers, "fizz_br2", seal(st), { maxAge: 60 * 60 * 24 * 30 }); } };
+  if (action === "warm") { remember(); return json({ ready: !b.starting }, { headers }); }
   if (b.starting) return json({ starting: true, text: "The cloud browser is starting (the first time takes about a minute)." });
-  if (action === "live") return json({ pages: await sandboxTabs(b.base, b.token), active: st.active, engine: "sandbox" });
+  remember();
+  if (action === "live") return json({ pages: await sandboxTabs(b.base, b.token), active: st.active, engine: "sandbox" }, { headers });
+  // The address bar (fast: true): just navigate — the live picture shows the page loading. Fizz Code's own
+  // "open" goes the full way below, because it needs the page's text and elements back.
+  if (action === "open" && body.fast) {
+    const r = await fetch(`${b.base}/navigate?token=${b.token}${body.tab ? `&target=${encodeURIComponent(body.tab)}` : ""}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url: body.url, newTab: Boolean(body.newTab) }), signal: AbortSignal.timeout(15000) });
+    const nav = await r.json().catch(() => ({}));
+    if (!r.ok) throw Object.assign(new Error(nav.error || "The cloud browser couldn't open that address."), { status: r.status === 400 ? 400 : 502 });
+    st.active = nav.id || st.active;
+    setCookie(headers, "fizz_br2", seal(st), { maxAge: 60 * 60 * 24 * 30 });
+    const views = await sandboxTabs(b.base, b.token).catch(() => []);
+    return json({ text: "", page: { url: body.url, title: "" }, elements: [], tabs: views.map((v) => ({ ...v, active: v.id === st.active })), engine: "sandbox" }, { headers });
+  }
   const out = await act({ connectUrl: cdpUrl(b.base, b.token), active: st.active }, body);
   st.active = out.state.active;
   setCookie(headers, "fizz_br2", seal(st), { maxAge: 60 * 60 * 24 * 30 });

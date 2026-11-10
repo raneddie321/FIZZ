@@ -65,6 +65,46 @@
     t.idx = t.history.length - 1;
   }
 
+  // ---------- straight to the cloud browser ----------
+  // Once the browser runs, the user's own navigation, tab list and back/forward go directly to it
+  // (one round trip) instead of through FIZZ's server, which also had to look the sandbox up each time.
+  function agent() {
+    const t = tabs.find((x) => x.kind === "cloud" && x.stream);
+    if (!t) return null;
+    try { const u = new URL(t.stream); return { base: u.origin, token: u.searchParams.get("token") }; } catch { return null; }
+  }
+  const agentUrl = (a, path, target) => `${a.base}${path}?token=${encodeURIComponent(a.token)}${target ? `&target=${encodeURIComponent(target)}` : ""}`;
+  async function agentCall(path, { target, body, ms = 8000 } = {}) {
+    const a = agent();
+    if (!a) throw new Error("no browser yet");
+    const r = await fetch(agentUrl(a, path, target), body ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(ms) } : { signal: AbortSignal.timeout(ms) });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw Object.assign(new Error(data.error || `The cloud browser answered ${r.status}`), { status: r.status });
+    return data;
+  }
+  /** The tab list straight from the browser, in the shape syncCloud takes. */
+  async function agentPages() {
+    const a = agent();
+    const { tabs: list } = await agentCall("/tabs", { ms: 5000 });
+    return list.map((p) => ({ ...p, stream: agentUrl(a, "/stream", p.id), input: agentUrl(a, "/input", p.id) }));
+  }
+  /** Opens a link in the cloud browser directly. Returns false when it can't (not started yet, asleep). */
+  async function directOpen(url, t, newTab) {
+    if (!agent()) return false;
+    try {
+      const r = await agentCall("/navigate", { target: newTab ? null : t.target, body: { url, newTab } });
+      Object.assign(t, { kind: "cloud", target: r.id, url, title: hostName(url) || t.title, busy: false, error: "" });
+      syncCloud({ pages: await agentPages() }, t);
+      if (newTab) active = t.id;
+      setTimeout(() => refreshTabs(), 1500); // the title arrives once the page has loaded
+      return true;
+    } catch (e) {
+      if (e.status === 400) { t.error = e.message; render(); F.toast(e.message); return true; }
+      return false;
+    }
+  }
+  async function refreshTabs() { try { syncCloud({ pages: await agentPages() }); } catch {} }
+
   /** Opens a URL in the actual cloud Chrome whenever available, instead of a reader pane. */
   async function go(input, t = tab()) {
     if (!t || t.kind === "preview") { newTab(input); return; }
@@ -81,7 +121,8 @@
     if (cloudOn() || t.kind === "cloud") {
       const wasCloud = t.kind === "cloud";
       try {
-        await cloud({ action: "open", url, ...(wasCloud && t.target ? { tab: t.target } : {}) }, t);
+        if (await directOpen(url, t, !wasCloud)) return;
+        await cloud({ action: "open", fast: true, url, ...(wasCloud && t.target ? { tab: t.target } : {}) }, t);
       } catch (e) {
         t.busy = false;
         t.error = e.message || "Couldn't open this site in the cloud browser.";
@@ -163,6 +204,9 @@
     if (checking || !tabs.some((t) => t.kind === "cloud")) return;
     checking = true;
     try {
+      if (!down && agent()) {
+        try { syncCloud({ pages: await agentPages() }); return; } catch {} // asleep or gone: ask the server below
+      }
       const r = await F.conn.api("/api/browser", { body: { action: "live" }, auth: true });
       if (r.ended) { for (const t of [...tabs]) if (t.kind === "cloud") tabs.splice(tabs.indexOf(t), 1); if (!tab()) active = "preview"; render(); F.toast("The cloud browser session ended"); return; }
       if (r.starting) { down = true; if (!starting) { starting = true; render(); } return; }
@@ -180,7 +224,16 @@
     liveTimer = setTimeout(async () => {
       if (!document.hidden && tab()?.kind === "cloud" && $(".pane-browser.on")) await checkLive();
       pollLive();
-    }, down || starting ? 2500 : 6000);
+    }, down || starting ? 2500 : 3000); // cheap now: it asks the browser directly
+  }
+  /** The live picture's address, sized for the panel showing it (lighter on a phone). */
+  function streamSrc(t, fresh) {
+    const r = $("#br-stage")?.getBoundingClientRect();
+    const dpr = Math.min(2, devicePixelRatio || 1);
+    const w = Math.round(Math.min(1920, Math.max(480, (r?.width || 1280) * dpr)));
+    const h = Math.round(Math.min(1600, Math.max(480, (r?.height || 800) * dpr)));
+    const q = innerWidth < 760 ? 55 : 65;
+    return `${t.stream}&w=${w}&h=${h}&q=${q}${fresh ? `&r=${Date.now()}` : ""}`;
   }
   /** Opens the live picture again (after the phone locked, the app was in the background, or the browser woke up). */
   function reconnectScreen() {
@@ -190,7 +243,7 @@
     img.dataset.mode = "stream";
     img.dataset.src = t.stream;
     img.dataset.fails = "0";
-    img.src = `${t.stream}&r=${Date.now()}`;
+    img.src = streamSrc(t, true);
   }
   // Coming back to the app: check the browser right away and reconnect the picture.
   const onBack = () => {
@@ -379,7 +432,7 @@
     if (t.kind === "cloud" && t.stream) {
       if (live) live.hidden = true;
       const img = screen.querySelector("img");
-      if (img.dataset.src !== t.stream || wasHidden) { img.dataset.src = t.stream; img.dataset.mode = "stream"; img.dataset.fails = "0"; img.src = `${t.stream}&r=${Date.now()}`; }
+      if (img.dataset.src !== t.stream || wasHidden) { img.dataset.src = t.stream; img.dataset.mode = "stream"; img.dataset.fails = "0"; img.src = streamSrc(t, true); }
       screen.dataset.input = t.input || "";
     } else if (t.kind === "cloud") {
       if (!live) { live = document.createElement("iframe"); live.id = "br-live"; live.className = "web-frame"; live.setAttribute("sandbox", "allow-same-origin allow-scripts allow-forms allow-popups"); live.setAttribute("allow", "clipboard-read; clipboard-write; autoplay"); $("#br-stage").appendChild(live); }
@@ -408,7 +461,8 @@
     else {
       const selected = tab(id);
       if (selected?.kind === "cloud" && selected.target) {
-        cloud({ action: "switch", tab: selected.target }, selected).catch((e) => F.toast(e.message));
+        // Fizz Code works in the tab you look at; the picture already shows it, so this runs in the background.
+        cloud({ action: "switch", tab: selected.target }, null).catch(() => {});
       }
     }
   }
@@ -419,7 +473,7 @@
     tabs.splice(i, 1);
     frames.get(id)?.remove();
     frames.delete(id);
-    if (t.kind === "cloud" && t.target) F.conn.api("/api/browser", { body: { action: "close", tab: t.target }, auth: true }).catch(() => {});
+    if (t.kind === "cloud" && t.target) agentCall("/close", { target: t.target, body: {} }).catch(() => F.conn.api("/api/browser", { body: { action: "close", tab: t.target }, auth: true }).catch(() => {}));
     if (active === id) active = tabs[Math.min(i, tabs.length - 1)].id;
     render();
   }
@@ -427,7 +481,11 @@
   async function nav(dir) {
     const t = tab();
     if (!t || t.kind === "preview") return;
-    if (t.kind === "cloud") return cloud({ action: dir === -1 ? "back" : dir === 1 ? "forward" : "reload", tab: t.target }, t).catch((e) => F.toast(e.message));
+    if (t.kind === "cloud") {
+      const type = dir === -1 ? "back" : dir === 1 ? "forward" : "reload";
+      try { await agentCall("/input", { target: t.target, body: { type } }); setTimeout(refreshTabs, 900); return; } catch {}
+      return cloud({ action: type, tab: t.target }, t).catch((e) => F.toast(e.message));
+    }
     if (dir === 0) { const f = frames.get(t.id); if (t.history[t.idx]?.kind === "frame") { f.src = t.history[t.idx].url; } else show(t); return; }
     const n = t.idx + dir;
     if (n < 0 || n >= t.history.length) return;

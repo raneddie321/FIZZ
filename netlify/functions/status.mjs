@@ -1,3 +1,4 @@
+import { storageKind } from "../lib/mcp-store.mjs";
 import { sandboxBrowserEnabled } from "../lib/sandbox-browser.mjs";
 import { sandboxEnabled } from "../lib/sandbox.mjs";
 import { env, getCookie, json, secretConfigured, unseal } from "../lib/util.mjs";
@@ -33,7 +34,7 @@ export default async (req) => {
     // Fizz Code tools: which ones this deployment can offer.
     tools: { search: searchProvider(), browser: Boolean(env("BROWSERBASE_API_KEY")) || sandboxBrowserEnabled(), browserEngine: env("BROWSERBASE_API_KEY") ? "browserbase" : sandboxBrowserEnabled() ? "sandbox" : null, sandbox: sandboxEnabled() && Boolean(env("VERCEL")), sync: kvConfigured() && clerkConfigured() },
     // MCP (Model Context Protocol) servers: FIZZ keeps them in a sealed cookie, so it needs FIZZ_SECRET.
-    mcp: { configured: secret },
+    mcp: { configured: secret, storage: storageKind() },
     google: { configured: Boolean(env("GOOGLE_CLIENT_ID")), clientId: env("GOOGLE_CLIENT_ID") ?? null },
   });
 };

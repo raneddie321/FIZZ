@@ -345,11 +345,9 @@ assert.equal(j.ai.model, "gemini-3.8-flash");
     }
     return realFetch(url, init);
   };
-  const post = (action, body, cookie, origin = O) => mcpFn(new Request(`${O}/api/mcp/${action}`, { method: "POST", headers: { origin, ...(body ? { "content-type": "application/json" } : {}), ...(cookie ? { cookie } : {}) }, body: body && JSON.stringify(body) }), { params: { action } });
-  const mcpCookieOf = (res) => {
-    const m = /fizz_mcp=([^;]+)/.exec(res.headers.get("set-cookie") || "");
-    return m ? `fizz_mcp=${m[1]}` : null;
-  };
+  // Without a database the list lives in the browser's sealed vault, sent with each request.
+  const post = (action, body, vault, origin = O, cookie) => mcpFn(new Request(`${O}/api/mcp/${action}`, { method: "POST", headers: { origin, "content-type": "application/json", ...(cookie ? { cookie } : {}) }, body: JSON.stringify({ ...(body || {}), ...(vault ? { vault } : {}) }) }), { params: { action } });
+  const vaultOf = async (res) => (await res.clone().json()).vault || null;
 
   j = await (await status(new Request(`${O}/api/status`))).json();
   assert.equal(j.mcp.configured, true, "status reports MCP as available");
@@ -363,12 +361,14 @@ assert.equal(j.ai.model, "gemini-3.8-flash");
   assert.equal(j.server.tools[0].name, "lookup");
   assert.ok(j.server.tools[0].input.includes("query"), "input schema summarized for the model");
   assert.ok(!JSON.stringify(j).includes("secret-mcp-token-abc123"), "the header value never comes back");
-  const setCookie = r.headers.get("set-cookie");
-  assert.ok(setCookie?.startsWith("fizz_mcp="), "kept in a sealed HttpOnly cookie");
-  assert.ok(/HttpOnly/.test(setCookie) && /Secure/.test(setCookie));
-  const sealed = /fizz_mcp=([^;]+)/.exec(setCookie)[1];
-  assert.ok(!sealed.includes("secret-mcp-token-abc123") && unseal(decodeURIComponent(sealed)).list[0].headers.Authorization === AUTH, "sealed — the page can't read the header");
-  let ck = `fizz_mcp=${sealed}`;
+  assert.equal(j.storage, "vault", "no database here: the browser keeps a sealed vault");
+  assert.ok(!r.headers.get("set-cookie")?.includes("fizz_mcp="), "no more cookies for the list (they had a size limit)");
+  const sealed = j.vault;
+  assert.ok(!sealed.includes("secret-mcp-token-abc123") && unseal(sealed).list[0].headers.Authorization === AUTH, "sealed — the page can't read the header");
+  let ck = sealed;
+  // Another user can't open this vault.
+  r = await mcpFn(new Request(`${O}/api/mcp/list`, { method: "POST", headers: { origin: O, "content-type": "application/json", "x-fizz-device": "b".repeat(32) }, body: JSON.stringify({ vault: ck }) }), { params: { action: "list" } });
+  assert.equal((await r.json()).servers.length, 0, "a vault is bound to its user");
 
   // list: public info only
   r = await post("list", null, ck);
@@ -410,7 +410,7 @@ assert.equal(j.ai.model, "gemini-3.8-flash");
   // the older HTTP+SSE transport: POST initialize → 404, then GET stream + endpoint event
   r = await post("add", { url: "https://203.0.113.99/sse" }, ck);
   assert.equal(r.status, 200, "legacy SSE transport connects");
-  ck = mcpCookieOf(r);
+  ck = await vaultOf(r);
   j = await r.json();
   assert.equal(j.server.name, "Legacy MCP", "name read from the handshake on the stream");
   assert.equal(j.server.toolCount, 1);
@@ -419,7 +419,7 @@ assert.equal(j.ai.model, "gemini-3.8-flash");
   // adding the same URL again updates the entry instead of duplicating it
   r = await post("add", { url: "https://203.0.113.10/mcp", headers: { Authorization: AUTH } }, ck);
   assert.equal(r.status, 200);
-  ck = mcpCookieOf(r);
+  ck = await vaultOf(r);
   r = await post("list", null, ck);
   j = await r.json();
   assert.equal(j.servers.length, 2, "still two servers after re-adding one");
@@ -432,7 +432,7 @@ assert.equal(j.ai.model, "gemini-3.8-flash");
   // remove
   r = await post("remove", { id }, ck);
   assert.equal(r.status, 200);
-  r = await post("list", null, mcpCookieOf(r) || ck);
+  r = await post("list", null, (await vaultOf(r)) || ck);
   j = await r.json();
   assert.equal(j.servers.length, 1);
   assert.equal(j.servers[0].name, "Legacy MCP");
@@ -518,14 +518,17 @@ assert.equal(j.ai.model, "gemini-3.8-flash");
   assert.match(r.headers.get("location"), /\/dev\.html\?mcp_connected=Composio/);
   assert.equal(issued, 1);
   const ck = cookiesOf(r);
-  assert.ok(ck.includes("fizz_mcp="), "connector saved");
+  assert.ok(ck.includes("fizz_mcp_new="), "the new connector waits in a short-lived sealed cookie");
   r = await post("list", {}, ck);
   j = await r.json();
+  assert.ok(j.vault, "…and moves into the vault on the next request");
+  assert.ok((r.headers.getSetCookie?.() || []).some((c) => c.startsWith("fizz_mcp_new=;")), "the hand-over cookie is cleared");
+  const vault = j.vault;
   assert.equal(j.servers[0].auth, "oauth");
   assert.equal(j.servers[0].tools[0].name, "gmail_send");
   assert.ok(!JSON.stringify(j).includes("at-1") && !JSON.stringify(j).includes("rt-1"), "tokens never reach the browser");
   // The access token expired (expires_in: 1): the next call refreshes it first.
-  r = await post("call", { id: j.servers[0].id, tool: "gmail_send", arguments: {} }, ck);
+  r = await post("call", { id: j.servers[0].id, tool: "gmail_send", arguments: {}, vault });
   j = await r.json();
   assert.equal(refreshed, 1, "token refreshed");
   assert.match(j.text, /called with ••••|called with Bearer at-2/);

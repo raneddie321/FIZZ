@@ -4,6 +4,29 @@
   const F = window.FIZZ;
 
   let memDevice = "";
+  // ---------- MCP vault (see F.conn.mcp) ----------
+  const VAULT = "fizz.mcp.vault";
+  let memVault = "";
+  const getVault = () => { try { return localStorage.getItem(VAULT) || memVault; } catch { return memVault; } };
+  const setVault = (v) => { memVault = v; try { localStorage.setItem(VAULT, v); } catch {} };
+  let mcpChain = Promise.resolve();
+  /** Changes go one at a time, so two of them never race over the same vault. */
+  function mcpApi(action, body = {}) {
+    const run = async () => {
+      try {
+        const r = await api(`/api/mcp/${action}`, { body: { ...body, vault: getVault() || undefined }, auth: true });
+        if (r?.vault) setVault(r.vault);
+        return r;
+      } catch (e) {
+        if (e.data?.vault) setVault(e.data.vault);
+        throw e;
+      }
+    };
+    if (action === "call") return run(); // tool calls run side by side; they only rarely refresh a sign-in
+    const p = mcpChain.then(run, run);
+    mcpChain = p.catch(() => {});
+    return p;
+  }
   function deviceId() {
     try {
       let id = localStorage.getItem("fizz.device");
@@ -39,6 +62,7 @@
       const e = new Error(data?.error?.message || (res.status === 404 ? "This feature needs the FIZZ server (deploy the site from GitHub to Netlify)." : `Request failed (${res.status}).`));
       e.code = data?.error?.code;
       e.status = res.status;
+      e.data = data;
       throw e;
     }
     return data;
@@ -192,12 +216,14 @@
     },
     // MCP (Model Context Protocol) servers: the URL is saved on the server with its headers, so the
     // browser only ever gets the server's name and its tool list.
+    // Without a database on the site, the list lives in an encrypted vault in this browser (only the server can
+    // open it); it's sent with each request and the server hands back a new one after every change.
     mcp: {
-      list: () => api("/api/mcp/list", { auth: true }),
-      add: (url, name, auth, extraHeaders = {}) => api("/api/mcp/add", { body: { url, name, headers: { ...(extraHeaders && typeof extraHeaders === "object" && !Array.isArray(extraHeaders) ? extraHeaders : {}), ...(auth ? { Authorization: auth } : {}) } }, auth: true }),
-      remove: (id) => api("/api/mcp/remove", { body: { id }, auth: true }),
-      refresh: (id) => api("/api/mcp/tools", { body: { id }, auth: true }),
-      call: (id, tool, arguments_) => api("/api/mcp/call", { body: { id, tool, arguments: arguments_ }, auth: true }),
+      list: () => mcpApi("list"),
+      add: (url, name, auth, extraHeaders = {}) => mcpApi("add", { url, name, headers: { ...(extraHeaders && typeof extraHeaders === "object" && !Array.isArray(extraHeaders) ? extraHeaders : {}), ...(auth ? { Authorization: auth } : {}) } }),
+      remove: (id) => mcpApi("remove", { id }),
+      refresh: (id) => mcpApi("tools", { id }),
+      call: (id, tool, arguments_) => mcpApi("call", { id, tool, arguments: arguments_ }),
     },
     connectToken: async (provider, token) => { const r = await api(`/api/oauth/${provider}/token`, { body: { token } }); await F.serverStatus(true); return r; },
     vercel: {

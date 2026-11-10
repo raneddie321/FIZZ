@@ -71,8 +71,8 @@ Never put secrets in code or in chat. Set them only in Netlify or Vercel (Vercel
 
 - GitHub and Vercel tokens are kept in AES-256-GCM encrypted, HttpOnly cookies scoped to `/api` —
   page JavaScript can never read them. All POST endpoints reject cross-site requests.
-- MCP servers are stored the same way (Upstash when connected, otherwise the same sealed cookie) and every
-  hop — including redirects — is checked against private and internal addresses. The Authorization header a
+- MCP servers are sealed with `FIZZ_SECRET` and bound to one user id wherever they're kept (see **Custom
+  connectors** below), and every hop — including redirects — is checked against private and internal addresses. The Authorization header a
   user pastes never reaches the browser and is redacted from tool results. The first call to each server asks
   for permission; calls that send, post or delete always ask.
 - If any credential was ever shared in chat or email, **rotate it** in the provider's dashboard.
@@ -210,6 +210,17 @@ server how it wants to be signed in to and pre-selects it — *Sign in now* (OAu
 *No sign-in* (API keys go in up to four request headers). OAuth uses the MCP authorization spec: protected-resource
 and authorization-server metadata, automatic client registration (DCR) or your own client ID, PKCE, the server as
 the token's resource, and refresh before expiry. Tokens stay on FIZZ's server (`netlify/lib/mcp-oauth.mjs`).
+
+**Where connectors are kept** (`netlify/lib/mcp-store.mjs`) — no limit on how many, picked automatically:
+
+| The site has | Connectors live in | Same on every device? |
+| --- | --- | --- |
+| `DATABASE_URL` / `POSTGRES_URL` (Vercel → Storage → **Neon**, free plan) | One row per server in `fizz_mcp_servers` (created automatically); headers and tokens sealed with `FIZZ_SECRET`, tagged with the user id | Yes, for signed-in RanEddie ID users (needs `CLERK_SECRET_KEY`) |
+| `KV_REST_API_URL`/`TOKEN` (Upstash) | One sealed key per user | Same as above |
+| Neither | An encrypted vault in the browser (`localStorage`), sent with each MCP request; only the server can open it | No — per browser |
+
+Old cookie-based lists (before this change) move over automatically on the first request. The tool list is
+cache and is fetched again whenever it's missing.
 
 ### The five checks
 After Fizz Code changes a project, FIZZ DEV runs five checks and sends what they find back to fix (up to 3 rounds,

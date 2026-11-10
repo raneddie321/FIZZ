@@ -247,8 +247,13 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
     if (b.action === "live") return r.fulfill({ json: asleep ? { starting: true } : { pages: tabsFor("https://duckduckgo.com/?q=snake"), engine: "sandbox" } });
     r.fulfill({ json: { text: "ok", page: { url: b.url, title: "Search" }, elements: [], tabs: tabsFor(b.url), engine: "sandbox" } });
   });
-  const shots = [];
-  await ctx.route("https://sb.test/**", (r) => { shots.push(r.request().url()); r.fulfill({ status: 200, contentType: "image/jpeg", body: Buffer.from("/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==", "base64") }); });
+  const shots = [], direct = [];
+  await ctx.route("https://sb.test/**", (r) => {
+    const u = new URL(r.request().url());
+    if (u.pathname === "/tabs") { direct.push("tabs"); return asleep ? r.abort() : r.fulfill({ json: { tabs: [{ id: "T1", title: "Page", url: "https://duckduckgo.com/?q=snake" }] } }); }
+    if (u.pathname === "/navigate") { direct.push(`navigate ${r.request().postDataJSON().url}`); return r.fulfill({ json: { ok: true, id: "T1" } }); }
+    if (u.pathname === "/input") { direct.push(`input ${r.request().postDataJSON().type}`); return r.fulfill({ json: { ok: true } }); }
+    shots.push(r.request().url()); r.fulfill({ status: 200, contentType: "image/jpeg", body: Buffer.from("/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==", "base64") }); });
   await p.goto(B + "dev.html"); await p.waitForTimeout(800);
   await p.click('#dev-app [data-tab="browser"]');
   await p.click("#br-new");
@@ -258,6 +263,16 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
   await p.waitForFunction(() => !document.querySelector("#br-screen")?.hidden, null, { timeout: 8000 });
   const open1 = calls.find((c) => c.action === "open");
   check("browser: a search opens a real search engine in Chrome", open1?.url === "https://duckduckgo.com/?q=snake%20game", open1?.url);
+  check("browser: the address bar uses the fast open (no page reading)", open1?.fast === true);
+  check("browser: the live picture is sized for the panel", /&w=\d+&h=\d+&q=\d+/.test(shots[0] || ""), shots[0]);
+  // Once it runs, navigation goes straight to the browser — no server round trip.
+  const opens = calls.filter((c) => c.action === "open").length;
+  await p.fill("#br-url", "wikipedia.org"); await p.keyboard.press("Enter");
+  await p.waitForTimeout(500);
+  check("browser: next address goes straight to the cloud browser", direct.includes("navigate https://wikipedia.org") && calls.filter((c) => c.action === "open").length === opens, direct.join(","));
+  await p.click("#br-back").catch(() => {});
+  await p.waitForTimeout(300);
+  check("browser: back goes straight to the browser", direct.includes("input back") || !(await p.locator("#br-back").count()), direct.join(","));
   // Leave (another pane, the app in the background) and come back: the screen reconnects.
   const before = shots.length;
   await p.click('#dev-app [data-tab="code"]'); await p.waitForTimeout(200);

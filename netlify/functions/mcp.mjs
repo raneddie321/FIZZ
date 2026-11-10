@@ -2,7 +2,8 @@ import { clearCookie, error, env, getCookie, json, readJson, sameOrigin, seal, s
 import { authorizeUrl, discover, ensureFresh, exchange, register } from "../lib/mcp-oauth.mjs";
 import { requireUser } from "../lib/auth.mjs";
 import { quotaCounter, today } from "../lib/kv.mjs";
-import { callTool, listTools, loadServers, MAX_MCP_SERVERS, MCP_LIMITS, publicServer, redact, slug, storeServers, validateServer } from "../lib/mcp.mjs";
+import { callTool, listTools, MAX_MCP_SERVERS, MCP_LIMITS, publicServer, redact, slug, validateServer } from "../lib/mcp.mjs";
+import { handOver, openStore } from "../lib/mcp-store.mjs";
 
 /** Connect, list, refresh and call the MCP (Model Context Protocol) servers the user added. */
 const PENDING = "fizz_mcp_oauth";
@@ -28,11 +29,10 @@ async function oauthCallback(req) {
     const t = await exchange(o, url.searchParams.get("code") || "", pending.verifier, callbackUrl(req));
     const cfg = { url: pending.url, headers: { ...pending.headers, Authorization: `${t.type} ${t.access}` } };
     const found = await listTools(cfg);
-    const servers = await loadServers(req, pending.userId);
-    const existing = servers.find((x) => x.url === cfg.url);
     const name = pending.name || found.name || humanHost(cfg.url);
-    const server = { id: existing?.id || uniqueId(servers, slug(name)), name, url: cfg.url, headers: cfg.headers, tools: found.tools, added: existing?.added || Date.now(), oauth: { ...o, refresh: t.refresh, exp: t.exp } };
-    await storeServers(headers, pending.userId, existing ? servers.map((x) => (x.id === existing.id ? server : x)) : [...servers, server]);
+    const server = { id: slug(name), name, url: cfg.url, headers: cfg.headers, tools: found.tools, added: Date.now(), oauth: { ...o, refresh: t.refresh, exp: t.exp } };
+    // Saved straight to Neon/Redis; in vault mode it waits in a short-lived sealed cookie until the page asks.
+    await handOver(req, pending.userId, server, headers);
     return back({ mcp_connected: name });
   } catch (e) {
     if (!e.status) console.error("[mcp oauth]", e);
@@ -41,9 +41,9 @@ async function oauthCallback(req) {
 }
 
 /** Runs fn with a fresh token, refreshing once more if the server says the token was rejected. */
-async function withFreshAuth(s, servers, headers, userId, fn) {
+async function withFreshAuth(s, store, fn) {
   let current = s;
-  const save = async (next) => { current = next; await storeServers(headers, userId, servers.map((x) => (x.id === next.id ? next : x))); };
+  const save = async (next) => { current = next; await store.save(store.list.map((x) => (x.id === next.id ? next : x))); };
   const fresh = await ensureFresh(current).catch(() => ({ server: current, changed: false }));
   if (fresh.changed) await save(fresh.server);
   try {
@@ -76,22 +76,35 @@ export default async (req, context) => {
   const headers = new Headers();
   // The header values (e.g. Authorization) must never come back to the browser, even inside an error.
   let active = null;
+  let fail = error;
   try {
+    // The body carries the browser's vault when the site has no database, so it may be large.
+    const body = req.method === "POST" ? await readJson(req, 4_000_000) : {};
+    const store = await openStore(req, who.userId, body, headers);
+    const reply = (data) => json({ ...data, ...store.out(), storage: store.kind }, { headers });
+    // Errors keep the vault too: a refreshed sign-in must not be lost because the call itself failed.
+    fail = (status, message, code = "error") => json({ error: { code, message }, ...store.out() }, { status, headers });
+
     if (action === "list") {
-      const servers = await loadServers(req, who.userId);
-      return json({ servers: servers.map(publicServer) });
+      // A server signed in on another page (OAuth) arrives without its tools: list them now.
+      const missing = store.list.filter((s) => !s.tools?.length);
+      if (missing.length) {
+        const fixed = await Promise.all(missing.map((s) => withFreshAuth(s, store, (cur) => listTools(cur)).then(({ value, server }) => ({ ...server, tools: value.tools }), () => null)));
+        const byId = new Map(fixed.filter(Boolean).map((s) => [s.id, s]));
+        if (byId.size) await store.save(store.list.map((s) => byId.get(s.id) || s));
+      }
+      return reply({ servers: store.list.map(publicServer) });
     }
-    const body = await readJson(req, 200_000);
 
     if (action === "add") {
       const cfg = await validateServer(body);
       active = cfg;
       // The handshake doubles as the check: a wrong URL or dead server fails here, before saving.
       const found = await listTools(cfg);
-      const servers = await loadServers(req, who.userId);
+      const servers = store.list;
       const existing = servers.find((s) => s.url === cfg.url);
       if (!existing && servers.length >= MAX_MCP_SERVERS) {
-        return error(413, `You can connect up to ${MAX_MCP_SERVERS} MCP servers at a time. Remove one first.`, "too_many");
+        return fail(413, `You can connect up to ${MAX_MCP_SERVERS} MCP servers at a time. Remove one first.`, "too_many");
       }
       // A name the user typed wins; otherwise the server's own name, then the host.
       const name = String(body.name || "").trim().slice(0, 40) || found.name || existing?.name || humanHost(cfg.url);
@@ -104,8 +117,8 @@ export default async (req, context) => {
         added: existing?.added || Date.now(),
       };
       const list = existing ? servers.map((s) => (s.id === existing.id ? server : s)) : [...servers, server];
-      await storeServers(headers, who.userId, list);
-      return json({ ok: true, server: publicServer(server) }, { headers });
+      await store.save(list);
+      return reply({ ok: true, server: publicServer(server) });
     }
 
     // Step 2 of "Add custom connector": how does this server want to be signed in to?
@@ -120,7 +133,7 @@ export default async (req, context) => {
       const cfg = await validateServer({ url: body.url, headers: body.headers });
       active = cfg;
       const meta = await discover(cfg.url);
-      if (meta.auth !== "oauth") return error(400, meta.auth === "none" ? "This server works without signing in — choose “No sign-in”." : "This server didn't ask for a sign-in.", "no_oauth");
+      if (meta.auth !== "oauth") return fail(400, meta.auth === "none" ? "This server works without signing in — choose “No sign-in”." : "This server didn't ask for a sign-in.", "no_oauth");
       const ownId = String(body.clientId || "").trim();
       const client = ownId
         ? { clientId: ownId.slice(0, 300), clientSecret: String(body.clientSecret || "").slice(0, 500), authMethod: body.clientSecret ? "client_secret_post" : "none" }
@@ -131,45 +144,45 @@ export default async (req, context) => {
       return json({ authorizeUrl: a.url }, { headers });
     }
 
-    const servers = await loadServers(req, who.userId);
+    const servers = store.list;
     const pick = (id) => servers.find((s) => s.id === String(id || ""));
 
     if (action === "remove") {
       const s = pick(body.id);
-      if (!s) return error(404, "That MCP server isn't connected.", "not_found");
-      await storeServers(headers, who.userId, servers.filter((x) => x.id !== s.id));
-      return json({ ok: true }, { headers });
+      if (!s) return fail(404, "That MCP server isn't connected.", "not_found");
+      await store.save(servers.filter((x) => x.id !== s.id));
+      return reply({ ok: true });
     }
 
     if (action === "tools") {
       const s = pick(body.id);
-      if (!s) return error(404, "That MCP server isn't connected.", "not_found");
-      const { value: found, server: latest } = await withFreshAuth(s, servers, headers, who.userId, (cur) => listTools(cur));
+      if (!s) return fail(404, "That MCP server isn't connected.", "not_found");
+      const { value: found, server: latest } = await withFreshAuth(s, store, (cur) => listTools(cur));
       const updated = { ...latest, tools: found.tools };
-      await storeServers(headers, who.userId, servers.map((x) => (x.id === s.id ? updated : x)));
-      return json({ ok: true, server: publicServer(updated) }, { headers });
+      await store.save(store.list.map((x) => (x.id === s.id ? updated : x)));
+      return reply({ ok: true, server: publicServer(updated) });
     }
 
     if (action === "call") {
       const s = pick(body.id);
-      if (!s) return error(404, "That MCP server isn't connected.", "not_found");
+      if (!s) return fail(404, "That MCP server isn't connected.", "not_found");
       const name = String(body.tool || "").trim();
-      if (!name || name.length > 120) return error(400, "Which tool should FIZZ call?", "bad_tool");
+      if (!name || name.length > 120) return fail(400, "Which tool should FIZZ call?", "bad_tool");
       let args = body.arguments;
-      if (args !== undefined && args !== null && typeof args !== "object") return error(400, "The arguments must be JSON.", "bad_arguments");
+      if (args !== undefined && args !== null && typeof args !== "object") return fail(400, "The arguments must be JSON.", "bad_arguments");
       try {
-        const { value: out } = await withFreshAuth(s, servers, headers, who.userId, (cur) => callTool(cur, name, args || {}));
-        return json({ ok: out.ok, isError: !out.ok, text: redact(out.text, s), images: out.images || [], truncated: Boolean(out.truncated) }, { headers });
+        const { value: out } = await withFreshAuth(s, store, (cur) => callTool(cur, name, args || {}));
+        return reply({ ok: out.ok, isError: !out.ok, text: redact(out.text, s), images: out.images || [], truncated: Boolean(out.truncated) });
       } catch (e) {
         const message = redact(e.message || String(e), s);
         if (!e.status) console.error("[mcp]", e);
-        return error(e.status || 502, message, e.code || "error");
+        return fail(e.status || 502, message, e.code || "error");
       }
     }
-    return error(404, "Unknown action.");
+    return fail(404, "Unknown action.");
   } catch (e) {
     if (!e.status) console.error("[mcp]", e);
-    return error(e.status || 502, redact(e.message || "The MCP server didn't answer.", active));
+    return fail(e.status || 502, redact(e.message || "The MCP server didn't answer.", active));
   }
 };
 

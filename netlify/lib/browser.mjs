@@ -103,6 +103,17 @@ export function describe(p) {
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+/** True for http(s) addresses on the public web — not the browser's own machine, a private network or cloud metadata. */
+export function publicWebUrl(raw) {
+  let u;
+  try { u = new URL(raw); } catch { return false; }
+  if (!/^https?:$/.test(u.protocol)) return false;
+  const h = u.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  if (h === "localhost" || h.endsWith(".localhost") || h.endsWith(".internal") || h === "0.0.0.0" || h === "::1" || /^f[cde]/.test(h) && h.includes(":")) return false;
+  const m = /^(\d+)\.(\d+)\.\d+\.\d+$/.exec(h);
+  if (m) { const a = +m[1], b = +m[2]; if (a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127)) return false; }
+  return true;
+}
 /**
  * Wait briefly for meaningful page readiness, but never hold up navigation for slow
  * third-party resources. Many pages keep loading ads, analytics, or streaming content
@@ -177,6 +188,7 @@ export async function act(state, a) {
       case "open": {
         let url = String(a.url || "").trim();
         if (!/^https?:\/\//i.test(url)) url = /^[\w-]+(\.[\w-]+)+(\/|$)/.test(url) ? `https://${url}` : `https://duckduckgo.com/?q=${encodeURIComponent(url)}`;
+        if (!publicWebUrl(url)) throw Object.assign(new Error("Only public web addresses can be opened in the cloud browser."), { status: 400 });
         if (a.newTab) {
           const { targetId } = await cdp.send("Target.createTarget", { url });
           state.active = targetId;

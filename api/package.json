@@ -2,9 +2,10 @@
   "name": "fizz-api",
   "private": true,
   "type": "module",
-  "description": "Vercel functions for FIZZ. Only the sandbox function uses a dependency (@vercel/sandbox).",
+  "description": "Vercel functions for FIZZ. Dependencies: @vercel/sandbox (sandbox, cloud browser) and @neondatabase/serverless (MCP connectors when the site has a Neon database).",
   "dependencies": {
-    "@vercel/sandbox": "3.5.1"
+    "@vercel/sandbox": "3.5.1",
+    "@neondatabase/serverless": "1.2.0"
   },
   "engines": {
     "node": "24.x"

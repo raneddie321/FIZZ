@@ -4,14 +4,10 @@
 // browser never sees the server's Authorization header. The URL and headers come from the user, so
 // every hop is checked against private/internal addresses the same way page reading does.
 import { assertPublic } from "./web.mjs";
-import { clearCookie, getCookie, seal, setCookie, unseal } from "./util.mjs";
-import { kvConfigured, redis } from "./kv.mjs";
 
 const PROTOCOL = "2025-06-18";
-const COOKIE = "fizz_mcp";
-/** Without Redis the list is sealed into at most CHUNKS cookies of CHUNK characters each. */
-const CHUNK = 3500, CHUNKS = 4;
-const MAX_SERVERS = 50;
+/** Not a product limit — a guard against a runaway script filling the store. */
+const MAX_SERVERS = 1000;
 const MAX_TOOLS = 200;
 /** Handshake/listing are quick; a tool call may legitimately take longer (capped below 60s on Vercel). */
 export const MCP_MS = { handshake: 25_000, call: 30_000 };
@@ -19,44 +15,7 @@ export const MCP_MS = { handshake: 25_000, call: 30_000 };
 const bad = (message, status = 400, code = "mcp") => Object.assign(new Error(message), { status, code });
 const safeJson = (text) => { try { const v = JSON.parse(text); return v && typeof v === "object" ? v : null; } catch { return null; } };
 
-// ---------------- storage ----------------
-// Upstash Redis when the site has it (durable, any size); otherwise the list is sealed in an
-// HttpOnly cookie like every other credential in FIZZ — page scripts can never read the headers.
-const kvKey = (userId) => `fizz:mcp:${userId}`;
-
-export async function loadServers(req, userId) {
-  if (kvConfigured()) {
-    try {
-      const raw = (await redis([["GET", kvKey(userId)]]))[0];
-      const list = raw ? JSON.parse(raw) : [];
-      return Array.isArray(list) ? list : [];
-    } catch {
-      return [];
-    }
-  }
-  // The sealed list may span a few cookies (OAuth tokens are long): fizz_mcp, fizz_mcp_1, …
-  let raw = getCookie(req, COOKIE) || "";
-  for (let i = 1; i < CHUNKS && raw; i++) { const part = getCookie(req, `${COOKIE}_${i}`); if (!part) break; raw += part; }
-  const list = unseal(raw)?.list;
-  return Array.isArray(list) ? list : [];
-}
-
-export async function storeServers(headers, userId, list) {
-  if (kvConfigured()) {
-    await redis([["SET", kvKey(userId), JSON.stringify(list)]]);
-    return;
-  }
-  const value = seal({ list, exp: Date.now() + 90 * 86400_000 });
-  if (value.length > CHUNK * CHUNKS) {
-    throw bad("This deployment keeps MCP servers in secure cookies, which have a size limit. Remove a connector, or add Upstash Redis (Vercel → Storage → Upstash Redis) to keep more.", 507, "no_room");
-  }
-  for (let i = 0; i < CHUNKS; i++) {
-    const part = value.slice(i * CHUNK, (i + 1) * CHUNK);
-    const name = i ? `${COOKIE}_${i}` : COOKIE;
-    if (part) setCookie(headers, name, part, { maxAge: 90 * 86400 });
-    else clearCookie(headers, name);
-  }
-}
+// Storage lives in ./mcp-store.mjs (Neon, Redis, or the browser's encrypted vault).
 
 /** What the UI and the model get to see: never the headers. */
 export const publicServer = (s) => ({
@@ -520,6 +479,5 @@ export const redact = (text, server) => {
 };
 
 export const MCP_LIMITS = { add: 30, remove: 120, list: 600, tools: 60, call: 400, discover: 60, "oauth-start": 30 };
-export const MCP_COOKIE = COOKIE;
 export const MAX_MCP_SERVERS = MAX_SERVERS;
 export { slug };

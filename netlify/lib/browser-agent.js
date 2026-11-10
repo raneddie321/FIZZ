@@ -23,22 +23,44 @@ let browserPath = "";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function devtools(path) { const res = await fetch("http://127.0.0.1:" + CDP_PORT + path); return res.json(); }
 
+// @sparticuz/chromium's flags are made for AWS Lambda. This is a full VM, so:
+//  • no --single-process: every tab gets its own renderer, so heavy sites use both CPUs and one slow
+//    page can't freeze the others (if this machine can't run that, we fall back to one process);
+//  • never --disable-web-security / --allow-running-insecure-content: the user signs in to real sites here;
+//  • a real disk cache (in the profile, which the sandbox keeps) so sites open faster the second time.
+const DROP = /^--(single-process|disable-web-security|allow-running-insecure-content|disable-site-isolation-trials|disk-cache-size=.*)$/;
+const FAST = ["--disk-cache-size=268435456", "--disable-background-timer-throttling", "--disable-renderer-backgrounding", "--disable-backgrounding-occluded-windows", "--disable-ipc-flooding-protection"];
+let singleProcess = false;
+async function launch(exe, base) {
+  const args = base.filter((a) => !DROP.test(a)).concat(singleProcess ? ["--single-process"] : [], FAST, ["--remote-debugging-port=" + CDP_PORT, "--remote-debugging-address=127.0.0.1", "--window-size=1280,800", "--user-data-dir=" + PROFILE, "--user-agent=" + UA, "--lang=en-US", "--hide-scrollbars", "about:blank"]);
+  const proc = spawn(exe, args, { stdio: "ignore", env: process.env });
+  chrome = proc;
+  proc.on("exit", () => { if (chrome === proc) { chrome = null; browserPath = ""; cdp = null; } });
+  for (let i = 0; i < 60; i++) {
+    if (chrome !== proc) break; // it exited
+    try { const v = await devtools("/json/version"); browserPath = new URL(v.webSocketDebuggerUrl).pathname; return true; } catch { await sleep(200); }
+  }
+  try { proc.kill("SIGKILL"); } catch {}
+  return false;
+}
 async function startChrome() {
-  let exe = process.env.CHROME_PATH, args = [];
+  let exe = process.env.CHROME_PATH, base = [];
   if (!exe) {
     const chromium = (await import("@sparticuz/chromium")).default;
     exe = await chromium.executablePath();
-    args = chromium.args;
-  } else args = ["--headless=new", "--no-sandbox"];
-  args = args.concat(["--remote-debugging-port=" + CDP_PORT, "--remote-debugging-address=127.0.0.1", "--window-size=1280,800", "--user-data-dir=" + PROFILE, "--user-agent=" + UA, "--lang=en-US", "--hide-scrollbars", "about:blank"]);
-  chrome = spawn(exe, args, { stdio: "ignore", env: process.env });
-  chrome.on("exit", () => { chrome = null; browserPath = ""; cdp = null; });
-  for (let i = 0; i < 80; i++) {
-    try { const v = await devtools("/json/version"); browserPath = new URL(v.webSocketDebuggerUrl).pathname; return; } catch { await sleep(250); }
-  }
+    base = chromium.args;
+  } else base = ["--headless=new", "--no-sandbox"];
+  if (await launch(exe, base)) return;
+  if (!singleProcess) { singleProcess = true; console.error("multi-process Chromium didn't start; using one process"); if (await launch(exe, base)) return; }
   throw new Error("Chromium didn't start");
 }
-async function ensureChrome() { if (!chrome || !browserPath) await startChrome(); }
+let starting = null;
+/** One start at a time, however many requests arrive while Chromium boots. */
+async function ensureChrome() {
+  if (chrome && browserPath) return;
+  starting ||= startChrome().finally(() => { starting = null; });
+  await starting;
+}
 
 // ---------- one CDP connection for screencasts and input ----------
 let cdp = null;
@@ -71,10 +93,24 @@ async function pickTarget(id) { const list = await pages(); return (list.find((t
 
 // ---------- live stream (MJPEG) ----------
 const streams = new Map(); // targetId → { clients:Set<res>, sessionId, last }
-async function startStream(targetId) {
+// The picture is sized for the screen showing it (a phone gets a smaller, lighter stream).
+const streamOpts = (url) => ({
+  w: Math.max(320, Math.min(1920, Number(url.searchParams.get("w")) || 1280)),
+  h: Math.max(320, Math.min(1600, Number(url.searchParams.get("h")) || 800)),
+  q: Math.max(30, Math.min(85, Number(url.searchParams.get("q")) || 62)),
+});
+async function startStream(targetId, opts = { w: 1280, h: 800, q: 62 }) {
   const c = await connectCdp();
   let s = streams.get(targetId);
-  if (s) return s;
+  if (s) {
+    // A bigger or sharper screen joined: restart the screencast at its size.
+    if (opts.w > s.opts.w || opts.h > s.opts.h || opts.q > s.opts.q) {
+      s.opts = { w: Math.max(opts.w, s.opts.w), h: Math.max(opts.h, s.opts.h), q: Math.max(opts.q, s.opts.q) };
+      await c.send("Page.stopScreencast", {}, s.sessionId).catch(() => {});
+      await c.send("Page.startScreencast", { format: "jpeg", quality: s.opts.q, maxWidth: s.opts.w, maxHeight: s.opts.h, everyNthFrame: 1 }, s.sessionId).catch(() => {});
+    }
+    return s;
+  }
   const sessionId = await c.session(targetId);
   s = { clients: new Set(), sessionId, last: null };
   streams.set(targetId, s);
@@ -85,7 +121,8 @@ async function startStream(targetId) {
     s.last = jpg;
     for (const res of s.clients) writeFrame(res, jpg);
   });
-  await c.send("Page.startScreencast", { format: "jpeg", quality: 62, maxWidth: 1280, maxHeight: 800, everyNthFrame: 1 }, sessionId);
+  s.opts = opts;
+  await c.send("Page.startScreencast", { format: "jpeg", quality: opts.q, maxWidth: opts.w, maxHeight: opts.h, everyNthFrame: 1 }, sessionId);
   return s;
 }
 function writeFrame(res, jpg) { try { res.write("--frame\r\nContent-Type: image/jpeg\r\nContent-Length: " + jpg.length + "\r\n\r\n"); res.write(jpg); res.write("\r\n"); } catch {} }
@@ -118,6 +155,17 @@ async function input(targetId, e) {
 }
 
 // ---------- HTTP ----------
+/** A public web address, or null: never this machine, its private network or cloud metadata. */
+function webUrl(raw) {
+  let u;
+  try { u = new URL(String(raw || "").trim()); } catch { return null; }
+  if (!/^https?:$/.test(u.protocol)) return null;
+  const h = u.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  if (h === "localhost" || h.endsWith(".localhost") || h.endsWith(".internal") || h === "0.0.0.0" || h === "::1" || (/^f[cde]/.test(h) && h.includes(":"))) return null;
+  const m = /^(\d+)\.(\d+)\.\d+\.\d+$/.exec(h);
+  if (m) { const a = +m[1], b = +m[2]; if (a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127)) return null; }
+  return u.href;
+}
 const authed = (req, url) => (url.searchParams.get("token") || req.headers["x-fizz-token"]) === TOKEN;
 const cors = (res) => { res.setHeader("Access-Control-Allow-Origin", "*"); res.setHeader("Access-Control-Allow-Headers", "content-type, x-fizz-token"); res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS"); };
 const json = (res, code, data) => { res.writeHead(code, { "content-type": "application/json", "cache-control": "no-store" }); res.end(JSON.stringify(data)); };
@@ -129,8 +177,25 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "OPTIONS") { res.writeHead(204); return res.end(); }
   if (!authed(req, url)) return json(res, 401, { error: "unauthorized" });
   try {
-    if (url.pathname === "/health") { await ensureChrome(); return json(res, 200, { ok: true, chrome: Boolean(browserPath) }); }
+    if (url.pathname === "/health") { await ensureChrome(); return json(res, 200, { ok: true, chrome: Boolean(browserPath), version: process.env.FIZZ_BR_VERSION || "", processes: singleProcess ? "single" : "multi" }); }
     if (url.pathname === "/tabs") return json(res, 200, { tabs: await pages() });
+    // The user's own navigation goes straight here (one round trip); the live picture shows it loading.
+    if (url.pathname === "/navigate" && req.method === "POST") {
+      const b = await body(req);
+      const to = webUrl(b.url);
+      if (!to) return json(res, 400, { error: "Only web addresses (http or https) can be opened." });
+      const c = await connectCdp();
+      let id = b.newTab ? null : await pickTarget(url.searchParams.get("target"));
+      if (!id) ({ targetId: id } = await c.send("Target.createTarget", { url: to }));
+      else await c.send("Page.navigate", { url: to }, await c.session(id));
+      return json(res, 200, { ok: true, id });
+    }
+    if (url.pathname === "/close" && req.method === "POST") {
+      const list = await pages();
+      const id = url.searchParams.get("target");
+      if (list.length > 1 && list.some((t) => t.id === id)) await (await connectCdp()).send("Target.closeTarget", { targetId: id });
+      return json(res, 200, { ok: true, tabs: await pages() });
+    }
     const target = await pickTarget(url.searchParams.get("target"));
     if (!target) return json(res, 404, { error: "no tab" });
     if (url.pathname === "/frame.jpg") {
@@ -140,7 +205,7 @@ const server = http.createServer(async (req, res) => {
       return res.end(Buffer.from(shot.data, "base64"));
     }
     if (url.pathname === "/stream") {
-      const s = await startStream(target);
+      const s = await startStream(target, streamOpts(url));
       res.writeHead(200, { "content-type": "multipart/x-mixed-replace; boundary=frame", "cache-control": "no-store", connection: "keep-alive", "x-accel-buffering": "no" });
       s.clients.add(res);
       if (s.last) writeFrame(res, s.last);
@@ -175,6 +240,9 @@ server.on("upgrade", async (req, socket, head) => {
   upstream.on("error", close);
   socket.on("error", close);
 });
+
+// When the agent is stopped (e.g. replaced by a newer one), its Chromium goes with it.
+for (const sig of ["SIGTERM", "SIGINT"]) process.on(sig, () => { try { chrome && chrome.kill("SIGKILL"); } catch {} process.exit(0); });
 
 server.listen(PORT, "0.0.0.0", () => console.log("fizz browser agent on " + PORT));
 ensureChrome().catch((e) => console.error(e));

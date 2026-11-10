@@ -12,11 +12,18 @@ const PORT = 8080;
 /** On when FIZZ_SANDBOX=on on Vercel (FIZZ_BROWSER=off turns just the browser off). */
 export const sandboxBrowserEnabled = () => sandboxEnabled() && Boolean(env("VERCEL") || env("FIZZ_SANDBOX_LOCAL")) && env("FIZZ_BROWSER") !== "off";
 export const tokenFor = (uid) => createHmac("sha256", env("FIZZ_SECRET") || "fizz").update(`browser:${uid}`).digest("hex").slice(0, 40);
+/** Changes whenever the agent's code does, so an older agent still running in a sandbox is replaced. */
+export const AGENT_VERSION = createHash("sha256").update(AGENT_JS + AGENT_PKG).digest("hex").slice(0, 12);
 const nameFor = (uid) => `fizz-br-${createHash("sha256").update(`browser:${uid}`).digest("hex").slice(0, 24)}`;
 
-/** 200 when the browser is ready, 401 when an agent with another token answers, 0 when nothing answers. */
+/** 200 when the current agent is ready, 409 when an older agent answers, 401 when one with another token answers, 0 when nothing does. */
 async function health(base, token) {
-  try { const r = await fetch(`${base}/health?token=${token}`, { signal: AbortSignal.timeout(6000) }); return r.status; } catch { return 0; }
+  try {
+    const r = await fetch(`${base}/health?token=${token}`, { signal: AbortSignal.timeout(6000) });
+    if (r.status !== 200) return r.status;
+    const v = await r.json().catch(() => ({}));
+    return v.version === AGENT_VERSION ? 200 : 409;
+  } catch { return 0; }
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -34,18 +41,23 @@ function publicBase(sbx) {
 }
 
 /** Makes sure the user's browser is running. Returns { base, token } or { starting: true } while it installs (first time ~1 minute). */
-export async function ensureBrowser(uid, { waitMs = 35000 } = {}) {
+export async function ensureBrowser(uid, { waitMs = 35000, base: known = "" } = {}) {
+  const token = tokenFor(uid);
+  // Fast path: the address from last time still answers — no Sandbox API call at all.
+  if (/^https:\/\/[\w.-]+$/.test(known) && (await health(known, token)) === 200) return { base: known, token };
   const { Sandbox } = await sdk();
   const sbx = await Sandbox.getOrCreate({ name: nameFor(uid), runtime: "node22", timeout: 45 * 60 * 1000, ports: [PORT], resources: { vcpus: 2 } });
-  const token = tokenFor(uid);
   let base = publicBase(sbx);
   // A sandbox made before the port was exposed: expose it now.
   if (!base && typeof sbx.update === "function") { await sbx.update({ ports: [PORT] }).catch(() => {}); base = publicBase(sbx); }
   if (!base) throw new Error("the sandbox has no public address for the browser");
   let st = await health(base, token);
   if (st === 200) return { base, token };
-  // An old agent started with a different token: stop it and start a fresh one.
-  if (st === 401) { await sbx.runCommand({ cmd: "pkill", args: ["-f", "node agent.mjs"] }).catch(() => {}); await sleep(500); }
+  // An older agent, or one started with a different token: stop it and start the current one.
+  if (st === 401 || st === 409) {
+    // Its Chromium too: it would keep the debugging port and the profile locked.
+    await sbx.runCommand({ cmd: "bash", args: ["-c", "pkill -f 'node agent.mjs'; pkill -f 'remote-debugging-port=9222'; sleep 1; pkill -9 -f 'remote-debugging-port=9222'; true"] }).catch(() => {});
+  }
 
   if (!(await listening(sbx))) {
     await sbx.writeFiles([
@@ -61,7 +73,7 @@ export async function ensureBrowser(uid, { waitMs = 35000 } = {}) {
     if (!(await listening(sbx))) {
       await sbx.runCommand({
         cmd: "bash", args: ["-c", "exec node agent.mjs >>/tmp/fizz-br.log 2>&1"], cwd: DIR, detached: true,
-        env: { FIZZ_BR_TOKEN: token, FIZZ_BR_PORT: String(PORT), AWS_EXECUTION_ENV: "AWS_Lambda_nodejs22.x" },
+        env: { FIZZ_BR_TOKEN: token, FIZZ_BR_PORT: String(PORT), FIZZ_BR_VERSION: AGENT_VERSION, AWS_EXECUTION_ENV: "AWS_Lambda_nodejs22.x" },
       });
     }
   }
