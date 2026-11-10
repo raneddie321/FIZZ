@@ -23,16 +23,16 @@ let browserPath = "";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function devtools(path) { const res = await fetch("http://127.0.0.1:" + CDP_PORT + path); return res.json(); }
 
-// @sparticuz/chromium's flags are made for AWS Lambda. This is a full VM, so:
-//  • no --single-process: every tab gets its own renderer, so heavy sites use both CPUs and one slow
-//    page can't freeze the others (if this machine can't run that, we fall back to one process);
+// @sparticuz/chromium's flags are made for AWS Lambda. Here:
+//  • --single-process stays: measured in Vercel Sandbox, separate renderer processes crash on the first
+//    cross-site navigation (the same kernel restriction as Lambda);
 //  • never --disable-web-security / --allow-running-insecure-content: the user signs in to real sites here;
 //  • a real disk cache (in the profile, which the sandbox keeps) so sites open faster the second time.
-const DROP = /^--(single-process|disable-web-security|allow-running-insecure-content|disable-site-isolation-trials|disk-cache-size=.*)$/;
+const DROP = /^--(disable-web-security|allow-running-insecure-content|disk-cache-size=.*)$/;
 const FAST = ["--disk-cache-size=268435456", "--disable-background-timer-throttling", "--disable-renderer-backgrounding", "--disable-backgrounding-occluded-windows", "--disable-ipc-flooding-protection"];
-let singleProcess = false;
+const singleProcess = true;
 async function launch(exe, base) {
-  const args = base.filter((a) => !DROP.test(a)).concat(singleProcess ? ["--single-process"] : [], FAST, ["--remote-debugging-port=" + CDP_PORT, "--remote-debugging-address=127.0.0.1", "--window-size=1280,800", "--user-data-dir=" + PROFILE, "--user-agent=" + UA, "--lang=en-US", "--hide-scrollbars", "about:blank"]);
+  const args = base.filter((a) => !DROP.test(a)).concat(FAST, ["--remote-debugging-port=" + CDP_PORT, "--remote-debugging-address=127.0.0.1", "--window-size=1280,800", "--user-data-dir=" + PROFILE, "--user-agent=" + UA, "--lang=en-US", "--hide-scrollbars", "about:blank"]);
   const proc = spawn(exe, args, { stdio: "ignore", env: process.env });
   chrome = proc;
   proc.on("exit", () => { if (chrome === proc) { chrome = null; browserPath = ""; cdp = null; } });
@@ -51,7 +51,6 @@ async function startChrome() {
     base = chromium.args;
   } else base = ["--headless=new", "--no-sandbox"];
   if (await launch(exe, base)) return;
-  if (!singleProcess) { singleProcess = true; console.error("multi-process Chromium didn't start; using one process"); if (await launch(exe, base)) return; }
   throw new Error("Chromium didn't start");
 }
 let starting = null;
