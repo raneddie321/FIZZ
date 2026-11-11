@@ -94,6 +94,13 @@
       if (cache === null) return "";
       return "MCP servers (Model Context Protocol) aren't connected yet. The user can add any MCP server in Settings → Connections → Add custom connector (just a name and the MCP URL). If what they're asking for could be done through one, say so in one sentence.";
     },
+    // For the permission gate (F.perm): which server and tool, whether it sends or deletes (always asks),
+    // and whether this is the first call to the server (asks once, unless a rule allows the server).
+    perm: (t) => {
+      const s = find(t.attrs.server);
+      if (!s || t.attrs.action === "tools" || t.attrs.action === "list") return { kind: "mcp", target: `${s?.id || "unknown"}:tools`, readOnly: true };
+      return { kind: "mcp", target: `${s.id}:${toolOf(t)}`, outbound: risky(toolOf(t)), softAsk: settings().mcpAsk === true || !granted.has(s.id) };
+    },
     needsApproval: (t) => {
       if (t.attrs.action === "tools" || t.attrs.action === "list") return false; // reading tool lists is harmless
       const s = find(t.attrs.server);

@@ -106,7 +106,7 @@
         <label class="check"><input type="checkbox" name="aiReview" /><span>Include the AI code review<small>The fifth check: a second AI pass that reads the changed files for real bugs. Uses one extra AI message per task.</small></span></label>
         <label class="field"><span>Steps per task</span><input class="input" type="number" name="agentSteps" min="5" max="40" step="1" /><small class="muted-sm">How many rounds Fizz Code may work on its own before it asks you to keep going (5–40).</small></label>
         <label class="check"><input type="checkbox" name="reviewChanges" /><span>Review file changes before they're applied</span></label>
-        <label class="check"><input type="checkbox" name="askBeforeRun" /><span>Ask before Fizz Code runs commands<small>Off: it runs commands in its sandbox without pausing.</small></span></label>
+        ${F.perm.settingsHtml()}
         <label class="check"><input type="checkbox" name="autoActions" /><span>Allow automatic GitHub Push and Vercel deploys<small>When enabled, FIZZ DEV can publish the current project after you request it, without an extra confirmation dialog. It still must be connected and must report the real result.</small></span></label>
 
       </div>
@@ -248,7 +248,7 @@
     f.autoVerify.checked = s.autoVerify !== false;
     f.aiReview.checked = s.aiReview !== false;
     f.agentSteps.value = String(Math.min(40, Math.max(5, Number(s.agentSteps) || 20)));
-    f.askBeforeRun.checked = Boolean(s.askBeforeRun);
+    F.perm.fillSettings(f, ctx.project?.());
     f.autoActions.checked = Boolean(s.autoActions);
     setTab(tab);
     F.serverStatus().then((st) => {
@@ -432,9 +432,10 @@
         autoVerify: f.autoVerify.checked,
         aiReview: f.aiReview.checked,
         agentSteps: Math.min(40, Math.max(5, Number(f.agentSteps.value) || 20)),
-        askBeforeRun: f.askBeforeRun.checked,
         autoActions: f.autoActions.checked,
       });
+      const badRules = F.perm.readSettings(f);
+      if (badRules.length) F.toast(`Not a rule, so it was left out: ${badRules.slice(0, 3).join(", ")}. Write kind:pattern, e.g. run:npm test`);
       if (s.cloudSync) F.sync?.now();
       ctx.save();
       d.close();

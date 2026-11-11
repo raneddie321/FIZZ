@@ -78,7 +78,7 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
   await p.fill("#dev-app #input", "build a hello page"); await p.keyboard.press("Enter");
   await lastReply(p, "#dev-app", "Built it").then(() => check(`dev build reply (${vp.width}px)`, true)).catch(() => check(`dev build reply (${vp.width}px)`, false));
   await p.waitForSelector("#dev-app .verify-note.ok", { timeout: 20000 }).then(() => check(`dev self-check passes (${vp.width}px)`, true)).catch(async () => check(`dev self-check passes (${vp.width}px)`, false, await p.locator("#dev-app .verify-note").allInnerTexts().then((x) => x.join(" "))));
-  const files = await p.evaluate(() => Object.keys(JSON.parse(localStorage.getItem(Object.keys(localStorage).find((k) => k.startsWith("fizz.data.")))).projects[0].files));
+  const files = await p.evaluate(() => Object.keys(FIZZ.loadData(FIZZ.auth.current()).projects[0].files));
   check(`dev wrote 3 files (${vp.width}px)`, files.length === 3, files.join(","));
   check(`dev handbook in prompt (${vp.width}px)`, bodies[0]?.system?.includes("# HOW YOU WORK"));
   if (vp.width > 800) {
@@ -316,6 +316,121 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
   await lastReply(p, "#chat-app", "Hello from the new model.").catch(() => {});
   check("gemini: a retired model falls back to the newest Flash the key has", asked.join(",") === "gemini-old,gemini-9.9-flash", asked.join(","));
   check("gemini: the reply arrives", (await p.locator("#chat-app").innerText()).includes("Hello from the new model."));
+  await ctx.close();
+}
+
+// ---------- Permissions: rules, Ask mode, read-only (phase 0) ----------
+{
+  const { ctx, p, errs, bodies, script } = await open({ width: 1280, height: 800 });
+  await p.goto(B + "dev.html"); await p.waitForTimeout(900);
+  const F = (path, body) => `<fizz-file path="${path}">\n${body}\n</fizz-file>\n`;
+  const setPerm = (mode, rules) => p.evaluate(([m, r]) => { const d = FIZZ.loadData(FIZZ.auth.current()); d.settings.autoVerify = false; if (r) FIZZ.perm.setRules(r); FIZZ.perm.setMode(m); }, [mode, rules]);
+  const files = () => p.evaluate(() => Object.keys(FIZZ.loadData(FIZZ.auth.current()).projects[0].files));
+  const say = async (text) => { await p.fill("#dev-app #input", text); await p.keyboard.press("Enter"); };
+
+  // A denied command isn't run, and Fizz Code is told why. A denied file isn't written; the others are.
+  await setPerm("auto", { deny: ["run:rm -rf *", "edit:.env"] });
+  script.push(F("index.html", "<!doctype html><title>t</title><h1>Hi</h1>") + F(".env", "KEY=1") + "<fizz-run>echo ok && rm -rf index.html</fizz-run>\nWorking.");
+  script.push("Understood, I left those alone.");
+  await say("build a page and clean up");
+  await lastReply(p, "#dev-app", "I left those alone");
+  const sent = JSON.stringify(bodies.at(-1)?.messages || []);
+  check("perm: a denied command is reported to Fizz Code", sent.includes("Blocked by the permission rule") && sent.includes("deny run:rm -rf *"), sent.slice(-300));
+  check("perm: a denied file is reported to Fizz Code", sent.includes("deny edit:.env"));
+  let fs = await files();
+  check("perm: the denied command didn't run, the denied file wasn't written", fs.includes("index.html") && !fs.includes(".env"), fs.join(","));
+
+  // Ask mode: a command waits; "Always allow" adds a rule; a look-only command doesn't wait.
+  await setPerm("ask", null);
+  script.push("<fizz-run>ls</fizz-run>\n<fizz-run>mkdir out</fizz-run>\nMaking a folder.");
+  script.push("Folder made.");
+  await say("make a folder called out");
+  await p.waitForSelector('#dev-app [data-always="1"]', { timeout: 15000 }).then(() => check("perm: Ask mode waits before a command", true)).catch(() => check("perm: Ask mode waits before a command", false));
+  check("perm: only the changing command waits", (await p.locator("#dev-app [data-approve]").count()) === 2, String(await p.locator("#dev-app [data-approve]").count()));
+  await p.click('#dev-app [data-always="1"]');
+  await lastReply(p, "#dev-app", "Folder made.");
+  const rules = await p.evaluate(() => FIZZ.perm.rules());
+  check("perm: Always allow adds a rule", rules.allow.includes("run:mkdir out"), JSON.stringify(rules));
+  const log = await p.evaluate(() => FIZZ.perm.log().map((e) => `${e.decision}:${e.kind}:${e.by}`));
+  check("perm: decisions are logged (blocked, asked, answered)", log.includes("deny:run:rule") && log.includes("ask:run:mode") && log.includes("allow:run:you"), log.join(" "));
+  await p.click('#dev-app [data-tab="activity"]');
+  check("perm: the Activity tab shows them", /Blocked/.test(await p.locator("#activity").innerText()) && /Ask first/.test(await p.locator("#activity").innerText()));
+
+  // Ask mode stages file changes for review.
+  script.push(F("about.html", "<!doctype html><title>a</title><p>About</p>") + "Added the page.");
+  await say("add an about page");
+  await p.waitForSelector("#dev-app [data-accept-all], #dev-app [data-accept]", { timeout: 15000 }).then(() => check("perm: Ask mode stages file changes for review", true)).catch(() => check("perm: Ask mode stages file changes for review", false));
+  check("perm: a staged file isn't written yet", !(await files()).includes("about.html"));
+
+  // Read-only: the agent only answers; nothing is written or run even if the model tries.
+  await setPerm("read-only", { deny: [] });
+  script.push(F("hack.html", "<p>x</p>") + "<fizz-run>npm install left-pad</fizz-run>\n<fizz-run>grep -rn Hi .</fizz-run>\nTrying anyway.");
+  script.push("OK, read-only.");
+  await say("build me a new page please");
+  await lastReply(p, "#dev-app", "OK, read-only.");
+  const sys = bodies.at(-2)?.system || "";
+  check("perm: read-only pins the agent to answers only", sys.includes("ASK MODE") && !sys.includes("BUILD MODE"));
+  const sent2 = JSON.stringify(bodies.at(-1)?.messages || []);
+  check("perm: read-only blocks a changing command and says why", sent2.includes("Read-only mode is on"), sent2.slice(-300));
+  check("perm: read-only still lets Fizz look", /index\.html[^"]*Hi/.test(sent2));
+  check("perm: read-only wrote nothing", !(await files()).includes("hack.html"));
+
+  // The + menu and Settings.
+  await p.click("#dev-app #attach");
+  await p.click('.plus-sheet [data-ps-go="permission"]');
+  const sheet = await p.locator(".plus-sheet").innerText();
+  check("perm: + menu lists the four modes", ["Auto", "Ask first", "Plan first", "Read-only"].every((x) => sheet.includes(x)));
+  await p.click('.plus-sheet [data-ps-perm="auto"]');
+  check("perm: + menu switches the mode", (await p.evaluate(() => FIZZ.perm.mode())) === "auto");
+  await p.click('.plus-sheet [data-ps="perm-rules"]');
+  await p.waitForSelector('dialog[open] [name="permDeny"]', { timeout: 5000 });
+  await p.fill('dialog[open] [name="permDeny"]', "run:rm -rf *\nnot a rule\ngit-push:main");
+  await p.selectOption('dialog[open] [name="permMode"]', "plan");
+  await p.locator('dialog[open] button[type="submit"], dialog[open] [data-save]').first().click();
+  await p.waitForTimeout(300);
+  const saved = await p.evaluate(() => ({ mode: FIZZ.perm.mode(), deny: FIZZ.perm.rules().deny }));
+  check("perm: Settings saves the mode and the rules, without the line that isn't a rule", saved.mode === "plan" && saved.deny.join("|") === "run:rm -rf *|git-push:main", JSON.stringify(saved));
+  check("perm: no script errors", !errs.length, errs.join(" | "));
+  await ctx.close();
+}
+
+// ---------- Storage: projects live in IndexedDB, old data moves over, no 5 MB limit (phase 0) ----------
+{
+  const { ctx, p, errs, script } = await open({ width: 1280, height: 800 });
+  // Data saved by an older version: one blob in localStorage with the projects inside.
+  await p.evaluate(() => {
+    const old = { settings: { autoVerify: false, style: "balanced" }, conversations: [{ id: "c-old", title: "Old chat", messages: [{ id: "m1", role: "user", content: "hello from before" }], updated: 1 }],
+      projects: [{ id: "p-old", name: "Old project", files: { "index.html": "<h1>Old</h1>" }, chats: [], history: [], created: 1, updated: 1 }] };
+    localStorage.setItem("fizz.data.rid:user_t", JSON.stringify(old));
+  });
+  await p.goto(B + "dev.html"); await p.waitForTimeout(900);
+  const key = await p.evaluate(() => `fizz.data.${FIZZ.auth.current().id}`);
+  if (key !== "fizz.data.rid:user_t") await p.evaluate((k) => { localStorage.setItem(k, localStorage.getItem("fizz.data.rid:user_t")); }, key).then(() => p.reload()).then(() => p.waitForTimeout(900));
+  let d = await p.evaluate(() => { const x = FIZZ.loadData(FIZZ.auth.current()); return { projects: x.projects.map((q) => q.name), file: x.projects[0]?.files?.["index.html"], chats: x.conversations.map((c) => c.title) }; });
+  check("storage: data from before is all there", d.projects.includes("Old project") && d.file === "<h1>Old</h1>" && d.chats.includes("Old chat"), JSON.stringify(d));
+  // A change, then everything is in IndexedDB and localStorage keeps only the small part.
+  const F = (path, body) => `<fizz-file path="${path}">\n${body}\n</fizz-file>\n`;
+  script.push(F("new.html", "<!doctype html><title>n</title><p>New</p>") + "Added.");
+  await p.fill("#dev-app #input", "add a file called new.html"); await p.keyboard.press("Enter");
+  await lastReply(p, "#dev-app", "Added.");
+  await p.evaluate(() => FIZZ.storage.flush());
+  let small = await p.evaluate((k) => { const x = JSON.parse(localStorage.getItem(k)); return { v: x.v, hasProjects: "projects" in x, ids: x.projectIds, bytes: localStorage.getItem(k).length, mode: FIZZ.storage.mode() }; }, key);
+  check("storage: localStorage keeps only settings and ids", small.v === 2 && !small.hasProjects && small.ids.includes("p-old") && small.mode === "idb", JSON.stringify(small));
+  // A project far beyond localStorage's limit.
+  await p.evaluate(() => { const u = FIZZ.auth.current(), x = FIZZ.loadData(u); x.projects[0].files["big.txt"] = "x".repeat(7_000_000); FIZZ.saveData(u, x); return FIZZ.storage.flush(); });
+  await p.reload(); await p.waitForTimeout(1200);
+  d = await p.evaluate(() => { const x = FIZZ.loadData(FIZZ.auth.current()); const q = x.projects.find((y) => y.id === "p-old"); return { big: q?.files?.["big.txt"]?.length, added: q?.files?.["new.html"]?.includes("New"), chats: x.conversations.length, mode: FIZZ.storage.mode() }; });
+  check("storage: after a reload the project is back from IndexedDB, 7 MB file included", d.big === 7_000_000 && d.added && d.chats === 1 && d.mode === "idb", JSON.stringify(d));
+  check("storage: the project shows in the app after the reload", (await p.locator("#dev-app").innerText()).includes("Old project"));
+  // Unsaved changes when the page closes are picked up from the journal.
+  await p.evaluate(() => { const u = FIZZ.auth.current(), x = FIZZ.loadData(u); x.projects[0].files["late.txt"] = "written just before closing"; FIZZ.saveData(u, x); window.dispatchEvent(new Event("pagehide")); });
+  await p.reload(); await p.waitForTimeout(1200);
+  check("storage: a change made just before closing survives", (await p.evaluate(() => FIZZ.loadData(FIZZ.auth.current()).projects.find((y) => y.id === "p-old")?.files?.["late.txt"])) === "written just before closing");
+  // Deleting removes the record too.
+  await p.evaluate(() => { const u = FIZZ.auth.current(), x = FIZZ.loadData(u); x.conversations.length = 0; FIZZ.saveData(u, x); return FIZZ.storage.flush(); });
+  await p.reload(); await p.waitForTimeout(1000);
+  check("storage: a deleted chat stays deleted", (await p.evaluate(() => FIZZ.loadData(FIZZ.auth.current()).conversations.length)) === 0);
+  check("storage: no script errors", !errs.length, errs.join(" | "));
   await ctx.close();
 }
 

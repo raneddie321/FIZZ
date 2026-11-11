@@ -222,6 +222,31 @@ the token's resource, and refresh before expiry. Tokens stay on FIZZ's server (`
 Old cookie-based lists (before this change) move over automatically on the first request. The tool list is
 cache and is fetched again whenever it's missing.
 
+### Permissions
+Every action Fizz Code takes in FIZZ DEV goes through one gate (`static-site/assets/permissions.js`; the decision logic is
+`decidePermission` in `netlify/lib/agent-core.mjs`, shared with the server).
+
+- **Modes** ("+" → Permissions, or Settings → Tools): **Auto** (commands and edits run; sending, posting, paying and
+  deleting ask), **Ask first** (commands, connected apps and browser clicks ask; file changes wait for review),
+  **Plan first** (nothing changes until you approve the plan), **Read-only** (reading and searching only).
+- **Rules** (Settings → Tools → Permissions), one per line as `kind:pattern` — kinds `run`, `edit`, `network`, `browser`,
+  `mcp`, `git-push`, `deploy`, `device`; `*` matches anything. "Never allow" beats "Always ask" beats "Always allow".
+  Every part of a compound command (`a && b; c | d`, `$(…)`) is checked. Examples: `run:npm run *`, `edit:.env`,
+  `mcp:composio:*`. "Always allow" on a waiting step adds the rule for you.
+- **Project rules**: a project can carry its own in `.fizz/settings.json` → `{"permissions": {"allow": [], "ask": [], "deny": []}}`.
+  Its deny and ask rules always count; its allow rules only after you trust them (Settings shows them).
+- Things that send, post, pay or delete always ask, whatever the rules say. Every decision is listed in the Activity tab.
+
+### Where projects and chats are stored
+In the browser's IndexedDB (`static-site/assets/idb.js`): one record per project, per chat and per project file, so
+there is no 5 MB limit and saving one file writes one small record. `localStorage` keeps settings and the lists of ids.
+Data saved by older versions moves over on the first save; without IndexedDB everything stays in `localStorage` as before.
+
+### The shared agent core
+`netlify/lib/agent-core.mjs` holds the agent logic that doesn't need a page (tool tags, mode detection, permissions,
+what the loop does next). `node scripts/build-agent-core.mjs` writes the browser copy, `static-site/assets/agent-core.js`.
+The plan for what comes next is in [`docs/roadmap/`](docs/roadmap/README.md).
+
 ### The five checks
 After Fizz Code changes a project, FIZZ DEV runs five checks and sends what they find back to fix (up to 3 rounds,
 stopping early if the same problems come back): code (syntax, imports, links, JSON, CSS), every page loads, phone

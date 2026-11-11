@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="assets/site.css?v=20261110-cc1" />
 <link rel="stylesheet" href="vendor/codemirror/codemirror.css" />
 <link rel="stylesheet" href="vendor/xterm/xterm.css" />
-<link rel="stylesheet" href="assets/dev.css?v=20261110-auto1" />
+<link rel="stylesheet" href="assets/dev.css?v=20261111-p0" />
 <script>document.documentElement.dataset.app=/\/dev(\.html)?$/.test(location.pathname)?"dev":"chat";try{var t=localStorage.getItem("fizz.theme");t=t?JSON.parse(t):"system";if(t==="dark"||(t!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}</script>
 <script src="vendor/marked.min.js"></script>
 <script src="vendor/purify.min.js"></script>
@@ -30,23 +30,26 @@
 <script src="vendor/xterm/xterm.js"></script>
 <script src="vendor/xterm/addon-fit.js"></script>
 <script src="assets/core.js?v=20261110-console1"></script>
+<script src="assets/idb.js?v=20261111-p0"></script>
+<script src="assets/agent-core.js?v=20261111-p0"></script>
 <script src="assets/raneddie-id.js?v=20261110-console1"></script>
 <script src="assets/site.js"></script>
 <script src="assets/connections.js?v=20261110-vault"></script>
-<script src="assets/settings.js?v=20261110-console1"></script>
+<script src="assets/settings.js?v=20261111-p0"></script>
 <script src="assets/shell.js"></script>
 <script src="assets/terminal.js"></script>
 <script src="assets/blobs.js"></script>
-<script src="assets/agent-tools.js"></script>
+<script src="assets/agent-tools.js?v=20261111-p0"></script>
+<script src="assets/permissions.js?v=20261111-p0"></script>
 <script src="assets/docs.js"></script>
 <script src="assets/skills.js"></script>
-<script src="assets/cloud-tools.js"></script>
+<script src="assets/cloud-tools.js?v=20261111-p0"></script>
 <script src="assets/builds.js"></script>
 <script src="assets/sync.js"></script>
 <script src="assets/web-browser.js?v=20261110-br3"></script>
 <script src="assets/google-tools.js"></script>
 <script src="assets/app-tools.js"></script>
-<script src="assets/mcp-tools.js"></script>
+<script src="assets/mcp-tools.js?v=20261111-p0"></script>
 <script src="assets/custom-connectors.js?v=20261110-vault"></script>
 <script src="assets/fizz-brain.js"></script>
 <script src="assets/brain-design.js"></script>
@@ -212,7 +215,12 @@
 <dialog class="dlg" id="quick-open"><div class="dlg-body"><input class="input mono" id="qo-input" placeholder="Go to file…" aria-label="Go to file" /><div class="qo-list" id="qo-list"></div></div></dialog>
 </div>
 
-<script src="assets/chat.js?v=20261109-audit1"></script>
-<script src="assets/dev.js?v=20261110-auto1"></script>
+<!-- The two apps read the user's data as soon as they run, so they start once storage is ready (assets/idb.js). -->
+<script>(function (list) {
+  var S = window.FIZZ && FIZZ.storage;
+  if (S) return S.boot(list);
+  // idb.js didn't load: start the apps anyway (data stays in localStorage, as before).
+  list.forEach(function (src) { var s = document.createElement("script"); s.src = src; s.async = false; document.body.appendChild(s); });
+})(["assets/chat.js?v=20261109-audit1", "assets/dev.js?v=20261111-p0"]);</script>
 </body>
 </html>

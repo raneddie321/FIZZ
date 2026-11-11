@@ -38,3 +38,5 @@ jobs:
         run: node tests/netlify/sandbox-browser.test.mjs
       - name: Test MCP connector storage
         run: node tests/netlify/mcp-store.test.mjs
+      - name: Test the shared agent core (tool tags, modes, permissions, loop)
+        run: node tests/netlify/agent-core.test.mjs

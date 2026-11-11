@@ -295,7 +295,7 @@
       const def = T()[t.type] || {};
       let body = "";
       if (open) {
-        if (waiting) { const w = def.waiting?.(t) || {}; body = `<div class="stage-bar${w.handoff ? " handoff" : ""}"><span class="muted-sm">${esc(w.text || "Fizz Code wants to do this.")}</span>${w.html || ""}<button class="btn btn-sm" data-approve="${m.id}:${idx}">${esc(w.ok || "Allow")}</button><button class="btn btn-outline btn-sm" data-deny="${m.id}:${idx}">${esc(w.cancel || "Don't allow")}</button></div>`; }
+        if (waiting) { const w = def.waiting?.(t) || {}; body = `<div class="stage-bar${w.handoff ? " handoff" : ""}"><span class="muted-sm">${esc(w.text || `Fizz Code wants to do this.${t.permNote ? ` ${t.permNote}` : ""}`)}</span>${w.html || ""}<button class="btn btn-sm" data-approve="${m.id}:${idx}">${esc(w.ok || "Allow")}</button>${t.permAlways && !w.handoff && !w.html ? `<button class="btn btn-outline btn-sm" data-approve="${m.id}:${idx}" data-always="1" title="Adds the rule: allow ${esc(t.permAlways)}">Always allow</button>` : ""}<button class="btn btn-outline btn-sm" data-deny="${m.id}:${idx}">${esc(w.cancel || "Don't allow")}</button></div>`; }
         else if (t.result) body = (t.result.html || outputHtml(t.result.text)) + (t.result.images || []).map((src) => `<img class="tool-img" src="${esc(src)}" alt="" />`).join("");
         else body = outputHtml(t.progress || t.body);
       }
@@ -442,6 +442,7 @@
       ? `<p class="act-empty">Progress, outputs and skills for this chat appear here.</p>`
       : sec("Activity", `<div class="act-row"><span>Skills</span><b>${skills.size} used</b></div><div class="act-row"><span>Tool steps</span><b>${cmds.length}</b></div><div class="act-row"><span>Messages</span><b>${replies.length}</b></div>`)
         + sec("Progress", liveProgressHtml + planProgressHtml)
+        + sec("Permissions", F.perm.activityHtml())
         + sec("Outputs", outputs.size ? [...outputs.values()].map((ch) => `<button class="act-file" data-open-file="${esc(ch.path)}"><span>${esc(ch.path)}</span><small><span class="add">+${ch.added}</span> <span class="del">−${ch.removed}</span></small></button>`).join("") : `<p class="act-empty">No files changed yet.</p>`)
         + sec("Skills", skills.size ? [...skills.values()].map((k) => `<div class="act-row"><span>${esc(k.name)}</span><small>${k.n}×</small></div>`).join("") : `<p class="act-empty">None used. Press + in the composer to add one.</p>`)
         + sec("Sources", sources.length ? sources.map((a) => `<div class="act-row"><span>${esc(a.name)}</span></div>`).join("") : `<p class="act-empty">No attachments.</p>`);
@@ -612,7 +613,7 @@
   // Per turn: how many times a cut-off reply was continued and how many self-checks ran.
   let turn = { continues: 0, verifies: 0, emptyBuildRetries: 0 };
   const MAX_CONTINUES = 4, MAX_VERIFIES = 3;
-  const estimateTokens = (text) => Math.ceil(String(text || "").length / 3.6);
+  const estimateTokens = F.agentCore.estimateTokens;
   function contextUse() {
     const c = chat();
     const sys = systemPrompt([]);
@@ -723,9 +724,9 @@
     // without any executable file block or tool call. Retry once with an explicit instruction.
     const parsedNow = parseAssistant(reply.content || "", { fences: reply.mode === "build" || !reply.mode });
     const hasArtifacts = Boolean((reply.changes || []).length || parsedNow.files.some((x) => x.closed) || parsedNow.edits.length || parsedNow.tools.length);
-    const narratedIntent = /\b(?:i(?:'| a)m going to|i(?:'| a)ll|now i|let me|i will|creating|writing|going to create|going to write)\b/i.test(parsedNow.prose || "")
-      && /\b(?:file|index\.html|\.css|\.js|component|implement|create|write|run|execute)\b/i.test(parsedNow.prose || "");
-    if (reply.mode === "build" && !hasArtifacts && narratedIntent && turn.emptyBuildRetries < 1 && reply.step < MAX_STEPS()) {
+    const narratedIntent = F.agentCore.narratesWork(parsedNow.prose);
+    const next = F.agentCore.nextStep({ asked, waiting, stopped: stopLoop, mode: reply.mode, hasArtifacts, narratedIntent, cutOff: reply.cutOff, results: results.length, editErrors: editErrors.length, step: reply.step, maxSteps: MAX_STEPS(), maxContinues: MAX_CONTINUES, turn });
+    if (next.action === "retry-narration") {
       turn.emptyBuildRetries++;
       chat().messages.push({
         id: F.uid(), role: "user", auto: true, autoLabel: "Asked Fizz Code to apply the work instead of narrating",
@@ -735,19 +736,19 @@
       save();
       return generate({ step: reply.step + 1 });
     }
-    if (reply.mode === "build" && !hasArtifacts && narratedIntent && turn.emptyBuildRetries >= 1) {
+    if (next.narrationFailed) {
       reply.error = "Fizz Code described the work but still did not create a file or run a tool. Try asking it to create the files directly, or check that the selected model supports the requested output format.";
     }
-    const cut = reply.cutOff && reply.mode === "build";
-    if (cut && (turn.continues >= MAX_CONTINUES || reply.step >= MAX_STEPS())) {
+    const cut = next.cut;
+    if (next.action === "finish" && cut) {
       reply.content += "\n\n*The reply reached its maximum length — ask Fizz Code to continue.*";
       reply.loopStopped = true; save(); renderThread();
       return finishLoop(reply, "limit");
     }
-    if (!cut && !results.length && !editErrors.length) return (await selfCheck(reply)) ? undefined : finishLoop(reply, "done");
-    if (reply.step >= MAX_STEPS()) { reply.loopStopped = true; save(); renderThread(); return finishLoop(reply, "limit"); }
+    if (next.action === "check") return (await selfCheck(reply)) ? undefined : finishLoop(reply, "done");
+    if (next.action === "finish") { reply.loopStopped = true; save(); renderThread(); return finishLoop(reply, "limit"); }
     const parts = results.map((t) => `<tool-result tool="${t.type}" request="${esc(toolLabel(t)).slice(0, 200)}" ok="${t.status === "done"}">\n${scrubSecrets(String(t.result?.text || "").slice(0, 12_000))}\n</tool-result>`);
-    for (const [path, err] of editErrors) parts.push(`<tool-result tool="edit" request="${esc(path)}" ok="false">\n${err}\nThe file was not changed. Send the edit again with SEARCH text copied exactly from the current file, or rewrite the whole file with <fizz-file>.\n</tool-result>`);
+    for (const [path, err] of editErrors) parts.push(`<tool-result tool="edit" request="${esc(path)}" ok="false">\n${err}\n${String(err).startsWith("Blocked:") ? "The file was not changed. Don't write it again or work around it: continue without it, or tell the user." : "The file was not changed. Send the edit again with SEARCH text copied exactly from the current file, or rewrite the whole file with <fizz-file>."}\n</tool-result>`);
     const images = results.filter((t) => t.result?.sendImages !== false).flatMap((t) => (t.result?.images || []).slice(0, 2)).slice(0, 3).map((src, k) => ({ type: "image", name: `screenshot-${k + 1}.jpg`, mime: src.slice(5, src.indexOf(";")), data: src.split(",")[1] }));
     let tail = "Continue the task from here. Fix anything that failed. If everything works, finish with the updated <fizz-plan> and a short summary, without tool tags.";
     if (cut) {
@@ -946,8 +947,19 @@
       if (stopLoop) break;
       const def = F.agentTools.registry[t.type];
       if (!def?.run || t.status === "done" || t.status === "failed" || t.status === "denied") continue;
-      if (t.status !== "approved" && def.needsApproval?.(t, ctx)) {
+      // The permission gate: the mode, the user's and the project's rules, and the tool's own reasons to ask.
+      const perm = t.status === "approved" ? { decision: "allow" } : F.perm.forTool(t, def, ctx);
+      if (perm.decision === "deny") {
+        t.result = { ok: false, text: `${perm.message} Don't retry this or work around it: continue without it, or tell the user what you need.` };
+        t.status = "failed";
+        t.blocked = true;
+        save();
+        renderThread();
+        continue;
+      }
+      if (perm.decision === "ask") {
         t.status = "waiting";
+        Object.assign(t, { permNote: perm.message || "", permAlways: perm.always || "", permKind: perm.kind || "", permTarget: perm.target || "" });
         save();
         renderThread();
         const visible = reply.tools.filter((x) => !["ask", "push", "attach", "memory"].includes(x.type));
@@ -1011,7 +1023,6 @@
     label: (t) => t.body.split("\n")[0].slice(0, 120),
     summary: (k) => `ran ${k} command${k === 1 ? "" : "s"}`,
     prompt: "<fizz-run>command</fizz-run> runs a command line in the project's terminal (a bash-like shell: pipes, &&, ||, ;, > >> <, $VARS, * globs). Built in and instant: ls, cat, grep -rn, find, sed -i, awk, sort, uniq, wc, head, tail, cut, tr, diff, jq, xargs, tee, mkdir -p, rm -rf, cp -r, mv, touch, curl/wget (save pages with -o), zip/unzip, base64, `node file.js` (JavaScript in an isolated worker; top-level await works) and `python file.py` / `pip install` (Python 3 in the browser). Scripts can make real documents: require('docx') (Word), require('xlsx') (Excel, SheetJS), require('pptxgenjs') (PowerPoint), require('jspdf') / require('pdf-lib') (PDF), and save them with fizz.writeFile('out/report.docx', data) (data: string, Uint8Array, ArrayBuffer or Blob; e.g. await docx.Packer.toBlob(doc), XLSX.write(wb, { type: 'array', bookType: 'xlsx' }), await pptx.write({ outputType: 'uint8array' }), pdf.output('arraybuffer')). Then show the file with <fizz-attach path='…'/>. npm, npx, git, make and other programs run in real Linux in the cloud sandbox automatically (when it's turned on for this site).",
-    needsApproval: () => data.settings.askBeforeRun === true,
     async run(t, ctx) {
       const term = ctx.term();
       const r = await term.capture(t.body.split("\n")[0].slice(0, 500));
@@ -1119,7 +1130,14 @@
       if (res.error) reply.editErrors[e.path] = res.error;
       else proposals.push({ path: e.path, after: res.text, kind: "edit" });
     }
-    if (data.settings.reviewChanges) {
+    // The gate for each file: a denied file is not written (and Fizz Code is told); "ask" stages everything for review.
+    let review = Boolean(data.settings.reviewChanges);
+    for (const x of [...proposals]) {
+      const perm = F.perm.forEdit(x.path, { project: p, reply });
+      if (perm.decision === "deny") { proposals.splice(proposals.indexOf(x), 1); reply.editErrors[x.path] = `Blocked: ${perm.message}`; }
+      else if (perm.decision === "ask") review = true;
+    }
+    if (review) {
       reply.staged = proposals.map((x) => ({ ...x, before: p.files[x.path] ?? null, ...diffStats(p.files[x.path] ?? null, x.after) }));
       if (reply.staged.length) F.toast(`${reply.staged.length} change${reply.staged.length === 1 ? "" : "s"} ready for review`);
       return;
@@ -1334,26 +1352,12 @@
   }
 
   /** The mode the user pinned in the + menu, or "" for automatic. */
-  const forcedMode = () => (["build", "plan", "ask", "do"].includes(data.settings.devForce) ? data.settings.devForce : "");
+  const forcedMode = () => F.perm.agentMode() || (["build", "plan", "ask", "do"].includes(data.settings.devForce) ? data.settings.devForce : "");
   /**
    * What a message wants: "ask" (a question — answer it, maybe look things up, never change files), "do"
    * (a task on websites, accounts or connected apps), "plan" or "build". Hebrew and English.
    */
-  function detectMode(text) {
-    const t = String(text || "").trim().toLowerCase();
-    if (!t) return "build";
-    if (/^(plan|make a plan|just plan)\b|^(תכנן|תתכנן|תכין תוכנית|תעשה תוכנית)/.test(t)) return "plan";
-    const build = /\b(build|make|create|add|fix|change|update|implement|write|refactor|redesign|design|generate|convert|rename|remove|delete|style|improve|translate|deploy)\b|(^|\s)(תבנה|תבני|בנה|תעשה|תעשי|תיצור|צור|תוסיף|תוסיפי|תתקן|תקן|תשנה|תעדכן|תכתוב|תעצב|תמחק|תסדר|תשפר|תהפוך|תמיר|תתרגם)(\s|$)/.test(t);
-    const doTask = /\b(sign (me )?up|register|log ?in|send (an? |the )?(email|message)|reply to|upload|post (it|this|to)|book|order|buy|schedule|go to|open (the )?(site|website|page)|get me (an? )?(api )?key|in my (gmail|calendar|drive|notion|inbox))\b|(תירשם|תרשום אותי|תרשמי|תשלח|תעלה ל|תפרסם|תזמין|תקבע|תיכנס ל|תכנס ל|תביא לי|במייל שלי|ביומן שלי|בדרייב|בנושן|בג'ימייל)/.test(t);
-    const question = /\?\s*$/.test(t) || /^(what|why|how|when|where|which|who|whose|is|are|was|can you (tell|explain)|could you explain|does|do i|did|explain|tell me|should|would|am i)\b/.test(t)
-      || /^(מה|למה|מדוע|איך|כיצד|מתי|איפה|היכן|איזה|איזו|אילו|מי|האם|תסביר|תגיד לי|תגיד|כמה|יש לי|אני מחובר|תבדוק מה|תבדוק למה|תבדוק אם|בדוק מה|בדוק למה|תראה לי מה|מה זה)/.test(t);
-    const askToBuild = /^(can|could|would) you (please )?(build|make|create|add|fix|change|write|design)\b|^(תוכל|תוכלי|אתה יכול|את יכולה) (לבנות|ליצור|להוסיף|לתקן|לשנות|לכתוב)/.test(t);
-    if (doTask) return "do";
-    if (question && !askToBuild) return "ask";
-    if (build) return "build";
-    // A statement with no clear verb: a project to work on gets the build agent, otherwise just answer.
-    return Object.keys(project().files).length || /אתר|אפליקציה|משחק|website|app|game|page/.test(t) ? "build" : "ask";
-  }
+  const detectMode = (text) => F.agentCore.detectMode(text, { hasFiles: Object.keys(project().files).length > 0 });
 
   // ---------- panel ----------
   let term = null;
@@ -1929,7 +1933,7 @@
   }
   document.addEventListener("click", (e) => { if (openMenu && !openMenu.contains(e.target) && !e.target.closest("[aria-haspopup],[data-pmenu]")) closeMenu(); });
 
-  const settingsCtx = { user, data, save, onSaved: () => renderAll() };
+  const settingsCtx = { user, data, save, onSaved: () => renderAll(), project: () => project() };
   const openSettings = (tab) => F.settings.open(settingsCtx, tab);
 
   // ---------- project actions ----------
@@ -2073,10 +2077,10 @@
     if (plusView === "connectors") return back("Connectors") + `<div class="ps-list">${connectorRows()}<button type="button" class="ps-row" data-ps="add-connector"><span class="ps-ic">${F.icon("plus")}</span><span class="ps-txt"><b>Add custom connector</b><small>Any MCP server by its URL</small></span></button><button type="button" class="ps-row" data-ps="manage-connections"><span class="ps-ic">${F.icon("plug")}</span><span class="ps-txt"><b>Manage connections</b><small>GitHub, Vercel, Google, apps and custom connectors</small></span>${chev}</button></div>`;
     if (plusView === "skills") return back("Skills") + `<div class="ps-list">${skills.map((x) => `<button type="button" class="ps-row" data-ps-skill="${x.id}"><span class="ps-ic">${F.skills.glyph(x)}</span><span class="ps-txt"><b>${esc(x.name)}</b><small>${esc(x.description || "")}</small></span>${toggle(pinned.includes(x.id))}</button>`).join("") || '<p class="muted-sm">No skills yet.</p>'}<button type="button" class="ps-row" data-ps="manage-skills"><span class="ps-ic">${F.icon("gear")}</span><span class="ps-txt"><b>Manage skills…</b></span></button></div>`;
     if (plusView === "permission") return back("Permissions") + `<div class="ps-list">
-      <button type="button" class="ps-row" data-ps-perm="auto"><span class="ps-txt"><b>Auto</b><small>Fizz runs commands in its own sandbox right away (every change can be undone). Sending, posting, paying and deleting still ask.</small></span>${tick(!data.settings.askBeforeRun)}</button>
-      <button type="button" class="ps-row" data-ps-perm="ask"><span class="ps-txt"><b>Ask before running commands</b><small>Fizz asks before every command it runs.</small></span>${tick(Boolean(data.settings.askBeforeRun))}</button>
+      ${F.perm.MODES.map(([k, name, desc]) => `<button type="button" class="ps-row" data-ps-perm="${k}"><span class="ps-txt"><b>${name}</b><small>${desc}</small></span>${tick(F.perm.mode() === k)}</button>`).join("")}
       <button type="button" class="ps-row" data-ps-opt="reviewChanges"><span class="ps-txt"><b>Review file changes first</b><small>See each change and accept or reject it.</small></span>${toggle(Boolean(data.settings.reviewChanges))}</button>
-      <button type="button" class="ps-row" data-ps-opt="autoVerify" data-default-on><span class="ps-txt"><b>Check work automatically</b><small>5 checks after every change, fixed automatically.</small></span>${toggle(data.settings.autoVerify !== false)}</button></div>`;
+      <button type="button" class="ps-row" data-ps-opt="autoVerify" data-default-on><span class="ps-txt"><b>Check work automatically</b><small>5 checks after every change, fixed automatically.</small></span>${toggle(data.settings.autoVerify !== false)}</button>
+      <button type="button" class="ps-row" data-ps="perm-rules"><span class="ps-ic">${F.icon("shield")}</span><span class="ps-txt"><b>Rules…</b><small>${(() => { const r = F.perm.rules(); const n = r.allow.length + r.ask.length + r.deny.length; return n ? `${n} rule${n === 1 ? "" : "s"}: always allow, always ask, never allow` : "Always allow, always ask or never allow specific commands, files and apps"; })()}</small></span>${chev}</button></div>`;
     return `<div class="ps-head"><strong>Add to chat</strong><button type="button" class="icon-btn" data-ps="close" aria-label="Close">${F.icon("x")}</button></div>
       <div class="ps-tiles">
         <button type="button" class="ps-tile" data-ps="files">${F.icon("file")}<span>Files</span></button>
@@ -2088,7 +2092,7 @@
         <button type="button" class="ps-row" data-ps-go="mode"><span class="ps-ic">${F.icon("target")}</span><span class="ps-txt"><b>Mode</b><small>${modeName}</small></span>${chev}</button>
         <button type="button" class="ps-row" data-ps-go="connectors"><span class="ps-ic">${F.icon("plug")}</span><span class="ps-txt"><b>Connectors</b><small>${connected} connected</small></span>${chev}</button>
         <button type="button" class="ps-row" data-ps-go="skills"><span class="ps-ic">${F.icon("bulb")}</span><span class="ps-txt"><b>Skills</b><small>${pinned.length ? `${pinned.length} on for this project` : "Automatic"}</small></span>${chev}</button>
-        <button type="button" class="ps-row" data-ps-go="permission"><span class="ps-ic">${F.icon("shield")}</span><span class="ps-txt"><b>Permissions</b><small>${data.settings.askBeforeRun ? "Ask before running" : "Auto"}</small></span>${chev}</button>
+        <button type="button" class="ps-row" data-ps-go="permission"><span class="ps-ic">${F.icon("shield")}</span><span class="ps-txt"><b>Permissions</b><small>${F.perm.label()}</small></span>${chev}</button>
         <button type="button" class="ps-row" data-ps-opt="research"><span class="ps-ic">${F.icon("search")}</span><span class="ps-txt"><b>Research</b><small>Search the web thoroughly and cite sources</small></span>${toggle(Boolean(data.settings.research))}</button>
         <button type="button" class="ps-row" data-ps="memory"><span class="ps-ic">${F.icon("brain")}</span><span class="ps-txt"><b>Project memory</b><small>FIZZ.md — standing instructions for this project</small></span>${chev}</button>
       </div>`;
@@ -2139,7 +2143,8 @@
     if (d.ps === "manage-connections") { closePlus(); return openSettings("connections"); }
     if (d.psMode !== undefined) { setForce(d.psMode); plusView = "main"; return drawPlus(); }
     if (d.psSkill) { toggleSkill(d.psSkill); return drawPlus(); }
-    if (d.psPerm) { data.settings.askBeforeRun = d.psPerm === "ask"; save(); return drawPlus(); }
+    if (d.psPerm) { F.perm.setMode(d.psPerm); renderComposer(); return drawPlus(); }
+    if (d.ps === "perm-rules") { closePlus(); return openSettings("tools"); }
     if (d.psOpt) {
       const o = d.psOpt;
       data.settings[o] = o === "autoVerify" ? data.settings[o] === false : !data.settings[o];
@@ -2211,6 +2216,8 @@
           T()[tool.type]?.provide?.(tool, field.value);
         }
         tool.status = t.dataset.approve ? "approved" : "denied";
+        if (tool.permKind) F.perm.answered(tool.permKind, tool.permTarget, Boolean(t.dataset.approve));
+        if (t.dataset.always && tool.permAlways && F.perm.addRule("allow", tool.permAlways)) F.toast(`Rule added: allow ${tool.permAlways}`);
         // One approval can cover the reply's other steps waiting for the same thing (e.g. "Connect Google").
         if (t.dataset.approve) for (const x of m.tools || []) if (x !== tool && x.status === "waiting" && T()[x.type]?.approveTogether?.(tool, x)) x.status = "approved";
         if (t.dataset.deny) tool.result = { ok: false, text: "The user didn't allow this." };

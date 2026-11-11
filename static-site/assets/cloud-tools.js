@@ -74,7 +74,6 @@
     summary: (k) => `ran ${k} cloud command${k === 1 ? "" : "s"}`,
     prompt: '<fizz-sandbox>command</fizz-sandbox> runs a bash command in your own Linux computer in the cloud (Node 22, npm, git, Python 3, internet access). The project\'s text files are copied in first, and files the command creates or changes come back into the project (node_modules stays there between commands). Use it without asking for npm install, npm test, npm run build, real Node/Python packages, git and anything the browser terminal can\'t do. For a server, listen on 0.0.0.0 port 3000 and add background="true": it keeps running and you get a public link.',
     available: () => Boolean(tools()?.sandbox),
-    needsApproval: (t, ctx) => ctx.data.settings.askBeforeRun === true,
     async run(t, ctx) {
       const cmd = t.body.trim();
       if (!cmd) return { ok: false, text: "The command was empty." };
