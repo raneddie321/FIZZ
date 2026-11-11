@@ -5,7 +5,7 @@ Eight phases, each shippable on its own (branch → Preview → tests → main, 
 | Phase | What | Status |
 | --- | --- | --- |
 | 0 | Foundations: permission gate, storage without the 5 MB limit, shared agent core | built — see [phase-0.md](phase-0.md) for what is and isn't in it |
-| 1 | Long conversations: compact at ~70% of the context, retry on "context too long", `/compact`, `/clear` | not started (a first version of compaction already exists in `dev.js`) |
+| 1 | Long conversations: compact at ~70% of the context, retry on "context too long", `/compact`, `/clear` | built — see [phase-1.md](phase-1.md) |
 | 2 | Big projects and local folders: File System Access API, clone in the sandbox, tree/grep/read tools | not started |
 | 3 | Hooks: `.fizz/hooks.json` (afterEdit, afterTurn, beforePush, …) | not started |
 | 4 | Full Git & GitHub: branches, commits, PRs, review replies, CI fix loop (inside `api/github/[action].mjs`) | not started |

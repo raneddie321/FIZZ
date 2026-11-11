@@ -434,6 +434,63 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
   await ctx.close();
 }
 
+// ---------- Long conversations: compaction, the project's memory of it, and the "too long" retry (phase 1) ----------
+{
+  const { ctx, p, errs } = await open({ width: 1280, height: 800 });
+  const all = []; let n = 0, failNext = false;
+  await ctx.route("**/api/ai/chat", async (r) => {
+    const b = r.request().postDataJSON();
+    if (failNext && !String(b.system || "").startsWith("You summarise")) { failNext = false; all.push({ failed: true }); return r.fulfill({ status: 400, json: { error: { message: "This model's maximum context length is 8192 tokens. However, your messages resulted in 9911 tokens." } } }); }
+    const summary = String(b.system || "").startsWith("You summarise");
+    all.push({ ...b, summary });
+    await r.fulfill({ status: 200, headers: { "content-type": "text/event-stream" }, body: sse(summary ? "GOAL — a long test chat.\nDECISIONS — none.\nFILES — none.\nOPEN — none.\nNEXT — keep answering." : `Answer #${++n}#. ` + "lorem ipsum ".repeat(300)) });
+  });
+  await p.goto(B + "dev.html"); await p.waitForTimeout(900);
+  await p.evaluate(() => { FIZZ.loadData(FIZZ.auth.current()).settings.autoVerify = false; });
+  const text = (m) => (typeof m.content === "string" ? m.content : (m.content || []).map((x) => x.text || "").join(""));
+  const tokens = (b) => Math.ceil((String(b.system || "").length + (b.messages || []).reduce((k, m) => k + (typeof m.content === "string" ? m.content.length : JSON.stringify(m.content).length), 0)) / 3.6);
+  const ask = async (k) => { const want = `Answer #${n + 1}#`; await p.fill("#dev-app #input", `what about detail number ${k}?`); await p.keyboard.press("Enter"); await lastReply(p, "#dev-app", want); };
+  await ask(0);
+  // A context where about 6,000 tokens of messages reach the 70% mark.
+  const max = Math.round((Math.ceil(all[0].system.length / 3.6) + 6000) / 0.7);
+  await p.evaluate((m) => { FIZZ.loadData(FIZZ.auth.current()).settings.contextWindow = m; }, max);
+  for (let k = 1; k <= 14; k++) await ask(k);
+  const answers = all.filter((b) => !b.summary && !b.failed);
+  const over = answers.filter((b) => tokens(b) > max);
+  check("long chat: compaction ran", all.some((b) => b.summary), `${all.length} requests`);
+  check("long chat: no request went over the model's context", over.length === 0, `${over.length} over; biggest ${Math.max(...answers.map(tokens))} of ${max}`);
+  const firstAfter = all[all.findIndex((b) => b.summary) + 1];
+  check("long chat: after compaction the summary leads and the last six messages stay", text(firstAfter.messages[0]).startsWith("Summary of our earlier conversation") && firstAfter.messages.length >= 7 && firstAfter.messages[1].role === "assistant", `${firstAfter.messages.length} messages`);
+  const sum = all.find((b) => b.summary);
+  check("long chat: the summariser gets the structured brief and the transcript", /GOAL[\s\S]*FILES[\s\S]*NEXT/.test(sum.system) && text(sum.messages[0]).includes("USER: what about detail number 0?"));
+  check("long chat: the summary shows in the thread", (await p.locator("#dev-app #thread").innerText()).includes("Earlier messages were summarised"));
+
+  // The provider says "too long": FIZZ DEV summarises and tries once more, and the user gets the answer.
+  // (With a huge context nothing is compacted beforehand, so the order of requests is exact.)
+  await p.evaluate(() => { FIZZ.loadData(FIZZ.auth.current()).settings.contextWindow = 5_000_000; });
+  let len = 0;
+  for (let k = 15; k < 22 && len < 9; k++) { await ask(k); len = await p.evaluate(() => { const pr = FIZZ.loadData(FIZZ.auth.current()).projects[0]; return (pr.chats.at(-1)?.messages || []).length; }); }
+  const before = all.length;
+  failNext = true;
+  await ask(99);
+  const after = all.slice(before);
+  check("too long: the failed request is followed by a summary and a second try", after[0]?.failed && after[1]?.summary && after[2] && !after[2].summary && !after[2].failed, after.map((b) => (b.failed ? "failed" : b.summary ? "summary" : "answer")).join(","));
+  check("too long: no error is left in the chat", !(await p.locator("#dev-app #thread").innerText()).includes("too long for the model"));
+
+  // A new chat in the same project knows where things stand.
+  await p.fill("#dev-app #input", "/new"); await p.keyboard.press("Enter"); await p.waitForTimeout(300);
+  await ask(100);
+  check("new chat: it is told where the project stands", all.at(-1).system.includes("WHERE THIS PROJECT STANDS") && all.at(-1).system.includes("a long test chat"));
+  // A short chat that can't be made smaller shows a clear error instead of looping.
+  failNext = true;
+  const count = all.length;
+  await p.fill("#dev-app #input", "and one more question?"); await p.keyboard.press("Enter");
+  await p.waitForFunction(() => document.querySelector("#dev-app #thread")?.innerText.includes("too long for the model"), null, { timeout: 15000 }).then(() => check("too long: a chat that can't shrink says so clearly", true)).catch(() => check("too long: a chat that can't shrink says so clearly", false));
+  check("too long: it doesn't retry forever", all.length - count <= 2, String(all.length - count));
+  check("long chat: no script errors", !errs.length, errs.join(" | "));
+  await ctx.close();
+}
+
 // ---------- app switch keeps one page ----------
 {
   const { ctx, p, errs } = await open({ width: 1280, height: 800 });

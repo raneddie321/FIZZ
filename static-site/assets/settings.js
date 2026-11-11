@@ -105,6 +105,7 @@
         <label class="check"><input type="checkbox" name="autoVerify" /><span>Check Fizz Code's work automatically<small>After every change FIZZ DEV runs 5 checks — code, every page, phone layout, pressing every button, and an AI code review — and has Fizz Code fix what they find.</small></span></label>
         <label class="check"><input type="checkbox" name="aiReview" /><span>Include the AI code review<small>The fifth check: a second AI pass that reads the changed files for real bugs. Uses one extra AI message per task.</small></span></label>
         <label class="field"><span>Steps per task</span><input class="input" type="number" name="agentSteps" min="5" max="40" step="1" /><small class="muted-sm">How many rounds Fizz Code may work on its own before it asks you to keep going (5–40).</small></label>
+        <label class="field"><span>Context size</span><input class="input" type="number" name="contextWindow" min="2000" step="1000" placeholder="Automatic" /><small class="muted-sm">How many tokens the model can read at once. Leave it empty and FIZZ works it out from the model. FIZZ DEV summarises a chat when it reaches 70% of this, and keeps the last six messages as they are.</small></label>
         <label class="check"><input type="checkbox" name="reviewChanges" /><span>Review file changes before they're applied</span></label>
         ${F.perm.settingsHtml()}
         <label class="check"><input type="checkbox" name="autoActions" /><span>Allow automatic GitHub Push and Vercel deploys<small>When enabled, FIZZ DEV can publish the current project after you request it, without an extra confirmation dialog. It still must be connected and must report the real result.</small></span></label>
@@ -249,6 +250,7 @@
     f.aiReview.checked = s.aiReview !== false;
     f.agentSteps.value = String(Math.min(40, Math.max(5, Number(s.agentSteps) || 20)));
     F.perm.fillSettings(f, ctx.project?.());
+    f.contextWindow.value = Number(s.contextWindow) >= 2000 ? String(Math.round(s.contextWindow)) : "";
     f.autoActions.checked = Boolean(s.autoActions);
     setTab(tab);
     F.serverStatus().then((st) => {
@@ -432,6 +434,7 @@
         autoVerify: f.autoVerify.checked,
         aiReview: f.aiReview.checked,
         agentSteps: Math.min(40, Math.max(5, Number(f.agentSteps.value) || 20)),
+        contextWindow: Number(f.contextWindow.value) >= 2000 ? Math.round(Number(f.contextWindow.value)) : 0,
         autoActions: f.autoActions.checked,
       });
       const badRules = F.perm.readSettings(f);

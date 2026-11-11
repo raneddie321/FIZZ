@@ -207,3 +207,96 @@ export function nextStep({ asked = false, waiting = false, stopped = false, mode
   if (step >= maxSteps) return { action: "finish", why: "limit", cut, narrationFailed };
   return { action: "continue", cut, narrationFailed };
 }
+
+// ---------------- long conversations ----------------
+const CONTEXT_SIZES = [
+  [/gemini/, 1_000_000],
+  [/claude/, 200_000],
+  [/glm-(?:4\.[6-9]|[5-9])/, 200_000],
+  [/deepseek/, 64_000],
+  [/gemma|mixtral|llama-?3-8b|llama3-8b/, 8_000],
+];
+/**
+ * How many tokens the model can take in. An explicit setting wins; then a size written in the model's name
+ * ("-32768", "-128k"); then what's known about the family; otherwise 128k. Guessing low only compacts earlier;
+ * guessing high is caught by the "too long" retry.
+ */
+export function contextSize(model, override) {
+  const set = Number(override);
+  if (set >= 2000) return Math.round(set);
+  const m = String(model || "").toLowerCase();
+  const exact = /(?:^|[-_/:.])(8192|16384|32768|65536|131072|262144)(?=$|[-_/:.])/.exec(m);
+  if (exact) return Number(exact[1]);
+  const k = /(?:^|[-_/:.])(\d{1,4})k(?=$|[-_/:.])/.exec(m);
+  if (k && +k[1] >= 4 && +k[1] <= 2000) return +k[1] * 1000;
+  for (const [re, n] of CONTEXT_SIZES) if (re.test(m)) return n;
+  return 128_000;
+}
+
+/** The provider said the conversation doesn't fit the model (or the request is too large for it). */
+export function isContextOverflow(err) {
+  const status = Number(err?.status) || 0;
+  if (status && ![400, 413, 422, 500].includes(status)) return false;
+  return /context[\s_-]?(?:length|window|size|limit)|maximum context|context_length_exceeded|too many (?:input )?tokens|token limit|tokens? (?:limit )?exceed|exceeds? (?:the )?(?:maximum|max|model|context)|prompt is too long|input is too long|request too large|reduce the (?:length|size)|too long for (?:this|the) model/i.test(String(err?.message || err || ""));
+}
+
+const tokensOf = (m) => estimateTokens(m?.content) + (m?.attachments || []).reduce((n, a) => n + (a.type === "image" ? 1500 : estimateTokens(a.text)), 0);
+/** Tokens in a list of chat messages (text, plus a flat cost per image). */
+export const messagesTokens = (messages) => (messages || []).reduce((n, m) => n + tokensOf(m), 0);
+
+/**
+ * Which messages to summarise and which to keep as they are: at least the last `keep`, starting at an assistant
+ * message — the summary takes the place of a user message, so roles still alternate, and a reply stays with the
+ * tool results that follow it. null when there is nothing worth summarising.
+ */
+export function compactPlan(messages, keep = 6) {
+  const n = messages?.length || 0;
+  if (n < keep + 2) return null;
+  let cut = n - keep;
+  while (cut > 0 && messages[cut].role !== "assistant") cut--;
+  if (cut < 2) { cut = n - keep; while (cut < n - 1 && messages[cut].role !== "assistant") cut++; }
+  if (cut < 2 || cut >= n - 1) return null;
+  return { older: messages.slice(0, cut), kept: messages.slice(cut), olderTokens: messagesTokens(messages.slice(0, cut)) };
+}
+
+/** What the summariser is told: fixed sections, so the next context finds things where it expects them. */
+export const SUMMARY_SYSTEM = [
+  "You summarise a coding session so the work can continue in a fresh context. Write these sections in this order, at most 450 words in total, as plain text:",
+  "GOAL — what the user wants built, in one or two sentences.",
+  "DECISIONS — choices and preferences the user stated (design, tech, wording, things to avoid).",
+  "FILES — each file that was created or changed, with one line on what it does now.",
+  "OPEN — bugs, errors and unfinished parts, with the exact error text when it is known.",
+  "NEXT — the next steps, in order.",
+  "Keep names, paths, URLs, numbers and the user's own wording exact. Leave out a section's content only if there is none (write “none”). Don't add advice or greetings. Write in the language the user writes in.",
+].join("\n");
+
+/** The older messages as a transcript for the summariser, within a size the model can read. */
+export function summaryTranscript(messages, { proseOf = (m) => m.content, maxChars = 120_000, files = [] } = {}) {
+  const who = (m) => (m.summary ? "EARLIER SUMMARY" : m.role === "user" ? (m.auto ? "TOOL RESULTS" : "USER") : "FIZZ CODE");
+  const body = (messages || []).map((m) => `${who(m)}: ${String(proseOf(m) || m.content || "")}`.slice(0, 6000)).join("\n\n");
+  const list = files.length ? `\n\nFILES CHANGED IN THESE MESSAGES: ${[...new Set(files)].slice(0, 80).join(", ")}` : "";
+  // The start (the goal) and the end (where things stand) matter most.
+  const room = Math.max(4000, maxChars - list.length);
+  const text = body.length <= room ? body : `${body.slice(0, Math.round(room * 0.35))}\n\n[… middle left out …]\n\n${body.slice(-Math.round(room * 0.6))}`;
+  return text + list;
+}
+
+/**
+ * Last resort when the chat still doesn't fit and can't be summarised: shorten long messages (keeping their start
+ * and end), and if that changes nothing, keep only the last few with a note. → { messages, changed }
+ */
+export function shrinkMessages(messages, { max = 4000, keepLast = 2, note = "Earlier messages were left out to fit this model's context." } = {}) {
+  const list = messages || [];
+  let changed = false;
+  const out = list.map((m, i) => {
+    const text = String(m.content || "");
+    if (i >= list.length - keepLast || text.length <= max) return m;
+    changed = true;
+    return { ...m, content: `${text.slice(0, Math.round(max * 0.6))}\n\n[… shortened to fit the model's context …]\n\n${text.slice(-Math.round(max * 0.25))}` };
+  });
+  if (changed) return { messages: out, changed };
+  if (list.length <= 4) return { messages: list, changed: false }; // too short to drop anything
+  let cut = list.length - 4;
+  while (cut < list.length - 1 && list[cut].role !== "assistant") cut++;
+  return { messages: [{ role: "user", summary: true, content: note }, ...list.slice(cut)], changed: true };
+}

@@ -247,6 +247,13 @@ Data saved by older versions moves over on the first save; without IndexedDB eve
 what the loop does next). `node scripts/build-agent-core.mjs` writes the browser copy, `static-site/assets/agent-core.js`.
 The plan for what comes next is in [`docs/roadmap/`](docs/roadmap/README.md).
 
+### Long conversations
+FIZZ DEV works out the model's context size (Settings → Tools → Context size overrides it), summarises a chat when it
+reaches 70% — goal, decisions, files, open problems, next steps — and keeps the last six messages as they are. If a
+provider still answers that the conversation is too long, FIZZ DEV summarises (or, failing that, shortens) it and tries
+that step once more. The latest summary stays with the project, so a new chat knows where things stand.
+`/compact` does it by hand; `/clear` empties the chat.
+
 ### The five checks
 After Fizz Code changes a project, FIZZ DEV runs five checks and sends what they find back to fix (up to 3 rounds,
 stopping early if the same problems come back): code (syntax, imports, links, JSON, CSS), every page loads, phone

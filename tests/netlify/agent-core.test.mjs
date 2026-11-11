@@ -100,4 +100,42 @@ n = nextStep({ mode: "build", hasArtifacts: true, results: 1, step: 20, maxSteps
 assert.ok(n.action === "finish" && n.why === "limit" && !n.cut);
 assert.ok(narratesWork("I'll create index.html now") && !narratesWork("Here is the answer."));
 
+// ---------- long conversations ----------
+const { contextSize, isContextOverflow, compactPlan, shrinkMessages, summaryTranscript, messagesTokens, estimateTokens, SUMMARY_SYSTEM } = core;
+assert.equal(contextSize("gemini-3.8-flash"), 1_000_000);
+assert.equal(contextSize("z-ai/glm-4.6"), 200_000);
+assert.equal(contextSize("mixtral-8x7b-32768"), 32768, "a size in the model's name is used");
+assert.equal(contextSize("moonshot-v1-128k"), 128_000);
+assert.equal(contextSize("some-new-model"), 128_000, "unknown: a safe default");
+assert.equal(contextSize("gemini-3.8-flash", 50_000), 50_000, "the user's setting wins");
+assert.equal(contextSize("llama-3.3-70b-versatile"), 128_000, "70b is not a context size");
+assert.ok(isContextOverflow({ status: 400, message: "This model's maximum context length is 8192 tokens. However, your messages resulted in 9000 tokens." }));
+assert.ok(isContextOverflow({ status: 400, message: "prompt is too long: 210000 tokens > 200000 maximum" }));
+assert.ok(isContextOverflow({ status: 413, message: "Request too large for model `llama-3.3-70b` … tokens per minute" }));
+assert.ok(!isContextOverflow({ status: 429, message: "Rate limit: token limit reached" }), "a rate limit is not an overflow");
+assert.ok(!isContextOverflow({ status: 400, message: "Invalid API key" }) && !isContextOverflow({ status: 401, message: "context length" }));
+// what to summarise, what to keep
+const chatOf = (k) => [...Array(k)].map((_, i) => ({ role: i % 2 ? "assistant" : "user", content: `message ${i} ` + "x".repeat(400) }));
+assert.equal(compactPlan(chatOf(6)), null, "a short chat is left alone");
+let plan = compactPlan(chatOf(13));
+assert.ok(plan.kept.length >= 6 && plan.kept[0].role === "assistant" && plan.older.length + plan.kept.length === 13, "the kept part starts at a reply, so roles alternate after the summary");
+assert.equal(plan.olderTokens, messagesTokens(plan.older));
+// a reply stays with the tool results that follow it
+const loop = [{ role: "user", content: "build" }, { role: "assistant", content: "a1" }, { role: "user", auto: true, content: "results 1" }, { role: "assistant", content: "a2" }, { role: "user", auto: true, content: "results 2" }, { role: "assistant", content: "a3" }, { role: "user", auto: true, content: "results 3" }, { role: "assistant", content: "a4" }, { role: "user", auto: true, content: "results 4" }, { role: "assistant", content: "a5" }, { role: "user", auto: true, content: "results 5" }];
+plan = compactPlan(loop);
+assert.ok(plan.kept[0].role === "assistant" && plan.kept.at(-1).content === "results 5" && plan.older[0].content === "build");
+// the transcript for the summariser fits, and keeps the start and the end
+const tr = summaryTranscript([{ role: "user", content: "GOAL-MARK make a shop" }, ...chatOf(60), { role: "assistant", content: "END-MARK done" }], { maxChars: 9000, files: ["index.html", "index.html", "app.js"] });
+assert.ok(tr.length < 9400 && tr.includes("GOAL-MARK") && tr.includes("END-MARK") && tr.includes("FILES CHANGED IN THESE MESSAGES: index.html, app.js"));
+assert.ok(summaryTranscript([{ role: "user", summary: true, content: "old summary" }]).startsWith("EARLIER SUMMARY:"), "an earlier summary is carried forward");
+assert.ok(/GOAL[\s\S]*DECISIONS[\s\S]*FILES[\s\S]*OPEN[\s\S]*NEXT/.test(SUMMARY_SYSTEM));
+// the last resort
+let sh = shrinkMessages([{ role: "user", content: "a".repeat(20_000) }, { role: "assistant", content: "b".repeat(20_000) }, { role: "user", content: "c".repeat(20_000) }]);
+assert.ok(sh.changed && sh.messages[0].content.length < 4200 && sh.messages[2].content.length === 20_000, "long old messages are shortened, the latest are not");
+assert.ok(sh.messages[0].content.startsWith("aaa") && sh.messages[0].content.endsWith("aaa") && sh.messages[0].content.includes("shortened"));
+sh = shrinkMessages(chatOf(12));
+assert.ok(sh.changed && sh.messages.length <= 5 && sh.messages[0].summary && sh.messages[1].role === "assistant", "nothing long to shorten: only the last few stay, with a note");
+assert.equal(shrinkMessages(chatOf(2)).changed, false, "nothing left to drop");
+assert.equal(estimateTokens("x".repeat(3600)), 1000);
+
 console.log("Agent core tests passed");

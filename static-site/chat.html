@@ -31,11 +31,11 @@
 <script src="vendor/xterm/addon-fit.js"></script>
 <script src="assets/core.js?v=20261110-console1"></script>
 <script src="assets/idb.js?v=20261111-p0"></script>
-<script src="assets/agent-core.js?v=20261111-p0"></script>
+<script src="assets/agent-core.js?v=20261111-p1"></script>
 <script src="assets/raneddie-id.js?v=20261110-console1"></script>
 <script src="assets/site.js"></script>
 <script src="assets/connections.js?v=20261110-vault"></script>
-<script src="assets/settings.js?v=20261111-p0"></script>
+<script src="assets/settings.js?v=20261111-p1"></script>
 <script src="assets/shell.js"></script>
 <script src="assets/terminal.js"></script>
 <script src="assets/blobs.js"></script>
@@ -221,6 +221,6 @@
   if (S) return S.boot(list);
   // idb.js didn't load: start the apps anyway (data stays in localStorage, as before).
   list.forEach(function (src) { var s = document.createElement("script"); s.src = src; s.async = false; document.body.appendChild(s); });
-})(["assets/chat.js?v=20261109-audit1", "assets/dev.js?v=20261111-p0"]);</script>
+})(["assets/chat.js?v=20261109-audit1", "assets/dev.js?v=20261111-p1"]);</script>
 </body>
 </html>
