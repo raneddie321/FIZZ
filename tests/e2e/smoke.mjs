@@ -491,6 +491,120 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
   await ctx.close();
 }
 
+// ---------- Big projects: an index in the prompt and tools to look around (phase 2) ----------
+{
+  const { ctx, p, errs, bodies, script } = await open({ width: 1280, height: 800 });
+  await p.goto(B + "dev.html"); await p.waitForTimeout(900);
+  await p.evaluate(() => {
+    const u = FIZZ.auth.current(), d = FIZZ.loadData(u), pr = d.projects[0];
+    d.settings.autoVerify = false;
+    for (let i = 0; i < 120; i++) pr.files[`src/mod${i}/file${i}.js`] = `export function fn${i}() {\n  return ${i} * 1000;\n}\n// MARK-${i}\n`;
+    Object.assign(pr.files, { "package.json": '{"name":"big"}', "index.html": "<h1>Big</h1>", ".env": "SECRET_KEY=abc123" });
+    FIZZ.saveData(u, d);
+  });
+  script.push('<fizz-tree path="src" depth="1"/>\n<fizz-grep pattern="MARK-77$"/>\n<fizz-read path="src/mod77/file77.js" lines="1-2"/>\n<fizz-symbols path="src/mod77/file77.js"/>\n<fizz-read path=".env"/>\n<fizz-read path="file77.ts"/>\nLooking.');
+  script.push("It is in src/mod77/file77.js.");
+  await p.fill("#dev-app #input", "where is MARK-77 defined?"); await p.keyboard.press("Enter");
+  await lastReply(p, "#dev-app", "It is in src/mod77/file77.js.");
+  const sys = bodies[0].system;
+  check("big project: the prompt carries an index, not every file", sys.includes("THIS IS A LARGE PROJECT: 123 files") && sys.includes("FILE TREE:") && sys.includes("mod77/ (1 file") && !sys.includes("return 55 * 1000") && sys.includes('<fizz-file path="package.json">'), `${sys.length} chars`);
+  check("big project: the prompt explains the tools", ["<fizz-tree", "<fizz-grep", "<fizz-read", "<fizz-symbols"].every((x) => sys.includes(x)));
+  const back = JSON.stringify(bodies.at(-1).messages.at(-1));
+  check("tools: tree folds a folder to a count", back.includes("mod77/ (1 file,"), back.slice(0, 300));
+  check("tools: grep answers path:line: text", back.includes("src/mod77/file77.js:4: // MARK-77") && !back.includes("MARK-771"));
+  check("tools: read answers numbered lines", back.includes("1  export function fn77() {") && back.includes("lines 1–2 of 5"));
+  check("tools: symbols gives the outline", back.includes("1  export function fn77() {") && back.includes("1 symbol"));
+  check("tools: .env values never reach the AI", back.includes("SECRET_KEY=•••• (set") && !back.includes("abc123") && !sys.includes("abc123"));
+  check("tools: a wrong path gets a helpful answer", back.includes("There is no file file77.ts") && back.includes("Did you mean: src/mod77/file77.js"));
+  check("tools: looking around is allowed in read-only mode", await p.evaluate(() => { FIZZ.perm.setMode("read-only"); const d = FIZZ.perm.decide("read", "grep x", { readOnly: true, quiet: true }).decision; FIZZ.perm.setMode("auto"); return d === "allow"; }));
+  // 5,000 files: searching and listing stay fast, and the project comes back from storage quickly.
+  const t = await p.evaluate(async () => {
+    const u = FIZZ.auth.current(), d = FIZZ.loadData(u), pr = d.projects[0];
+    for (let i = 0; i < 5000; i++) pr.files[`pkg/dir${i % 50}/sub${i % 7}/file${i}.js`] = `// file ${i}\nexport const value${i} = ${i};\n${"const pad = 'lorem ipsum dolor sit amet';\n".repeat(40)}${i === 4321 ? "// NEEDLE-HERE\n" : ""}`;
+    let t0 = performance.now();
+    const g = FIZZ.agentCore.grepFiles(pr.files, { pattern: "NEEDLE-\\w+" });
+    const grep = performance.now() - t0;
+    t0 = performance.now();
+    const tree = FIZZ.agentCore.treeText(FIZZ.codeTools.entries(pr.files), { depth: 2 });
+    const treeMs = performance.now() - t0;
+    t0 = performance.now();
+    FIZZ.saveData(u, d);
+    await FIZZ.storage.flush();
+    return { grep, found: g.matches[0]?.path, treeMs, lines: tree.split("\n").length, save: performance.now() - t0, files: Object.keys(pr.files).length };
+  });
+  check("5,000 files: grep finds a needle in under 2 s", t.found === "pkg/dir21/sub2/file4321.js" && t.grep < 2000, `${Math.round(t.grep)} ms`);
+  check("5,000 files: the tree is built in under 1 s", t.treeMs < 1000 && t.lines < 420, `${Math.round(t.treeMs)} ms, ${t.lines} lines`);
+  const t0 = Date.now();
+  await p.reload();
+  await p.waitForFunction(() => window.FIZZ?.storage && document.querySelector("#dev-app #input") && FIZZ.loadData(FIZZ.auth.current()).projects[0] && Object.keys(FIZZ.loadData(FIZZ.auth.current()).projects[0].files).length > 5000, null, { timeout: 30000 });
+  const openMs = Date.now() - t0;
+  check("5,000 files: the project opens in under 10 s", openMs < 10000, `${openMs} ms (saved in ${Math.round(t.save)} ms, ${t.files} files)`);
+  check("big project: no script errors", !errs.length, errs.join(" | "));
+  await ctx.close();
+}
+
+// ---------- A folder on this computer (phase 2): the browser's private file system stands in for the picker ----------
+{
+  const { ctx, p, errs, script } = await open({ width: 1280, height: 800 });
+  // Headless Chromium crashes reading a private-file-system handle back from IndexedDB, so the tests keep the folder by name.
+  await ctx.addInitScript(() => {
+    window.__FIZZ_HANDLE_STORE = {
+      async get(id) { const name = localStorage.getItem(`t.handle.${id}`); return name ? (await navigator.storage.getDirectory()).getDirectoryHandle(name) : null; },
+      async put(id, h) { localStorage.setItem(`t.handle.${id}`, h.name); },
+      async delete(id) { localStorage.removeItem(`t.handle.${id}`); },
+    };
+  });
+  await p.goto(B + "dev.html"); await p.waitForTimeout(900);
+  // A small site on "disk", with things that must be left out.
+  await p.evaluate(async () => {
+    const root = await navigator.storage.getDirectory();
+    try { await root.removeEntry("site", { recursive: true }); } catch {}
+    const site = await root.getDirectoryHandle("site", { create: true });
+    const put = async (path, text) => { let d = site; const parts = path.split("/"); for (const x of parts.slice(0, -1)) d = await d.getDirectoryHandle(x, { create: true }); const w = await (await d.getFileHandle(parts.at(-1), { create: true })).createWritable(); await w.write(text); await w.close(); };
+    await put("index.html", "<!doctype html><title>Disk</title><h1>From disk</h1>");
+    await put("css/style.css", "h1 { color: red; }");
+    await put("notes.txt", "delete me");
+    await put(".gitignore", "secret/\n*.log\n");
+    await put("secret/key.txt", "nope");
+    await put("debug.log", "nope");
+    await put("node_modules/pkg/index.js", "nope");
+    window.showDirectoryPicker = async () => site;
+    window.__disk = async (path) => { try { let d = site; const parts = path.split("/"); for (const x of parts.slice(0, -1)) d = await d.getDirectoryHandle(x); return await (await (await d.getFileHandle(parts.at(-1))).getFile()).text(); } catch { return null; } };
+    window.__put = put;
+    FIZZ.loadData(FIZZ.auth.current()).settings.autoVerify = false;
+  });
+  await p.click("#new-project");
+  await p.locator('[data-k="folder"]').click();
+  await p.waitForFunction(() => FIZZ.loadData(FIZZ.auth.current()).projects[0]?.local, null, { timeout: 10000 });
+  let st = await p.evaluate(() => { const pr = FIZZ.loadData(FIZZ.auth.current()).projects[0]; return { name: pr.name, files: Object.keys(pr.files).sort(), linked: FIZZ.localFolder.linked(pr) }; });
+  check("folder: it opens as a project, without what .gitignore and node_modules cover", st.name === "site" && st.linked && st.files.join(",") === ".gitignore,css/style.css,index.html,notes.txt", st.files.join(","));
+  // The agent changes a file, adds one and deletes one: the disk follows.
+  script.push('<fizz-file path="index.html">\n<!doctype html><title>Disk</title><h1>Changed by Fizz</h1>\n</fizz-file>\n<fizz-file path="js/new.js">\nconsole.log("new");\n</fizz-file>\n<fizz-run>rm notes.txt</fizz-run>\nDone with the files.');
+  script.push("All written.");
+  await p.fill("#dev-app #input", "change the heading, add js/new.js and delete notes.txt"); await p.keyboard.press("Enter");
+  await lastReply(p, "#dev-app", "All written.");
+  await p.evaluate(async () => { for (let i = 0; i < 50 && !((await window.__disk("js/new.js")) !== null && (await window.__disk("notes.txt")) === null); i++) await new Promise((r) => setTimeout(r, 100)); });
+  const disk = await p.evaluate(async () => ({ index: await window.__disk("index.html"), added: await window.__disk("js/new.js"), gone: await window.__disk("notes.txt"), css: await window.__disk("css/style.css"), ignored: await window.__disk("secret/key.txt") }));
+  check("folder: the agent's edit reaches the real file", disk.index?.includes("Changed by Fizz"), String(disk.index));
+  check("folder: a new file is created (with its folder) and a deleted one is deleted", disk.added?.includes('"new"') && disk.gone === null, JSON.stringify(disk));
+  check("folder: files FIZZ didn't touch are left alone", disk.css === "h1 { color: red; }" && disk.ignored === "nope");
+  // A change made outside FIZZ comes in when the tab is looked at again.
+  await p.evaluate(async () => { await new Promise((r) => setTimeout(r, 30)); await window.__put("css/style.css", "h1 { color: blue; }"); await window.__put("about.html", "<h1>About</h1>"); window.dispatchEvent(new Event("focus")); });
+  await p.waitForFunction(() => { const f = FIZZ.loadData(FIZZ.auth.current()).projects[0].files; return f["css/style.css"]?.includes("blue") && f["about.html"]; }, null, { timeout: 8000 }).then(() => check("folder: a change made outside FIZZ is brought in", true)).catch(() => check("folder: a change made outside FIZZ is brought in", false));
+  check("folder: bringing a change in doesn't write it back", (await p.evaluate(async () => { await new Promise((r) => setTimeout(r, 700)); return (await FIZZ.localFolder.sync(FIZZ.loadData(FIZZ.auth.current()).projects[0])).written; })) === 0);
+  // After a reload the project is still there and offers to reconnect; reconnecting brings in what changed meanwhile.
+  await p.evaluate(() => FIZZ.storage.flush());
+  await p.reload(); await p.waitForTimeout(1200);
+  await p.evaluate(async () => { const site = await (await navigator.storage.getDirectory()).getDirectoryHandle("site"); const w = await (await site.getFileHandle("index.html")).createWritable(); await w.write("<h1>Edited while FIZZ was closed</h1>"); await w.close(); });
+  const bar = await p.locator("#local-bar").innerText().catch(() => "");
+  check("folder: after a reload the project asks to reconnect", /Reconnect folder/.test(bar), bar);
+  await p.click('#local-bar [data-local="reconnect"]');
+  await p.waitForFunction(() => FIZZ.loadData(FIZZ.auth.current()).projects[0].files["index.html"]?.includes("while FIZZ was closed"), null, { timeout: 8000 }).then(() => check("folder: reconnecting brings in what changed meanwhile", true)).catch(() => check("folder: reconnecting brings in what changed meanwhile", false));
+  check("folder: the bar goes away once connected", (await p.locator("#local-bar").count()) === 0);
+  check("folder: no script errors", !errs.length, errs.join(" | "));
+  await ctx.close();
+}
+
 // ---------- app switch keeps one page ----------
 {
   const { ctx, p, errs } = await open({ width: 1280, height: 800 });

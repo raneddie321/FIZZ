@@ -247,6 +247,16 @@ Data saved by older versions moves over on the first save; without IndexedDB eve
 what the loop does next). `node scripts/build-agent-core.mjs` writes the browser copy, `static-site/assets/agent-core.js`.
 The plan for what comes next is in [`docs/roadmap/`](docs/roadmap/README.md).
 
+### Big projects and folders on your computer
+- **Big projects** (over 80 files or 120k characters): the prompt carries the file tree and only the files that matter
+  now; Fizz Code looks at the rest with `<fizz-tree>`, `<fizz-grep>`, `<fizz-read path lines>` and `<fizz-symbols>`
+  (`static-site/assets/code-tools.js`). These only read, so they work in Read-only and Plan-first mode, and `.env`
+  values are never shown.
+- **A folder on your computer** (New project → *Open a folder from this computer*, Chrome or Edge on a computer): the
+  folder becomes a project; every change is written to the real files, and changes made outside FIZZ come in when you
+  return to the tab. `.git`, `node_modules` and what `.gitignore` lists are left out. After a reload the browser asks
+  for one click to reconnect. Such a project is never uploaded by cloud sync (`static-site/assets/local-folder.js`).
+
 ### Long conversations
 FIZZ DEV works out the model's context size (Settings → Tools → Context size overrides it), summarises a chat when it
 reaches 70% — goal, decisions, files, open problems, next steps — and keeps the last six messages as they are. If a

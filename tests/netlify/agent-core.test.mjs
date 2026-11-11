@@ -138,4 +138,33 @@ assert.ok(sh.changed && sh.messages.length <= 5 && sh.messages[0].summary && sh.
 assert.equal(shrinkMessages(chatOf(2)).changed, false, "nothing left to drop");
 assert.equal(estimateTokens("x".repeat(3600)), 1000);
 
+// ---------- looking around a project ----------
+const { treeText, readLines, grepFiles, symbolsOf, pathGlob, ignoreMatcher, isBigProject } = core;
+assert.ok(!isBigProject({ files: 12, chars: 40_000 }) && isBigProject({ files: 81, chars: 10 }) && isBigProject({ files: 3, chars: 130_000 }));
+const E = [{ path: "index.html", size: 900 }, { path: "src/app.js", size: 12_000 }, { path: "src/ui/a.js", size: 300 }, { path: "src/ui/deep/b.js", size: 50 }, { path: "README.md", size: 2000 }];
+let tree = treeText(E, { depth: 2 });
+assert.ok(tree.startsWith("./ — 5 files") && tree.includes("src/\n  ui/ (2 files, 350 B)\n  app.js  12 kB") && tree.includes("index.html  900 B"), tree);
+assert.ok(treeText(E, { path: "src/ui" }).includes("deep/\n  b.js  50 B") && treeText(E, { path: "./src/ui/" }).startsWith("src/ui/ — 2 files"));
+assert.match(treeText(E, { path: "nope" }), /Nothing at nope/);
+assert.match(treeText([...Array(500)].map((_, i) => ({ path: `f${i}.txt`, size: 1 })), { max: 50 }), /more not shown/);
+assert.deepEqual(readLines("a\nb\nc\nd\ne", "2-4"), { text: "2  b\n3  c\n4  d", from: 2, to: 4, total: 5, more: true });
+assert.equal(readLines("a\nb", "9").text, "2  b", "past the end: the last line, not an error");
+assert.equal(readLines([...Array(1000)].map((_, i) => `l${i + 1}`).join("\n"), "").to, 400, "at most 400 lines at a time");
+assert.equal(readLines("x".repeat(50_000) + "\nshort", "", { maxChars: 1000 }).text, "", "a line too long for the limit isn't cut in the middle");
+const G = { "a.js": "let x = 1;\nfoo(x)", "src/b.css": ".foo{}", ".env": "KEY=foo", "img.png": "\u0000blob:{}" };
+let g = grepFiles(G, { pattern: "foo", skip: (p, t) => p === ".env" || t.startsWith("\u0000") });
+assert.deepEqual(g.matches, [{ path: "a.js", line: 2, text: "foo(x)" }, { path: "src/b.css", line: 1, text: ".foo{}" }]);
+assert.equal(grepFiles(G, { pattern: "FOO", ignoreCase: true, glob: "*.css" }).matches.length, 1);
+assert.equal(grepFiles(G, { pattern: "foo", path: "src" }).matches[0].path, "src/b.css");
+g = grepFiles({ "a.js": "call(x" }, { pattern: "call(" });
+assert.ok(g.literal && g.matches.length === 1, "not a valid regular expression: searched as plain text");
+assert.ok(grepFiles({ "a.txt": "x\n".repeat(500) }, { pattern: "x", max: 10 }).truncated);
+assert.equal(grepFiles({ "a.js": "one\n// MARK-7\n// MARK-77\n" }, { pattern: "MARK-7$" }).matches[0].line, 2, "$ is the end of a line, not of the file");
+assert.deepEqual(symbolsOf("export function a(){}\nconst b = () => 1;\nclass C {}\n  let q = 5;\nexport const VERSION = 2;", "x.js").map((x) => `${x.line}:${x.name}`), ["1:a", "2:b", "3:C", "5:VERSION"]);
+assert.deepEqual(symbolsOf("def run():\n  pass\nclass App:\n  def go(self): pass", "x.py").map((x) => x.name), ["run", "App", "go"]);
+assert.deepEqual(symbolsOf("# Title\ntext\n## Part", "README.md").map((x) => x.name), ["# Title", "## Part"]);
+assert.ok(pathGlob("*.js")("a/b.js") && !pathGlob("*.js")("a/b.ts") && pathGlob("src/**/*.ts")("src/x/y.ts") && pathGlob("src/**/*.ts")("src/y.ts") && pathGlob("docs/")("docs/a.md") && pathGlob("")("anything"));
+const ig = ignoreMatcher("node_modules/\n*.log\n/dist\n!keep.log\nbuild/\n# comment\n");
+assert.ok(ig("node_modules/x/y.js") && ig("a/node_modules/z.js") && ig("app.log") && !ig("keep.log") && ig("dist/a.js") && !ig("src/dist/a.js") && ig("build/x") && !ig("builder.js") && ig("node_modules", true) && !ig("src/app.js"));
+
 console.log("Agent core tests passed");

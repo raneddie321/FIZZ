@@ -7,7 +7,7 @@
   // after editing); the server will run it for automation. Keep it free of imports, DOM and Node APIs.
 
   // ---------------- tool tags ----------------
-  const TOOL_TYPES = ["run", "sandbox", "search", "fetch", "browser", "screenshot", "export", "attach", "ask", "build", "push", "memory", "collect", "google", "remember", "api", "mcp"];
+  const TOOL_TYPES = ["run", "sandbox", "search", "fetch", "browser", "screenshot", "export", "attach", "ask", "build", "push", "memory", "collect", "google", "remember", "api", "mcp", "tree", "grep", "read", "symbols"];
   const TOOL_RE = /<fizz-([a-z]+)\b((?:\s+[a-zA-Z][\w-]*\s*=\s*"[^"]*")*)\s*(\/>|>([\s\S]*?)(<\/fizz-\1>|$))/g;
   const ATTR_RE = /([a-zA-Z][\w-]*)\s*=\s*"([^"]*)"/g;
   const unescapeAttr = (s) => s.replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
@@ -304,5 +304,154 @@
     return { messages: [{ role: "user", summary: true, content: note }, ...list.slice(cut)], changed: true };
   }
 
-  window.FIZZ.agentCore = { TOOL_TYPES, parseTools, detectMode, estimateTokens, PERM_KINDS, PERM_MODES, parseRule, normalizeRules, splitCommand, readOnlyCommand, ruleMatches, decidePermission, narratesWork, nextStep, contextSize, isContextOverflow, messagesTokens, compactPlan, SUMMARY_SYSTEM, summaryTranscript, shrinkMessages };
+  // ---------------- looking around a project ----------------
+  /** Above this a project gets an index in the prompt instead of every file. */
+  const BIG_PROJECT = { files: 80, chars: 120_000 };
+  const isBigProject = ({ files = 0, chars = 0 } = {}) => files > BIG_PROJECT.files || chars > BIG_PROJECT.chars;
+  const human = (n) => (n < 1000 ? `${n} B` : n < 1_000_000 ? `${(n / 1000).toFixed(n < 10_000 ? 1 : 0)} kB` : `${(n / 1_000_000).toFixed(1)} MB`);
+  const cleanPath = (p) => String(p || "").replace(/^\.?\/+/, "").replace(/\/+$/, "").replace(/^\.$/, "");
+
+  /**
+   * The files as an indented tree with sizes. entries: [{ path, size }]. Folders deeper than `depth` are folded to
+   * "name/ (N files, size)"; the listing stops at `max` lines and says how to see the rest.
+   */
+  function treeText(entries, { path = "", depth = 3, max = 400 } = {}) {
+    const base = cleanPath(path);
+    const under = (entries || []).filter((e) => !base || e.path === base || e.path.startsWith(`${base}/`));
+    if (!under.length) return base ? `Nothing at ${base}.` : "The project has no files.";
+    const root = { dirs: new Map(), files: [], count: 0, size: 0 };
+    for (const e of under) {
+      const rel = base ? e.path.slice(base.length + 1) : e.path;
+      if (!rel) { root.files.push({ name: e.path.split("/").pop(), size: e.size || 0 }); root.count++; root.size += e.size || 0; continue; }
+      const parts = rel.split("/");
+      let node = root;
+      node.count++; node.size += e.size || 0;
+      for (const dir of parts.slice(0, -1)) {
+        if (!node.dirs.has(dir)) node.dirs.set(dir, { dirs: new Map(), files: [], count: 0, size: 0 });
+        node = node.dirs.get(dir);
+        node.count++; node.size += e.size || 0;
+      }
+      node.files.push({ name: parts.at(-1), size: e.size || 0 });
+    }
+    const lines = [];
+    let cut = false;
+    const walk = (node, level) => {
+      const pad = "  ".repeat(level);
+      for (const [name, dir] of [...node.dirs].sort((a, b) => a[0].localeCompare(b[0]))) {
+        if (lines.length >= max) { cut = true; return; }
+        if (level + 1 >= depth) { lines.push(`${pad}${name}/ (${dir.count} file${dir.count === 1 ? "" : "s"}, ${human(dir.size)})`); continue; }
+        lines.push(`${pad}${name}/`);
+        walk(dir, level + 1);
+      }
+      for (const f of node.files.sort((a, b) => a.name.localeCompare(b.name))) {
+        if (lines.length >= max) { cut = true; return; }
+        lines.push(`${pad}${f.name}  ${human(f.size)}`);
+      }
+    };
+    walk(root, 0);
+    const head = `${base || "."}/ — ${root.count} file${root.count === 1 ? "" : "s"}, ${human(root.size)}`;
+    return `${head}\n${lines.join("\n")}${cut ? `\n… more not shown: ask for a folder (path="…") or a smaller depth.` : ""}`;
+  }
+
+  /** Lines of a text with their numbers. range: "120-260", "120" (from there) or empty (from the top). */
+  function readLines(text, range = "", { maxLines = 400, maxChars = 30_000 } = {}) {
+    const all = String(text ?? "").split("\n");
+    const m = /^\s*(\d+)?\s*(?:-\s*(\d+)?)?\s*$/.exec(String(range || ""));
+    let from = Math.max(1, Number(m?.[1]) || 1);
+    let to = Number(m?.[2]) || (m?.[1] && !String(range).includes("-") ? from + maxLines - 1 : all.length);
+    from = Math.min(from, Math.max(1, all.length));
+    to = Math.min(Math.max(to, from), all.length, from + maxLines - 1);
+    const width = String(to).length;
+    let out = "", last = from - 1;
+    for (let i = from; i <= to; i++) {
+      const line = `${String(i).padStart(width)}  ${all[i - 1]}\n`;
+      if (out.length + line.length > maxChars) break;
+      out += line; last = i;
+    }
+    return { text: out.replace(/\n$/, ""), from, to: last, total: all.length, more: last < all.length };
+  }
+
+  /** "*.js", "src/**" + "/*.ts", "docs/" → a test for a path. A pattern without a slash is matched against the file name. */
+  function pathGlob(glob) {
+    const g = String(glob || "").trim();
+    if (!g) return () => true;
+    const body = g.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*\*\/?/g, "\u0000").replace(/\*/g, "[^/]*").replace(/\?/g, "[^/]").replace(/\u0000/g, ".*");
+    const re = new RegExp(`^${body}${g.endsWith("/") ? ".*" : ""}$`);
+    return g.includes("/") ? (p) => re.test(p) : (p) => re.test(p.split("/").pop());
+  }
+
+  /**
+   * Search the project's text. files: { path: text }. → { matches: [{ path, line, text }], files, truncated, literal }
+   * A pattern that isn't a valid regular expression is searched as plain text.
+   */
+  function grepFiles(files, { pattern = "", path = "", glob = "", ignoreCase = false, max = 80, skip = () => false } = {}) {
+    let re, literal = false;
+    try { re = new RegExp(pattern, ignoreCase ? "i" : ""); } catch { literal = true; re = new RegExp(String(pattern).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), ignoreCase ? "i" : ""); }
+    const base = cleanPath(path), inGlob = pathGlob(glob);
+    const whole = new RegExp(re.source, `${re.flags}m`); // ^ and $ mean a line's start and end there, as they do per line below
+    const matches = [], hit = new Set();
+    let truncated = false;
+    for (const [p, text] of Object.entries(files || {})) {
+      if (typeof text !== "string" || (base && p !== base && !p.startsWith(`${base}/`)) || !inGlob(p) || skip(p, text)) continue;
+      if (!pattern || !whole.test(text)) continue; // one pass over the whole file before splitting it
+      const lines = text.split("\n");
+      for (let i = 0; i < lines.length; i++) {
+        if (!re.test(lines[i])) continue;
+        if (matches.length >= max) { truncated = true; break; }
+        matches.push({ path: p, line: i + 1, text: lines[i].trim().slice(0, 240) });
+        hit.add(p);
+      }
+      if (truncated) break;
+    }
+    return { matches, files: hit.size, truncated, literal };
+  }
+
+  const SYMBOLS = [
+    [/\.(m?[jt]sx?|cjs)$/i, [/^\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?function\*?\s+([A-Za-z_$][\w$]*)/, /^\s*(?:export\s+)?(?:default\s+)?(?:abstract\s+)?class\s+([A-Za-z_$][\w$]*)/, /^\s*(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>/, /^\s*(?:export\s+)?(?:interface|type|enum)\s+([A-Za-z_$][\w$]*)/, /^\s*export\s+(?:const|let|var)\s+([A-Za-z_$][\w$]*)/]],
+    [/\.py$/i, [/^\s*(?:async\s+)?def\s+([A-Za-z_]\w*)/, /^\s*class\s+([A-Za-z_]\w*)/]],
+    [/\.(go)$/i, [/^func\s+(?:\([^)]*\)\s*)?([A-Za-z_]\w*)/, /^type\s+([A-Za-z_]\w*)/]],
+    [/\.(rs)$/i, [/^\s*(?:pub\s+)?(?:async\s+)?fn\s+([A-Za-z_]\w*)/, /^\s*(?:pub\s+)?(?:struct|enum|trait|impl)\s+([A-Za-z_]\w*)/]],
+    [/\.(java|kt|cs|swift|php)$/i, [/^\s*(?:public|private|protected|internal|static|final|abstract|open|override|\s)*(?:class|interface|enum|struct|fun|func|function)\s+([A-Za-z_]\w*)/]],
+    [/\.(css|scss|less)$/i, [/^([^\s@/{}][^{}]*?)\s*\{/, /^(@(?:media|keyframes|font-face|supports)[^{]*)\{/]],
+    [/\.(html?|vue|svelte)$/i, [/<(?:[a-z][\w-]*)\b[^>]*\bid="([^"]+)"/i, /<(h[1-3])\b/i, /<(script|style|template)\b/i]],
+    [/\.(md|mdx)$/i, [/^(#{1,4}\s+.+)$/]],
+  ];
+  /** A quick outline of a source file — functions, classes, exports, selectors, headings — with line numbers. */
+  function symbolsOf(text, path = "", { max = 200 } = {}) {
+    const rules = SYMBOLS.find(([ext]) => ext.test(path))?.[1] || SYMBOLS[0][1];
+    const out = [];
+    const lines = String(text ?? "").split("\n");
+    for (let i = 0; i < lines.length && out.length < max; i++) {
+      if (lines[i].length > 400) continue; // minified
+      for (const re of rules) { const m = re.exec(lines[i]); if (m) { out.push({ line: i + 1, name: m[1].trim().slice(0, 80), text: lines[i].trim().slice(0, 120) }); break; } }
+    }
+    return out;
+  }
+
+  /** .gitignore lines → a test for a path ("node_modules/", "*.log", "/dist", "!keep.txt"). */
+  function ignoreMatcher(text) {
+    const rules = String(text || "").split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("#")).map((l) => {
+      const neg = l.startsWith("!");
+      let g = neg ? l.slice(1) : l;
+      const dirOnly = g.endsWith("/");
+      g = g.replace(/\/+$/, "");
+      const anchored = g.startsWith("/") || g.includes("/");
+      g = g.replace(/^\/+/, "");
+      const body = g.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*\*\/?/g, "\u0000").replace(/\*/g, "[^/]*").replace(/\?/g, "[^/]").replace(/\u0000/g, ".*");
+      return { neg, dirOnly, re: new RegExp(anchored ? `^${body}(?:/|$)` : `(?:^|/)${body}(?:/|$)`) };
+    });
+    /** isDir: the path is a folder. */
+    return (p, isDir = false) => {
+      let ignored = false;
+      for (const r of rules) {
+        if (!r.re.test(p)) continue;
+        // A folder-only rule matches a file only when the match is one of its parent folders.
+        if (r.dirOnly && !isDir && r.re.exec(p)[0].replace(/\/$/, "").length === p.length) continue;
+        ignored = !r.neg;
+      }
+      return ignored;
+    };
+  }
+
+  window.FIZZ.agentCore = { TOOL_TYPES, parseTools, detectMode, estimateTokens, PERM_KINDS, PERM_MODES, parseRule, normalizeRules, splitCommand, readOnlyCommand, ruleMatches, decidePermission, narratesWork, nextStep, contextSize, isContextOverflow, messagesTokens, compactPlan, SUMMARY_SYSTEM, summaryTranscript, shrinkMessages, BIG_PROJECT, isBigProject, treeText, readLines, pathGlob, grepFiles, symbolsOf, ignoreMatcher };
 })();

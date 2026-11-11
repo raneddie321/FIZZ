@@ -6,7 +6,7 @@ Eight phases, each shippable on its own (branch → Preview → tests → main, 
 | --- | --- | --- |
 | 0 | Foundations: permission gate, storage without the 5 MB limit, shared agent core | built — see [phase-0.md](phase-0.md) for what is and isn't in it |
 | 1 | Long conversations: compact at ~70% of the context, retry on "context too long", `/compact`, `/clear` | built — see [phase-1.md](phase-1.md) |
-| 2 | Big projects and local folders: File System Access API, clone in the sandbox, tree/grep/read tools | not started |
+| 2 | Big projects and local folders: File System Access API, clone in the sandbox, tree/grep/read tools | part 1 built (index + tools, local folders) — see [phase-2.md](phase-2.md); part 2 (projects that live in the sandbox) not started |
 | 3 | Hooks: `.fizz/hooks.json` (afterEdit, afterTurn, beforePush, …) | not started |
 | 4 | Full Git & GitHub: branches, commits, PRs, review replies, CI fix loop (inside `api/github/[action].mjs`) | not started |
 | 5 | FIZZ Bridge: the user's own computer (files, commands, screen, mouse, keyboard), paired by code | not started |
