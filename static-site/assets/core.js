@@ -433,6 +433,20 @@
     return { type: "text", name: file.name, text: text.slice(0, 200000) };
   }
   /** The attachments waiting in a composer: images as thumbnails (like a phone's share sheet), other files as chips. */
+  /** Logo <img> that tries each URL in turn and ends with the name's first letter. */
+  function logoImg(name, urls, cls = "app-mark") {
+    const list = (urls || []).filter(Boolean);
+    const letter = `<span class="app-ic" aria-hidden="true">${esc(String(name || "?").slice(0, 1))}</span>`;
+    if (!list.length) return letter;
+    return `<img class="${esc(cls)}" src="${esc(list[0])}" data-srcs="${esc(list.slice(1).join(" "))}" data-letter="${esc(String(name || "?").slice(0, 1))}" alt="${esc(name)} logo" loading="lazy" referrerpolicy="no-referrer" onerror="FIZZ.logoNext(this)" />`;
+  }
+  function logoNext(img) {
+    const rest = (img.dataset.srcs || "").split(" ").filter(Boolean);
+    if (rest.length) { img.dataset.srcs = rest.slice(1).join(" "); img.src = rest[0]; return; }
+    const span = document.createElement("span"); span.className = "app-ic"; span.setAttribute("aria-hidden", "true"); span.textContent = img.dataset.letter || "?";
+    img.replaceWith(span);
+  }
+  const faviconUrls = (domain) => (domain ? [`https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64`, `https://icons.duckduckgo.com/ip3/${encodeURIComponent(domain)}.ico`] : []);
   function pendingHtml(list) {
     return (list || []).map((a, i) => a.type === "image" && a.data
       ? `<span class="att-thumb"><img src="data:${esc(a.mime)};base64,${a.data}" alt="${esc(a.name)}" /><button type="button" class="att-x" data-rm="${i}" aria-label="Remove ${esc(a.name)}"><svg viewBox="0 0 24 24" class="i"><path d="M6 6l12 12M18 6L6 18"/></svg></button></span>`
@@ -519,6 +533,6 @@
     });
   }
 
-  window.FIZZ = { pendingHtml, app, serverStatus, serverStatusCached, aiStream, providerLabel, openrouterConnect, openrouterFinish, toOpenAI, store, esc, uid, theme, auth, loadData, saveData, MODELS, streamChat, readAttachment, toApiContent, markdown, toast, download, validEmail };
+  window.FIZZ = { pendingHtml, logoImg, logoNext, faviconUrls, app, serverStatus, serverStatusCached, aiStream, providerLabel, openrouterConnect, openrouterFinish, toOpenAI, store, esc, uid, theme, auth, loadData, saveData, MODELS, streamChat, readAttachment, toApiContent, markdown, toast, download, validEmail };
   theme.init();
 })();

@@ -16,12 +16,21 @@ export function shopDomain(input) {
   if (/^[a-z0-9][a-z0-9-]{0,60}$/.test(s)) s = `${s}.myshopify.com`;
   return /^[a-z0-9][a-z0-9-]{0,60}\.myshopify\.com$/.test(s) ? s : null;
 }
-/** Shopify signs its redirect back: HMAC-SHA256 of the other query parameters, sorted, with the app's secret. */
-export function shopifyHmacOk(searchParams, secret) {
-  const given = searchParams.get("hmac") || "";
-  const msg = [...searchParams.entries()].filter(([k]) => k !== "hmac" && k !== "signature").sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}=${v}`).join("&");
-  const want = createHmac("sha256", secret).update(msg).digest("hex");
-  return given.length === want.length && timingSafeEqual(Buffer.from(given), Buffer.from(want));
+/**
+ * Shopify signs its redirect back: HMAC-SHA256 (hex) of the other query parameters, sorted, joined with &, keyed with the
+ * app's secret. Libraries differ on whether the values are taken as sent (still URL-encoded) or decoded — `host` is base64
+ * with "=" — so both forms are checked. `raw` is the query string exactly as it arrived.
+ */
+export function shopifyHmacOk(searchParams, secret, raw = "") {
+  const given = String(searchParams.get("hmac") || "").toLowerCase();
+  const key = String(secret || "").trim();
+  if (!given || !key) return false;
+  const decoded = [...searchParams.entries()].filter(([k]) => k !== "hmac" && k !== "signature").sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0)).map(([k, v]) => `${k}=${v}`).join("&");
+  const asSent = String(raw || "").replace(/^\?/, "").split("&").filter((p) => p && !/^(hmac|signature)=/.test(p)).sort().join("&");
+  return [decoded, asSent].filter(Boolean).some((msg) => {
+    const want = createHmac("sha256", key).update(msg).digest("hex");
+    return given.length === want.length && timingSafeEqual(Buffer.from(given), Buffer.from(want));
+  });
 }
 export const PROVIDERS = {
   shopify: {
@@ -31,13 +40,13 @@ export const PROVIDERS = {
     /** The store comes with the start link (?shop=…) and is remembered for the callback. */
     prepare: (url) => { const shop = shopDomain(url.searchParams.get("shop")); if (!shop) throw Object.assign(new Error("Enter your store's address, like my-store or my-store.myshopify.com."), { status: 400 }); return { shop }; },
     authorizeUrl: (origin, state, _challenge, extra) => {
-      const q = { client_id: shopifyId(), scope: env("SHOPIFY_SCOPES") || SHOPIFY_SCOPES, redirect_uri: `${origin}/api/oauth/shopify/callback`, state };
+      const q = { client_id: shopifyId().trim(), scope: env("SHOPIFY_SCOPES") || SHOPIFY_SCOPES, redirect_uri: `${origin}/api/oauth/shopify/callback`, state };
       return `https://${extra.shop}/admin/oauth/authorize?${Object.entries(q).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&")}`;
     },
     async exchange(origin, code, _verifier, extra, url) {
-      if (!shopifyHmacOk(url.searchParams, shopifySecret())) throw new Error("Shopify's reply couldn't be verified.");
+      if (!shopifyHmacOk(url.searchParams, shopifySecret(), url.search)) throw new Error("Shopify's reply couldn't be verified: check that SHOPIFY_CLIENT_SECRET in Vercel is the app's Client secret (Shopify → the app → Settings), with no spaces, then Redeploy.");
       if (shopDomain(url.searchParams.get("shop")) !== extra.shop) throw new Error("The store in Shopify's reply isn't the one you chose.");
-      const res = await fetch(`https://${extra.shop}/admin/oauth/access_token`, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ client_id: shopifyId(), client_secret: shopifySecret(), code }) });
+      const res = await fetch(`https://${extra.shop}/admin/oauth/access_token`, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ client_id: shopifyId().trim(), client_secret: shopifySecret().trim(), code }) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.access_token) throw new Error(data.error_description || data.errors || data.error || `Shopify token request failed (${res.status}).`);
       return { t: data.access_token, shop: extra.shop, label: extra.shop, scopes: String(data.scope || "").split(",").filter(Boolean), ...(data.refresh_token ? { r: data.refresh_token, at: Date.now() + (Number(data.expires_in) || 3600) * 1000 } : {}) };

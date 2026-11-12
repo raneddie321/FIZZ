@@ -30,6 +30,12 @@ assert.equal((await oauth(new Request(`${O}/api/oauth/shopify/start?shop=evil.co
 const signed = (params) => { const q = new URLSearchParams(params); const msg = [...q.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}=${v}`).join("&"); q.set("hmac", createHmac("sha256", "shop-secret").update(msg).digest("hex")); return q; };
 const good = signed({ code: "c1", shop: "my-store.myshopify.com", state, timestamp: "1700000000", host: "abc" });
 assert.ok(shopifyHmacOk(good, "shop-secret"));
+// Signed over the values as sent (host is base64 with "=", sent as %3D) — also accepted.
+{
+  const raw = `code=c1&host=YWJj%3D%3D&shop=my-store.myshopify.com&state=${state}&timestamp=1700000000`;
+  const h = createHmac("sha256", "shop-secret").update(raw.split("&").sort().join("&")).digest("hex");
+  assert.ok(shopifyHmacOk(new URLSearchParams(`${raw}&hmac=${h}`), " shop-secret\n", `?${raw}&hmac=${h}`), "encoded form and a secret with spaces");
+}
 const forged = new URLSearchParams(good); forged.set("shop", "other.myshopify.com");
 assert.ok(!shopifyHmacOk(forged, "shop-secret"), "a changed parameter breaks the signature");
 const seen = [];
