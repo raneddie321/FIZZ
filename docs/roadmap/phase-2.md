@@ -56,3 +56,5 @@ Known limits:
   known binaries up to 3 MB each. Larger repositories are what part 2 is for.
 - Outside changes are picked up when the tab comes back to the front, not continuously.
 - A project linked to a folder is not uploaded by cloud sync.
+
+**Update:** opening a folder from the computer was removed at the owner's request (Bridge in phase 5 covers the computer).

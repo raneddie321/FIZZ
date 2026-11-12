@@ -6,9 +6,7 @@
   let user;
   try { user = F.auth.require(); } catch { return; }
   const data = F.loadData(user);
-  const save = () => { const ok = F.saveData(user, data); F.localFolder?.queue(data); return ok; };
-  // Projects linked to a folder on this computer: project id → "connected" | "reconnect" | "missing" | "unsupported"
-  const localState = new Map();
+  const save = () => F.saveData(user, data);
   const app = document.getElementById("dev-app");
   const $ = (s, r = app) => r.querySelector(s);
   const $$ = (s, r = app) => [...r.querySelectorAll(s)];
@@ -215,8 +213,7 @@
   function renderHeader() {
     const p = project();
     const n = Object.keys(p.files).length;
-    $("#proj-title").innerHTML = `${esc(p.name)}<small>${n} file${n === 1 ? "" : "s"}${p.git ? ` · ${esc(p.git.owner)}/${esc(p.git.repo)}` : ""}${p.local ? ` · folder on this computer` : ""}</small>`;
-    renderLocalBar();
+    $("#proj-title").innerHTML = `${esc(p.name)}<small>${n} file${n === 1 ? "" : "s"}${p.git ? ` · ${esc(p.git.owner)}/${esc(p.git.repo)}` : ""}</small>`;
     const live = p.deploy?.url && p.deploy.state === "READY";
     $("#deploy-btn").title = live ? `Live at ${p.deploy.url}` : "Deploy to Vercel";
     if (active()) document.title = `${p.name} · FIZZ DEV`;
@@ -469,7 +466,7 @@
     $("#model-btn").innerHTML = `${esc(modelLabel || "Choose AI model")} <svg class="i" viewBox="0 0 24 24" style="width:14px"><path d="M6 9l6 6 6-6"/></svg>`;
     $("#model-btn").title = `Selected model: ${modelLabel || "not available"}. Click to open AI settings.`;
     $("#model-btn").setAttribute("aria-label", `Selected model ${modelLabel || "not available"}; open AI settings`);
-    $("#pending").innerHTML = state.pending.map((a, i) => `<span class="chip">${esc(a.name)}<button type="button" data-rm="${i}" aria-label="Remove ${esc(a.name)}">${F.icon("x")}</button></span>`).join("");
+    $("#pending").innerHTML = F.pendingHtml(state.pending);
     $("#pending").classList.toggle("hidden", !state.pending.length);
     const busy = Boolean(state.controller);
     $("#send").innerHTML = busy ? '<svg class="i" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor"/></svg>' : '<svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg>';
@@ -2242,7 +2239,7 @@
     e.target.value = "";
     renderComposer();
   });
-  $("#pending").addEventListener("click", (e) => { const i = e.target.dataset.rm; if (i !== undefined) { state.pending.splice(+i, 1); renderComposer(); } });
+  $("#pending").addEventListener("click", (e) => { const i = e.target.closest("[data-rm]")?.dataset.rm; if (i !== undefined) { state.pending.splice(+i, 1); renderComposer(); } });
   const comp = $("#composer");
   comp.addEventListener("dragover", (e) => { e.preventDefault(); comp.classList.add("drag"); });
   comp.addEventListener("dragleave", () => comp.classList.remove("drag"));
@@ -2386,76 +2383,9 @@
     if (b.dataset.project !== state.projectId) selectProject(b.dataset.project);
     if (b.dataset.chat) { state.chatId = b.dataset.chat; renderAll(); closeDrawer(); if (isPhone()) setView("chat"); }
   });
-  // ---------- a folder on this computer (static-site/assets/local-folder.js) ----------
-  async function refreshLocal(p = project()) {
-    if (!p?.local || !F.localFolder) return;
-    localState.set(p.id, await F.localFolder.status(p));
-    if (p === project()) renderLocalBar();
-  }
-  function renderLocalBar() {
-    const p = project();
-    let bar = $("#local-bar");
-    const st = p.local ? localState.get(p.id) : null;
-    if (!p.local || !st || st === "connected") { bar?.remove(); if (p.local && !st) refreshLocal(p); return; }
-    if (!bar) { bar = document.createElement("div"); bar.id = "local-bar"; bar.className = "local-bar"; $(".dev-top").after(bar); }
-    bar.innerHTML = st === "reconnect"
-      ? `<span>This project is the folder <b>${esc(p.local.name)}</b> on this computer. The browser needs your OK to use it again.</span><button type="button" class="btn btn-sm" data-local="reconnect">Reconnect folder</button><button type="button" class="btn btn-outline btn-sm" data-local="unlink">Keep as a copy</button>`
-      : `<span>This project came from the folder <b>${esc(p.local.name)}</b>${st === "unsupported" ? ", but this browser can't open folders (Chrome or Edge on a computer can)" : " on another browser or device"}. Here it is a copy: changes stay in FIZZ.</span><button type="button" class="btn btn-outline btn-sm" data-local="unlink">OK</button>`;
-  }
-  async function openFolder() {
-    if (!F.localFolder?.supported()) return F.toast("Opening a folder works in Chrome or Edge on a computer. Here you can import from GitHub or upload a ZIP.");
-    let opened;
-    try { F.toast("Choose the folder…"); opened = await F.localFolder.pick(); }
-    catch (e) { if (e?.name !== "AbortError") F.toast(e.message || "Couldn't open that folder."); return; }
-    const count = Object.keys(opened.files).length;
-    if (!count) return F.toast("That folder has no files FIZZ can open.");
-    const p = newProject(opened.name.slice(0, 60));
-    p.files = opened.files;
-    data.projects.unshift(p);
-    await F.localFolder.link(p, opened);
-    localState.set(p.id, "connected");
-    selectProject(p.id);
-    save();
-    const left = opened.skipped.ignored + opened.skipped.tooBig + opened.skipped.tooMany;
-    F.toast(`Opened ${opened.name}: ${count} file${count === 1 ? "" : "s"}${left ? ` (${left} left out: ignored, too large or not text)` : ""}. Changes are saved to the folder.`);
-    showTab("code");
-  }
-  /** Changes made in the folder outside FIZZ come in when the tab is looked at again. */
-  async function scanLocal() {
-    const p = project();
-    if (!p?.local || !F.localFolder?.linked(p) || state.controller) return;
-    const r = await F.localFolder.scan(p);
-    const n = r.changed.length + r.added.length + r.removed.length;
-    if (!n) return;
-    F.saveData(user, data);
-    if (state.file && r.removed.includes(state.file)) state.file = null;
-    renderAll();
-    if (state.file && r.changed.includes(state.file)) openFile(state.file, { focus: false });
-    refreshPreview();
-    F.toast(`${n} file${n === 1 ? "" : "s"} changed in the folder — brought in.`);
-  }
-  document.addEventListener("visibilitychange", () => { if (!document.hidden && active()) scanLocal(); });
-  addEventListener("focus", () => { if (active()) scanLocal(); });
-  F.localFolder?.onProblem(({ failed }) => F.toast(`${failed} file${failed === 1 ? "" : "s"} couldn't be written to the folder. Check that the folder still exists and isn't read-only.`));
-  document.addEventListener("click", async (e) => {
-    const b = e.target.closest("[data-local]");
-    if (!b) return;
-    const p = project();
-    if (b.dataset.local === "unlink") { await F.localFolder.unlink(p); localState.delete(p.id); save(); renderHeader(); return; }
-    try {
-      const r = await F.localFolder.reconnect(p);
-      localState.set(p.id, "connected");
-      save();
-      renderAll();
-      const n = r.changed.length + r.added.length + r.removed.length;
-      F.toast(n ? `Folder reconnected — ${n} file${n === 1 ? "" : "s"} had changed there and were brought in.` : "Folder reconnected.");
-    } catch (err) { F.toast(err.message); }
-  });
-
   $("#new-project").setAttribute("aria-haspopup", "menu"); // it opens a menu now (and so the click that opens it doesn't close it)
   $("#new-project").addEventListener("click", async (e) => {
-    const how = await menu(e.currentTarget, [{ k: "empty", html: "Empty project" }, { k: "folder", html: "Open a folder from this computer…<small>Work on real files; changes are saved to them</small>" }, { k: "import", html: "Import a repository from GitHub…" }]);
-    if (how === "folder") return openFolder();
+    const how = await menu(e.currentTarget, [{ k: "empty", html: "Empty project" }, { k: "import", html: "Import a repository from GitHub…" }]);
     if (how === "import") return githubImport();
     if (how !== "empty") return;
     const v = await dialog({ title: "New project", fields: [{ name: "name", label: "Project name", placeholder: "My website", required: true }], ok: "Create" });
@@ -2707,7 +2637,6 @@
       { g: "Settings", label: "Keyboard shortcuts", hint: "?", run: () => shortcuts() },
       { g: "Ship", label: "Push to GitHub", run: () => githubPush() },
       { g: "Ship", label: "Import from GitHub…", run: () => githubImport() },
-      { g: "Files", label: "Open a folder from this computer…", run: () => openFolder() },
       { g: "Ship", label: "Deploy to Vercel", run: () => deploy() },
       { g: "Ship", label: "Build Android app", hint: "APK + AAB", run: () => moreAction("android") },
       { g: "Ship", label: "Build desktop app", hint: "exe · dmg · AppImage", run: () => moreAction("desktop") },

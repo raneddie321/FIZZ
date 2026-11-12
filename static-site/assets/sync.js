@@ -22,7 +22,6 @@
   function localItems() {
     const out = {};
     for (const p of data.projects || []) {
-      if (p.local) continue; // a folder on this computer stays on this computer: it isn't uploaded
       const d = cleanProject(p); out[`p-${p.id}`] = { kind: "project", name: p.name, data: d, hash: hash(JSON.stringify(d)) }; }
     if ((data.conversations || []).length) { const d = cleanChats(data.conversations); out.chats = { kind: "chats", name: "FIZZ chats", data: d, hash: hash(JSON.stringify(d)) }; }
     return out;

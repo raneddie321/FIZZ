@@ -702,3 +702,10 @@ svg.dots3 { stroke-width: 3; }
 .cc-err { margin: 0; color: var(--danger); font-size: 13.5px; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 @media (max-width: 520px) { .cc-hdr { grid-template-columns: 1fr; } }
+
+/* Images waiting to be sent: a thumbnail card with a remove button */
+#pending { align-items: flex-end; }
+.att-thumb { position: relative; display: inline-block; width: 112px; height: 112px; border-radius: 18px; overflow: hidden; background: var(--surface-2); border: 1px solid var(--border); flex: none; }
+.att-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.att-x { position: absolute; top: 6px; left: 6px; width: 30px; height: 30px; border-radius: 50%; border: 0; background: rgba(255,255,255,.95); color: #111; display: grid; place-items: center; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,.3); padding: 0; }
+.att-x .i { width: 16px; height: 16px; stroke: currentColor; stroke-width: 2.4; fill: none; }

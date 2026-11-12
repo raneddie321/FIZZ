@@ -728,7 +728,3 @@
 .act-row.perm-deny > span > b { color: var(--danger, #d33); }
 .act-row.perm-ask > span > b { color: var(--warning, #b7791f); }
 .act-row code { font-size: 12px; overflow-wrap: anywhere; }
-
-/* A project linked to a folder on this computer: the bar that asks to reconnect it */
-.local-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 14px; font-size: 13px; background: color-mix(in srgb, var(--primary) 9%, var(--surface)); border-bottom: 1px solid var(--border); }
-.local-bar > span { flex: 1; min-width: 200px; }

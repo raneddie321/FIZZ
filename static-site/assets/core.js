@@ -432,6 +432,12 @@
     if (text.includes("\u0000")) throw new Error(`"${file.name}" isn't a supported file. Use images, text or code files.`);
     return { type: "text", name: file.name, text: text.slice(0, 200000) };
   }
+  /** The attachments waiting in a composer: images as thumbnails (like a phone's share sheet), other files as chips. */
+  function pendingHtml(list) {
+    return (list || []).map((a, i) => a.type === "image" && a.data
+      ? `<span class="att-thumb"><img src="data:${esc(a.mime)};base64,${a.data}" alt="${esc(a.name)}" /><button type="button" class="att-x" data-rm="${i}" aria-label="Remove ${esc(a.name)}"><svg viewBox="0 0 24 24" class="i"><path d="M6 6l12 12M18 6L6 18"/></svg></button></span>`
+      : `<span class="chip">${esc(a.name)}<button type="button" data-rm="${i}" aria-label="Remove ${esc(a.name)}"><svg viewBox="0 0 24 24" class="i"><path d="M6 6l12 12M18 6L6 18"/></svg></button></span>`).join("");
+  }
   function toApiContent(m) {
     if (m.role === "assistant") return { role: "assistant", content: m.content };
     const parts = [];
@@ -513,6 +519,6 @@
     });
   }
 
-  window.FIZZ = { app, serverStatus, serverStatusCached, aiStream, providerLabel, openrouterConnect, openrouterFinish, toOpenAI, store, esc, uid, theme, auth, loadData, saveData, MODELS, streamChat, readAttachment, toApiContent, markdown, toast, download, validEmail };
+  window.FIZZ = { pendingHtml, app, serverStatus, serverStatusCached, aiStream, providerLabel, openrouterConnect, openrouterFinish, toOpenAI, store, esc, uid, theme, auth, loadData, saveData, MODELS, streamChat, readAttachment, toApiContent, markdown, toast, download, validEmail };
   theme.init();
 })();
