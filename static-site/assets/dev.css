@@ -728,3 +728,18 @@
 .act-row.perm-deny > span > b { color: var(--danger, #d33); }
 .act-row.perm-ask > span > b { color: var(--warning, #b7791f); }
 .act-row code { font-size: 12px; overflow-wrap: anywhere; }
+
+/* The terminal's Cloud Linux switch and sign-in cards */
+.pane-terminal { display: flex; flex-direction: column; }
+.pane-terminal .term-host { flex: 1; min-height: 0; }
+.term-bar { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.term-switch { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--border); background: var(--surface); color: var(--fg); border-radius: 999px; padding: 4px 11px; font: 500 12.5px var(--font); cursor: pointer; }
+.term-switch .dot { width: 8px; height: 8px; border-radius: 50%; background: color-mix(in srgb, var(--fg) 30%, transparent); }
+.term-switch[aria-pressed="true"] { border-color: var(--primary); }
+.term-switch[aria-pressed="true"] .dot { background: var(--success, #2a2); }
+.term-auth { display: grid; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--border); position: relative; }
+.term-auth > .icon-btn { position: absolute; top: 4px; right: 4px; }
+.auth-link { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--primary); background: color-mix(in srgb, var(--primary) 8%, var(--surface)); }
+.auth-link > div { flex: 1; min-width: 180px; display: grid; gap: 2px; }
+.auth-link small { color: var(--muted); }
+.auth-link code { font-size: 15px; letter-spacing: 1px; padding: 3px 8px; border-radius: 6px; background: var(--surface-2); }

@@ -59,10 +59,10 @@
   }
 
   /** Runs a command in the cloud sandbox for the terminal: { text, exitCode, changed, url }. */
-  async function sandbox(cmd, { project, write, background = false, isStopped = () => false }) {
+  async function sandbox(cmd, { project, write, background = false, isStopped = () => false, onProgress = null }) {
     let r = await F.conn.sandbox({ action: "run", projectId: project.id, cmd, background, files: textFiles(project.files) });
     const started = Date.now();
-    while (r.running && !background && !isStopped() && Date.now() - started < 10 * 60_000) r = await F.conn.sandbox({ action: "wait", projectId: project.id, cmdId: r.cmdId });
+    while (r.running && !background && !isStopped() && Date.now() - started < 15 * 60_000) { onProgress?.(String(r.text || "")); r = await F.conn.sandbox({ action: "wait", projectId: project.id, cmdId: r.cmdId }); }
     const changed = await bringBack(r.files, { project: () => project, writeFile: (p, c) => write(p, c) });
     return { text: String(r.text || ""), exitCode: r.running && !background ? 124 : r.exitCode, changed, url: r.url };
   }
@@ -72,7 +72,7 @@
     icon: "box", feedback: true,
     label: (t) => `${t.attrs.background === "true" ? "Started" : "Ran"} in the cloud: ${t.body.split("\n")[0].slice(0, 110)}`,
     summary: (k) => `ran ${k} cloud command${k === 1 ? "" : "s"}`,
-    prompt: '<fizz-sandbox>command</fizz-sandbox> runs a bash command in your own Linux computer in the cloud (Node 22, npm, git, Python 3, internet access). The project\'s text files are copied in first, and files the command creates or changes come back into the project (node_modules stays there between commands). Use it without asking for npm install, npm test, npm run build, real Node/Python packages, git and anything the browser terminal can\'t do. For a server, listen on 0.0.0.0 port 3000 and add background="true": it keeps running and you get a public link.',
+    prompt: 'When a CLI needs the user to sign in (vercel login, gh auth login --web, wrangler login, netlify login…), run it in the sandbox: FIZZ shows the user the sign-in link and code as a button, and the command waits until they finish (up to 15 minutes). Never ask the user to paste a password or token into the chat.\n<fizz-sandbox>command</fizz-sandbox> runs a bash command in your own Linux computer in the cloud (Node 22, npm, git, Python 3, internet access). The project\'s text files are copied in first, and files the command creates or changes come back into the project (node_modules stays there between commands). Use it without asking for npm install, npm test, npm run build, real Node/Python packages, git and anything the browser terminal can\'t do. For a server, listen on 0.0.0.0 port 3000 and add background="true": it keeps running and you get a public link.',
     available: () => Boolean(tools()?.sandbox),
     async run(t, ctx) {
       const cmd = t.body.trim();
@@ -81,12 +81,14 @@
       const background = t.attrs.background === "true";
       let r = await F.conn.sandbox({ action: "run", projectId, cmd, background, files: textFiles(ctx.project().files) });
       const started = Date.now();
-      while (r.running && !background && Date.now() - started < 10 * 60_000) {
+      // 15 minutes: long enough for the user to finish a sign-in a command printed (device codes last 10–15).
+      while (r.running && !background && Date.now() - started < 15 * 60_000) {
         t.progress = r.text;
+        t.authLinks = F.authLinks?.detect(r.text) || [];
         ctx.rerender();
         r = await F.conn.sandbox({ action: "wait", projectId, cmdId: r.cmdId });
       }
-      if (r.running && !background) return { ok: false, text: `Still running after 10 minutes, so FIZZ stopped waiting. Output so far:\n${r.text}` };
+      if (r.running && !background) return { ok: false, text: `Still running after 15 minutes, so FIZZ stopped waiting. Output so far:\n${r.text}` };
       const changed = await bringBack(r.files, ctx);
       if (changed.length) ctx.rerender();
       const out = String(r.text || "").trim();

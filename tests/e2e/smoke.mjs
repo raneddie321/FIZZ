@@ -639,6 +639,42 @@ for (const app of ["chat", "dev"]) {
   await ctx.close();
 }
 
+// ---------- Cloud terminal switch and sign-in links from the sandbox ----------
+{
+  const { ctx, p, errs, script } = await open({ width: 1280, height: 800 });
+  await ctx.route("**/api/status", (r) => r.fulfill({ json: { server: true, apps: [], ai: { configured: true, model: "test-model", dailyLimit: 50 }, connections: {}, google: {}, tools: { search: "wikipedia", sandbox: true } } }));
+  let waits = 0, release = false;
+  const cmds = [];
+  await ctx.route("**/api/sandbox", async (r) => {
+    const b = r.request().postDataJSON();
+    if (b.action === "run") { cmds.push(b.cmd); if (!/vercel login/.test(b.cmd)) return r.fulfill({ json: { running: false, exitCode: 0, text: `ran: ${b.cmd}\n`, files: {} } }); return r.fulfill({ json: { running: true, cmdId: "c1", text: "Vercel CLI 50.0.0\n> Visit https://vercel.com/oauth/device?user_code=ABCD-EFGH to log in\n" } }); }
+    waits++;
+    await new Promise((ok) => setTimeout(ok, 300));
+    r.fulfill({ json: release ? { running: false, exitCode: 0, text: "> Success! Logged in.\n", files: {} } : { running: true, cmdId: "c1", text: "Vercel CLI 50.0.0\n> Visit https://vercel.com/oauth/device?user_code=ABCD-EFGH to log in\nWaiting for authentication...\n" } });
+  });
+  await p.goto(B + "dev.html"); await p.waitForTimeout(900);
+  await p.evaluate(() => { FIZZ.loadData(FIZZ.auth.current()).settings.autoVerify = false; });
+  script.push("<fizz-sandbox>npx --yes vercel login</fizz-sandbox>\nSigning in to Vercel.");
+  script.push("You're signed in to Vercel.");
+  await p.fill("#dev-app #input", "log in to vercel in the sandbox"); await p.keyboard.press("Enter");
+  await p.waitForSelector("#dev-app .auth-link a[href*='vercel.com/oauth/device']", { timeout: 15000 }).then(() => check("sign-in: the Vercel link shows as a button while the command waits", true)).catch(() => check("sign-in: the Vercel link shows as a button while the command waits", false));
+  const card = await p.locator("#dev-app .auth-link").first().innerText().catch(() => "");
+  check("sign-in: the card names the service and how long it's valid", /Sign in to Vercel/.test(card) && /valid for about 10 more minutes/.test(card), card);
+  release = true;
+  await lastReply(p, "#dev-app", "You're signed in to Vercel.");
+  check("sign-in: the command finished after the sign-in", waits >= 1);
+  // The terminal's Cloud Linux switch.
+  await p.click('#dev-app [data-tab="terminal"]');
+  await p.waitForSelector("#term-cloud:not([hidden])", { timeout: 5000 }).then(() => check("terminal: the Cloud Linux switch shows when there is a sandbox", true)).catch(() => check("terminal: the Cloud Linux switch shows when there is a sandbox", false));
+  await p.click("#term-cloud");
+  check("terminal: the switch turns cloud mode on", (await p.getAttribute("#term-cloud", "aria-pressed")) === "true" && /real Linux/.test(await p.locator("#term-where").innerText()));
+  await p.click("#term-host"); await p.keyboard.type("ls -la"); await p.keyboard.press("Enter");
+  await p.waitForTimeout(800);
+  check("terminal: in cloud mode even ls runs in the sandbox", cmds.some((c) => /ls -la/.test(c)), cmds.join(" | "));
+  check("sign-in/terminal: no script errors", !errs.length, errs.join(" | "));
+  await ctx.close();
+}
+
 // ---------- app switch keeps one page ----------
 {
   const { ctx, p, errs } = await open({ width: 1280, height: 800 });

@@ -286,7 +286,7 @@
       return { text: line.replace(/^[-*\d.\s]+/, "").slice(0, 180), path: match?.[0] || null };
     })() : null;
     // Live cards (app builds) stay visible under the message, outside the collapsed steps.
-    const toolCards = tools.map((t) => (t.result ? T()[t.type]?.card?.(t, m) || "" : "")).join("");
+    const toolCards = tools.map((t) => (t.result ? T()[t.type]?.card?.(t, m) || "" : t.status === "running" && t.authLinks?.length ? F.authLinks.html(t.authLinks) : "")).join("");
     tools.forEach((t, idx) => {
       const key = `${m.id}:t${idx}`;
       const waiting = t.status === "waiting";
@@ -1464,6 +1464,26 @@
     if (tab === "browser") refreshPreview();
     if (tab === "activity") renderActivity();
   }
+  /** Sign-in links a cloud command in the terminal printed, shown above it while it waits. */
+  function termAuth(text) {
+    const links = F.authLinks?.detect(text) || [];
+    let bar = $("#term-auth");
+    if (!links.length) return;
+    if (!bar) { bar = document.createElement("div"); bar.id = "term-auth"; bar.className = "term-auth"; $("#term-host").before(bar); }
+    bar.innerHTML = F.authLinks.html(links) + '<button type="button" class="icon-btn" data-term-auth-x aria-label="Hide">×</button>';
+    clearTimeout(termAuth.t);
+    termAuth.t = setTimeout(() => $("#term-auth")?.remove(), 15 * 60_000);
+  }
+  document.addEventListener("click", (e) => { if (e.target.closest("[data-term-auth-x]")) $("#term-auth")?.remove(); });
+  function renderTermSwitch() {
+    const has = Boolean(F.serverStatusCached?.()?.tools?.sandbox);
+    const on = has && Boolean(term?.isCloud());
+    $("#term-cloud").hidden = !has;
+    $("#term-cloud").setAttribute("aria-pressed", String(on));
+    $("#term-where").textContent = !has ? "Commands run in the browser (the cloud sandbox isn't turned on for this site)." : on ? "Every command runs in real Linux (bash) in your own cloud sandbox." : "Commands run in the browser; npm, git and other programs go to the cloud by themselves.";
+  }
+  $("#term-cloud").addEventListener("click", () => { ensureTerm().setCloud(!term.isCloud()); renderTermSwitch(); term.focus?.(); });
+  F.serverStatus?.().then(renderTermSwitch, () => {});
   function ensureTerm() {
       if (!term) term = F.createTerminal($("#term-host"), {
         files: () => project().files,
@@ -1475,7 +1495,7 @@
         projectName: () => project().name,
         userName: () => user.name || user.email?.split("@")[0] || "user",
         sandboxAvailable: () => Boolean(F.serverStatusCached?.()?.tools?.sandbox),
-        sandbox: (cmd, opts) => F.cloudTools.sandbox(cmd, { ...opts, project: project(), write: (p, c) => { writeFile(p, c, { source: "terminal" }); save(); renderTree(); renderHeader(); if (p === state.file) renderEditor(); } }),
+        sandbox: (cmd, opts) => F.cloudTools.sandbox(cmd, { ...opts, onProgress: termAuth, project: project(), write: (p, c) => { writeFile(p, c, { source: "terminal" }); save(); renderTree(); renderHeader(); if (p === state.file) renderEditor(); } }),
       });
       return term;
   }

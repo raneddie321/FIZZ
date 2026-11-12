@@ -847,6 +847,9 @@
         return { text: (text + (lastCode ? `\nexit code ${lastCode}` : "")).slice(0, 8000), failed: lastCode !== 0, code: lastCode };
       },
       reset() { cwd = ""; term.clear(); redraw(); },
+      /** The Cloud Linux switch: every command in real bash in the cloud sandbox. */
+      isCloud: () => cloudMode,
+      setCloud(on) { cloudMode = Boolean(on); redraw(); },
       exec: (cmd) => execLine(cmd, false),
     };
   }

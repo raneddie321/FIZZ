@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="assets/site.css?v=20261112-att" />
 <link rel="stylesheet" href="vendor/codemirror/codemirror.css" />
 <link rel="stylesheet" href="vendor/xterm/xterm.css" />
-<link rel="stylesheet" href="assets/dev.css?v=20261112-att" />
+<link rel="stylesheet" href="assets/dev.css?v=20261112-p4" />
 <script>document.documentElement.dataset.app=/\/dev(\.html)?$/.test(location.pathname)?"dev":"chat";try{var t=localStorage.getItem("fizz.theme");t=t?JSON.parse(t):"system";if(t==="dark"||(t!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}</script>
 <script src="vendor/marked.min.js"></script>
 <script src="vendor/purify.min.js"></script>
@@ -37,16 +37,17 @@
 <script src="assets/connections.js?v=20261112-p4"></script>
 <script src="assets/settings.js?v=20261111-p1"></script>
 <script src="assets/shell.js"></script>
-<script src="assets/terminal.js"></script>
+<script src="assets/terminal.js?v=20261112-p4"></script>
 <script src="assets/blobs.js"></script>
 <script src="assets/agent-tools.js?v=20261111-p0"></script>
 <script src="assets/permissions.js?v=20261111-p0"></script>
 <script src="assets/code-tools.js?v=20261111-p2"></script>
 <script src="assets/hooks.js?v=20261112-p3"></script>
 <script src="assets/git-tools.js?v=20261112-p4"></script>
+<script src="assets/auth-links.js?v=20261112-p4"></script>
 <script src="assets/docs.js"></script>
 <script src="assets/skills.js"></script>
-<script src="assets/cloud-tools.js?v=20261111-p0"></script>
+<script src="assets/cloud-tools.js?v=20261112-p4"></script>
 <script src="assets/builds.js"></script>
 <script src="assets/sync.js?v=20261111-p2"></script>
 <script src="assets/web-browser.js?v=20261110-br3"></script>
@@ -191,7 +192,7 @@
 
     <div class="pane pane-activity" data-pane="activity"><div class="activity-pane" id="activity"></div></div>
 
-    <div class="pane pane-terminal" data-pane="terminal"><div class="term-host" id="term-host"></div></div>
+    <div class="pane pane-terminal" data-pane="terminal"><div class="term-bar"><button type="button" class="term-switch" id="term-cloud" aria-pressed="false" title="Run every command in real Linux (bash) in your own cloud sandbox"><span class="dot"></span><span>Cloud Linux</span></button><small class="muted-sm" id="term-where">Commands run in the browser; npm, git and other programs go to the cloud by themselves.</small></div><div class="term-host" id="term-host"></div></div>
 
     <div class="pane pane-browser" data-pane="browser" data-mode="preview">
       <div class="br-tabs" id="br-tabs" role="tablist" aria-label="Browser tabs"></div>
