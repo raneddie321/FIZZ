@@ -59,7 +59,10 @@ export default async (req, context) => {
     const headers = new Headers();
     clearCookie(headers, STATE_COOKIE);
     if (url.searchParams.get("error")) {
-      headers.set("Location", back(origin, { connect_error: provider, reason: url.searchParams.get("error") }));
+      // The provider's own explanation (no secrets in it) helps far more than the bare code.
+      const why = [url.searchParams.get("error"), url.searchParams.get("error_description")].filter(Boolean).join(": ").slice(0, 300);
+      console.error(`[oauth:${provider}] the provider sent the user back with an error: ${why}`);
+      headers.set("Location", back(origin, { connect_error: provider, reason: why }));
       return new Response(null, { status: 302, headers });
     }
     if (!saved || saved.provider !== provider || !safeEqual(saved.state, url.searchParams.get("state") || "")) {
