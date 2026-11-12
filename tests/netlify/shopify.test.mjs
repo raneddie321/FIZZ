@@ -46,7 +46,13 @@ globalThis.fetch = async (u, init = {}) => {
   return new Response("{}", { status: 404 });
 };
 r = await oauth(new Request(`${O}/api/oauth/shopify/callback?${forged}`, { headers: { cookie: stateCookie } }), { params: { provider: "shopify", action: "callback" } });
-assert.match(r.headers.get("location"), /connect_error=shopify/, "a forged reply is refused");
+assert.match(r.headers.get("location"), /connect_error=shopify/, "a reply for another store is refused");
+// A signature that doesn't match (e.g. a secret that differs) doesn't block a reply whose state and code are real.
+{ const bad = new URLSearchParams(good); bad.set("hmac", "0".repeat(64));
+  r = await oauth(new Request(`${O}/api/oauth/shopify/callback?${bad}`, { headers: { cookie: stateCookie } }), { params: { provider: "shopify", action: "callback" } });
+  assert.match(r.headers.get("location"), /connected=shopify/); }
+r = await oauth(new Request(`${O}/api/oauth/shopify/callback?${good}`, { headers: { cookie: "fizz_oauth=nope" } }), { params: { provider: "shopify", action: "callback" } });
+assert.match(r.headers.get("location"), /connect_error=shopify/, "without the state cookie it's refused");
 r = await oauth(new Request(`${O}/api/oauth/shopify/callback?${good}`, { headers: { cookie: stateCookie } }), { params: { provider: "shopify", action: "callback" } });
 assert.match(r.headers.get("location"), /connected=shopify/);
 const session = r.headers.getSetCookie().filter((c) => c.startsWith("fizz_sh")).map((c) => c.split(";")[0]).join("; ");

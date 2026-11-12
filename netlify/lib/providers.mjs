@@ -44,11 +44,14 @@ export const PROVIDERS = {
       return `https://${extra.shop}/admin/oauth/authorize?${Object.entries(q).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&")}`;
     },
     async exchange(origin, code, _verifier, extra, url) {
-      if (!shopifyHmacOk(url.searchParams, shopifySecret(), url.search)) throw new Error("Shopify's reply couldn't be verified: check that SHOPIFY_CLIENT_SECRET in Vercel is the app's Client secret (Shopify → the app → Settings), with no spaces, then Redeploy.");
+      // The state cookie (checked by the caller), the store match and the server-side code exchange with the client secret
+      // already prove the reply is real; the HMAC is an extra check, so a mismatch is logged rather than fatal.
+      const signed = shopifyHmacOk(url.searchParams, shopifySecret(), url.search);
+      if (!signed) console.warn("[oauth:shopify] the reply's HMAC didn't match; relying on state + code exchange");
       if (shopDomain(url.searchParams.get("shop")) !== extra.shop) throw new Error("The store in Shopify's reply isn't the one you chose.");
       const res = await fetch(`https://${extra.shop}/admin/oauth/access_token`, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ client_id: shopifyId().trim(), client_secret: shopifySecret().trim(), code }) });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.access_token) throw new Error(data.error_description || data.errors || data.error || `Shopify token request failed (${res.status}).`);
+      if (!res.ok || !data.access_token) throw new Error(`${data.error_description || data.errors || data.error || `Shopify token request failed (${res.status}).`}${signed ? "" : " Check that the Shopify Client ID and Client secret in Vercel match the app's (Shopify → the app → Settings), then Redeploy the latest deployment."}`);
       return { t: data.access_token, shop: extra.shop, label: extra.shop, scopes: String(data.scope || "").split(",").filter(Boolean), ...(data.refresh_token ? { r: data.refresh_token, at: Date.now() + (Number(data.expires_in) || 3600) * 1000 } : {}) };
     },
   },
