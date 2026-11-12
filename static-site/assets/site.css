@@ -709,3 +709,7 @@ svg.dots3 { stroke-width: 3; }
 .att-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .att-x { position: absolute; top: 6px; left: 6px; width: 30px; height: 30px; border-radius: 50%; border: 0; background: rgba(255,255,255,.95); color: #111; display: grid; place-items: center; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,.3); padding: 0; }
 .att-x .i { width: 16px; height: 16px; stroke: currentColor; stroke-width: 2.4; fill: none; }
+/* Settings: a big panel that fills most of the screen, not a small box. */
+dialog.settings-dlg#fizz-settings { width: min(1200px, calc(100vw - 32px)); height: calc(100dvh - 32px); max-height: calc(100dvh - 32px); }
+dialog.settings-dlg#fizz-settings > .dlg-body { height: 100%; max-height: none; }
+@media (max-width: 640px) { dialog.settings-dlg#fizz-settings { width: 100vw; height: 100dvh; max-height: 100dvh; max-width: 100vw; border-radius: 0; margin: 0; } }
