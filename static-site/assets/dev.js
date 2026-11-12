@@ -552,7 +552,8 @@
     const stats = { files: 0, chars: 0 };
     for (const v of Object.values(p.files)) { stats.files++; if (typeof v === "string" && !isBinary(v)) stats.chars += v.length; }
     let ctx;
-    if (!F.agentCore.isBigProject(stats)) ctx = order.map((path) => fileTag(path, budget)).join("\n");
+    if (p.remote) { stats.files = Math.max(stats.files, (p.remote.tree || []).length); stats.chars = Math.max(stats.chars, (p.remote.tree || []).reduce((n, e) => n + e.size, 0)); }
+    if (!p.remote && !F.agentCore.isBigProject(stats)) ctx = order.map((path) => fileTag(path, budget)).join("\n");
     else {
       // A large project: the tree, and in full only what matters now. The rest is one tool call away.
       const recent = [...new Set((chat()?.messages || []).flatMap((m) => (m.changes || []).map((x) => x.path)).reverse())].slice(0, 8);
@@ -562,7 +563,8 @@
       ctx = [
         `THIS IS A LARGE PROJECT: ${stats.files} files, about ${Math.round(stats.chars / 1000)}k characters of text. Only its file tree and a few files are shown here; everything else is one tool call away.`,
         "Before you change a file you haven't seen, look at it: <fizz-grep> finds where something is, <fizz-read path lines> shows that part, <fizz-symbols> gives a file's outline, <fizz-tree path> lists a folder. Change existing files with <fizz-edit>, copying the SEARCH text from what you read; don't rewrite a long file with <fizz-file>. Don't guess what a file contains.",
-        `FILE TREE:\n${F.agentCore.treeText(F.codeTools.entries(p.files), { depth: 2, max: 220 })}`,
+        ...(p.remote ? [`This repository (${p.remote.owner}/${p.remote.repo}@${p.remote.branch}) lives in your cloud sandbox: <fizz-read> brings a file into the project so you can edit it, and <fizz-sandbox> commands run on the whole repository there (your edits are copied in first).`] : []),
+        `FILE TREE:\n${F.agentCore.treeText(p.remote ? F.codeTools.remoteEntries(p) : F.codeTools.entries(p.files), { depth: 2, max: 220 })}`,
         `SHOWN IN FULL (${shown.length}: project memory, files you were pointed at, files changed in this chat, entry points):\n${full}`,
       ].join("\n\n");
     }
@@ -1212,7 +1214,7 @@
     for (const e of edits) {
       if (!e.closed || !validPath(e.path)) continue;
       const current = proposals.findLast((x) => x.path === e.path)?.after ?? p.files[e.path];
-      if (typeof current !== "string" || isBinary(current)) { reply.editErrors[e.path] = `${e.path} doesn't exist yet (or is binary). Create it with <fizz-file>.`; continue; }
+      if (typeof current !== "string" || isBinary(current)) { reply.editErrors[e.path] = p.remote && (p.remote.tree || []).some((x) => x.path === e.path) ? `${e.path} is in the repository but you haven't read it yet. Read it with <fizz-read path="${e.path}"/>, then send the edit again.` : `${e.path} doesn't exist yet (or is binary). Create it with <fizz-file>.`; continue; }
       const res = applyHunks(current, e.hunks);
       if (res.error) reply.editErrors[e.path] = res.error;
       else proposals.push({ path: e.path, after: res.text, kind: "edit" });
@@ -1919,21 +1921,35 @@
     if (!(await needConnection("github", "GitHub"))) return;
     const repo = await pickFrom("Import a repository", async () => (await F.conn.github.repos()).repos, (r) => `${r.fullName}${r.private ? " (private)" : ""}`);
     if (!repo) return;
-    const v = await dialog({ title: `Import ${repo.fullName}`, desc: "Text files are imported into a new FIZZ DEV project (up to 200 files).", fields: [{ name: "branch", label: "Branch", value: repo.defaultBranch || "main", mono: true, required: true }], ok: "Import" });
+    const cloud = Boolean(F.serverStatusCached?.()?.tools?.sandbox);
+    const v = await dialog({ title: `Import ${repo.fullName}`, desc: cloud ? "Small repositories are copied into the browser (up to 200 files). Big ones stay in your cloud sandbox: Fizz Code searches and reads them there and brings in only what it works on." : "Text files are imported into a new FIZZ DEV project (up to 200 files).", fields: [{ name: "branch", label: "Branch", value: repo.defaultBranch || "main", mono: true, required: true }], ok: "Import" });
     if (!v) return;
     F.toast("Importing…");
     try {
       const r = await F.conn.github.import(repo.owner, repo.name, v.branch);
       const p = newProject(repo.name);
-      p.files = r.files;
       p.git = { owner: repo.owner, repo: repo.name, branch: v.branch, lastSha: r.headSha, at: Date.now() };
-      data.projects.unshift(p);
-      selectProject(p.id);
-      save();
-      F.toast(`Imported ${r.imported} files${r.truncated ? " (repository was truncated)" : ""}`);
+      if (r.truncated && cloud) {
+        // Too big for the browser: it lives in the sandbox instead.
+        F.toast(`${repo.fullName} has ${r.total} files — cloning it into your cloud sandbox…`);
+        await F.codeTools.cloneInto(p, { owner: repo.owner, repo: repo.name, branch: v.branch });
+        p.git.pushed = [];
+        data.projects.unshift(p);
+        selectProject(p.id);
+        save();
+        F.toast(`${repo.fullName} is in your cloud sandbox (${p.remote.tree.length} files). Fizz Code reads what it needs from there.`);
+      } else {
+        p.files = r.files;
+        p.git.pushed = Object.keys(r.files);
+        data.projects.unshift(p);
+        selectProject(p.id);
+        save();
+        F.toast(`Imported ${r.imported} files${r.truncated ? " (the repository was larger; turn on the cloud sandbox to work on all of it)" : ""}`);
+      }
       showTab("code");
     } catch (e) { F.toast(e.message); }
   }
+
 
   async function deploy() {
     const p = project();
@@ -2497,6 +2513,7 @@
     if (k === "help") location.href = "contact.html";
   });
   $("#gh-btn").addEventListener("click", async (e) => {
+    const anchor = e.currentTarget; // read before any await: it's null afterwards
     const p = project();
     const st = await F.conn.status();
     const s = st.connections?.github || {};
@@ -2505,7 +2522,7 @@
     items.push({ k: "push-other", html: p.git ? "Push to another repository…" : "Push to a repository…" }, { k: "import", html: "Import a repository…" });
     if (p.git) items.push({ k: "unlink", html: "Unlink repository" });
     if (!s.connected) items.push("-", { k: "connect", html: s.configured ? "Connect GitHub" : "GitHub isn't available yet" });
-    const k = await menu(e.currentTarget, items);
+    const k = await menu(anchor, items);
     if (k === "push") githubPush();
     if (k === "push-other") { p.git = null; githubPush(); }
     if (k === "import") githubImport();

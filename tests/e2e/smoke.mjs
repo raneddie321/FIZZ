@@ -675,6 +675,44 @@ for (const app of ["chat", "dev"]) {
   await ctx.close();
 }
 
+// ---------- A big repository that lives in the cloud sandbox (phase 2, part 2) ----------
+{
+  const { ctx, p, errs, bodies, script } = await open({ width: 1280, height: 800 });
+  await ctx.route("**/api/status", (r) => r.fulfill({ json: { server: true, apps: [], ai: { configured: true, model: "test-model", dailyLimit: 50 }, connections: { github: { configured: true, connected: true } }, google: {}, tools: { search: "wikipedia", sandbox: true } } }));
+  const tree = [...Array(3000)].map((_, i) => ({ path: `pkg/m${i % 40}/f${i}.js`, size: 900 })).concat([{ path: "README.md", size: 40 }, { path: "src/auth/login.js", size: 120 }]);
+  const looks = [];
+  await ctx.route("**/api/github/**", (r) => { const a = new URL(r.request().url()).pathname.split("/").pop(); if (a === "repos") return r.fulfill({ json: { repos: [{ owner: "me", name: "huge", fullName: "me/huge", defaultBranch: "main" }] } }); if (a === "import") return r.fulfill({ json: { files: { "README.md": "# Huge" }, headSha: "abc", total: 3002, imported: 200, truncated: true } }); r.fulfill({ status: 404, json: {} }); });
+  await ctx.route("**/api/sandbox", (r) => {
+    const b = r.request().postDataJSON(); looks.push(b);
+    if (b.action === "clone") return r.fulfill({ json: { tree, files: tree.length, branch: "main", sha: "abc" } });
+    if (b.kind === "grep") return r.fulfill({ json: { matches: [{ path: "src/auth/login.js", line: 2, text: "redirect('/home')" }], truncated: false } });
+    if (b.kind === "read") return r.fulfill({ json: { files: Object.fromEntries(b.paths.map((x) => [x, x === "src/auth/login.js" ? "export function login() {\n  redirect('/home');\n}\n" : "# Huge\n"])) } });
+    r.fulfill({ json: { running: false, exitCode: 0, text: "", files: {} } });
+  });
+  await p.goto(B + "dev.html"); await p.waitForTimeout(900);
+  await p.evaluate(() => { FIZZ.loadData(FIZZ.auth.current()).settings.autoVerify = false; });
+  await p.evaluate(() => document.querySelector("#dev-app #gh-btn").click());
+  await p.waitForSelector('.menu [data-k="import"]', { state: "attached" });
+  await p.evaluate(() => document.querySelector('.menu [data-k="import"]').click());
+  await p.locator("#prompt-form [data-i]").filter({ hasText: "me/huge" }).first().click();
+  await p.locator('#prompt-dlg[open] button[value="ok"]').click();
+  await p.waitForFunction(() => FIZZ.loadData(FIZZ.auth.current()).projects[0]?.remote, null, { timeout: 10000 });
+  const pr = await p.evaluate(() => { const x = FIZZ.loadData(FIZZ.auth.current()).projects[0]; return { files: Object.keys(x.files), tree: x.remote.tree.length, git: x.git?.repo }; });
+  check("repo in sandbox: a big repository is cloned into the sandbox, not copied", looks[0]?.action === "clone" && pr.tree === 3002 && pr.files.length <= 5 && pr.git === "huge", JSON.stringify(pr));
+  script.push('<fizz-grep pattern="redirect"/>\n<fizz-read path="src/auth/login.js"/>\nLooking.');
+  script.push("<fizz-edit path=\"src/auth/login.js\">\n<<<<<<< SEARCH\n  redirect('/home');\n=======\n  redirect('/dashboard');\n>>>>>>> REPLACE\n</fizz-edit>\nChanged the redirect.");
+  script.push("Done.");
+  await p.fill("#dev-app #input", "make login redirect to /dashboard"); await p.keyboard.press("Enter");
+  await lastReply(p, "#dev-app", "Done.");
+  const sys = bodies[0].system;
+  check("repo in sandbox: the prompt has the tree and says where the repo lives", sys.includes("lives in your cloud sandbox") && sys.includes("3002 files") && sys.includes("src/"));
+  check("repo in sandbox: grep and read run there", looks.some((x) => x.kind === "grep" && x.pattern === "redirect") && looks.some((x) => x.kind === "read" && x.paths.includes("src/auth/login.js")));
+  const file = await p.evaluate(() => FIZZ.loadData(FIZZ.auth.current()).projects[0].files["src/auth/login.js"]);
+  check("repo in sandbox: a file that was read can be edited", file?.includes("redirect('/dashboard')"), String(file));
+  check("repo in sandbox: no script errors", !errs.length, errs.join(" | "));
+  await ctx.close();
+}
+
 // ---------- app switch keeps one page ----------
 {
   const { ctx, p, errs } = await open({ width: 1280, height: 800 });
