@@ -764,6 +764,10 @@
     }
     if (reply.error) return finishLoop(reply);
     if ((reply.staged || []).some((x) => !x.decided)) return finishLoop(reply, "review");
+    if (reply.changes?.length) {
+      const h = await runHooks("afterEdit", reply, { files: reply.changes.map((x) => x.path) });
+      if (h?.failed.length) reply.hookErrors = F.hooks.format("afterEdit", h);
+    }
     await runTools(reply);
     return continueIfNeeded(reply);
   }
@@ -774,6 +778,7 @@
     const waiting = (reply.tools || []).some((t) => t.status === "waiting");
     const results = (reply.tools || []).filter((t) => (t.status === "done" || t.status === "failed") && F.agentTools.registry[t.type]?.feedback);
     const editErrors = Object.entries(reply.editErrors || {});
+    if (reply.hookErrors) editErrors.push(["", reply.hookErrors]);
     if (asked || waiting || stopLoop) return finishLoop(reply, asked ? "question" : waiting ? "approval" : "stopped");
     // A common failure mode is a model narrating that it will create a file, then ending
     // without any executable file block or tool call. Retry once with an explicit instruction.
@@ -800,10 +805,22 @@
       reply.loopStopped = true; save(); renderThread();
       return finishLoop(reply, "limit");
     }
-    if (next.action === "check") return (await selfCheck(reply)) ? undefined : finishLoop(reply, "done");
+    if (next.action === "check") {
+      // afterTurn hooks (tests, type-checks…): a failure goes back to Fizz Code, at most twice per task.
+      if (reply.mode === "build" && turnChanges().length && (turn.hookFixes || 0) < 2) {
+        const h = await runHooks("afterTurn", reply);
+        if (h?.failed.length && !stopLoop) {
+          turn.hookFixes = (turn.hookFixes || 0) + 1;
+          chat().messages.push({ id: F.uid(), role: "user", auto: true, autoLabel: `A hook failed after the task — Fizz Code is fixing it`, content: `${F.hooks.format("afterTurn", h)}\nThe project's afterTurn hook failed. Fix the cause (don't change or remove the hook).`, mode: "build", at: Date.now() });
+          save();
+          return generate({ step: reply.step + 1 });
+        }
+      }
+      return (await selfCheck(reply)) ? undefined : finishLoop(reply, "done");
+    }
     if (next.action === "finish") { reply.loopStopped = true; save(); renderThread(); return finishLoop(reply, "limit"); }
     const parts = results.map((t) => `<tool-result tool="${t.type}" request="${esc(toolLabel(t)).slice(0, 200)}" ok="${t.status === "done"}">\n${scrubSecrets(String(t.result?.text || "").slice(0, 12_000))}\n</tool-result>`);
-    for (const [path, err] of editErrors) parts.push(`<tool-result tool="edit" request="${esc(path)}" ok="false">\n${err}\n${String(err).startsWith("Blocked:") ? "The file was not changed. Don't write it again or work around it: continue without it, or tell the user." : "The file was not changed. Send the edit again with SEARCH text copied exactly from the current file, or rewrite the whole file with <fizz-file>."}\n</tool-result>`);
+    for (const [path, err] of editErrors) if (!path) parts.push(`${err}\nA hook (.fizz/hooks.json) failed after your edit: fix what it reports.`); else parts.push(`<tool-result tool="edit" request="${esc(path)}" ok="false">\n${err}\n${String(err).startsWith("Blocked:") ? "The file was not changed. Don't write it again or work around it: continue without it, or tell the user." : "The file was not changed. Send the edit again with SEARCH text copied exactly from the current file, or rewrite the whole file with <fizz-file>."}\n</tool-result>`);
     const images = results.filter((t) => t.result?.sendImages !== false).flatMap((t) => (t.result?.images || []).slice(0, 2)).slice(0, 3).map((src, k) => ({ type: "image", name: `screenshot-${k + 1}.jpg`, mime: src.slice(5, src.indexOf(";")), data: src.split(",")[1] }));
     let tail = "Continue the task from here. Fix anything that failed. If everything works, finish with the updated <fizz-plan> and a short summary, without tool tags.";
     if (cut) {
@@ -922,6 +939,16 @@
       return m ? { path: m[1], line: Number(m[2]) || undefined, text: `review: ${m[3]}` } : { path: "", text: `review: ${t}` };
     });
   }
+  /** Runs the project's hooks for an event (static-site/assets/hooks.js). */
+  const hookCtx = (reply, extra = {}) => ({ project: project(), term: () => ensureTerm(), reply, write: (p, c) => { writeFile(p, c, { source: "agent", msgId: reply?.id }); renderTree(); }, ...extra });
+  async function runHooks(event, reply, extra) {
+    if (!F.hooks || !F.hooks.config(project()).count) return null;
+    const res = await F.hooks.run(event, hookCtx(reply, extra));
+    if (res.skipped) { if (reply) reply.hookNote = res.skipped; F.toast(res.skipped); }
+    if (res.ran.length) { renderTree(); renderHeader(); }
+    return res;
+  }
+
   async function selfCheck(reply) {
     if (reply.mode !== "build" || reply.error || data.settings.autoVerify === false || !F.verify) return false;
     const changed = turnChanges();
@@ -1023,6 +1050,10 @@
       }
       t.status = "running";
       renderThread();
+      if ((t.type === "run" || t.type === "sandbox") && F.hooks?.config(project()).hooks.beforeCommand.length) {
+        const h = await runHooks("beforeCommand", reply, { command: t.body.split("\n")[0] });
+        if (h?.blocked) { t.result = { ok: false, text: `A beforeCommand hook stopped this command:\n${F.hooks.format("beforeCommand", h)}` }; t.status = "failed"; save(); renderThread(); continue; }
+      }
       try {
         const res = await def.run(t, ctx);
         // A tool can ask for the user's OK again after a first step (e.g. connected, now confirm sending).
@@ -1512,7 +1543,7 @@
   function flushSave() {
     if (!cm || !state.file || project().files[state.file] === undefined) return;
     const v = cm.getValue();
-    if (writeFile(state.file, v, { source: "user" })) { save(); renderHeader(); }
+    if (writeFile(state.file, v, { source: "user" })) { if (state.file === F.hooks?.FILE) F.hooks.trust(project()); save(); renderHeader(); }
     setSaved("Saved");
     if (ui.tab === "browser" || app.dataset.view === "browser") refreshPreview();
   }
@@ -1845,6 +1876,8 @@
       ? await dialog({ title: `Push to ${target.owner}/${target.repo}`, desc: "Creates one commit with this project's files. Other files in the repository are kept.", fields: [{ name: "branch", label: "Branch", value: target.branch, mono: true, required: true }, { name: "message", label: "Commit message", value: message, required: true }], ok: "Push" })
       : { branch: target.branch, message };
     if (!v) return;
+    const hp = await runHooks("beforePush", null);
+    if (hp?.blocked) return F.toast(`Not pushed: a beforePush hook failed — ${hp.failed[0].run}: ${(hp.failed[0].text || "").split("\n").slice(-2).join(" ").slice(0, 160)}`);
     F.toast("Pushing to GitHub…");
     try {
       const r = await F.conn.github.push(target.owner, target.repo, v.branch, v.message, await filesForUpload());
@@ -1887,6 +1920,8 @@
     if (!(await needConnection("vercel", "Vercel"))) return;
     const v = await dialog({ title: "Deploy to Vercel", desc: "Uploads this project's files and creates a deployment.", fields: [{ name: "name", label: "Vercel project name", value: p.deploy?.name || p.name.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-|-$/g, "") || "fizz-project", mono: true, required: true }, { name: "production", label: "Production deployment", type: "checkbox", value: true }], ok: "Deploy" });
     if (!v) return;
+    const hd = await runHooks("beforeDeploy", null);
+    if (hd?.blocked) return F.toast(`Not deployed: a beforeDeploy hook failed — ${hd.failed[0].run}: ${(hd.failed[0].text || "").split("\n").slice(-2).join(" ").slice(0, 160)}`);
     const c = chat() || (() => { const n = { id: F.uid(), title: "Deployments", messages: [], created: Date.now() }; p.chats.push(n); state.chatId = n.id; return n; })();
     const note = { id: F.uid(), role: "assistant", content: `Deploying **${p.name}** to Vercel…`, at: Date.now(), model: "Vercel", deploy: { state: "QUEUED", url: "" } };
     c.messages.push(note);
@@ -2149,6 +2184,7 @@
         <button type="button" class="ps-row" data-ps-go="skills"><span class="ps-ic">${F.icon("bulb")}</span><span class="ps-txt"><b>Skills</b><small>${pinned.length ? `${pinned.length} on for this project` : "Automatic"}</small></span>${chev}</button>
         <button type="button" class="ps-row" data-ps-go="permission"><span class="ps-ic">${F.icon("shield")}</span><span class="ps-txt"><b>Permissions</b><small>${F.perm.label()}</small></span>${chev}</button>
         <button type="button" class="ps-row" data-ps-opt="research"><span class="ps-ic">${F.icon("search")}</span><span class="ps-txt"><b>Research</b><small>Search the web thoroughly and cite sources</small></span>${toggle(Boolean(data.settings.research))}</button>
+        <button type="button" class="ps-row" data-ps="hooks"><span class="ps-ic">${F.icon("terminal")}</span><span class="ps-txt"><b>Hooks</b><small>${(() => { const h = F.hooks?.config(project()); return !h?.count ? "Commands that run by themselves: format, test, build…" : `${h.count} hook${h.count === 1 ? "" : "s"}${F.hooks.trusted(project()) ? "" : " · not trusted yet"}`; })()}</small></span>${chev}</button>
         <button type="button" class="ps-row" data-ps="memory"><span class="ps-ic">${F.icon("brain")}</span><span class="ps-txt"><b>Project memory</b><small>FIZZ.md — standing instructions for this project</small></span>${chev}</button>
       </div>`;
   }
@@ -2193,6 +2229,7 @@
     if (d.ps === "camera") { closePlus(); return pickFiles("image/*", true); }
     if (d.ps === "drive") { closePlus(); return attachFromDrive(); }
     if (d.ps === "memory") { closePlus(); return openMemory(); }
+    if (d.ps === "hooks") { closePlus(); return openHooks(); }
     if (d.ps === "manage-skills") { closePlus(); return manageSkills(); }
     if (d.ps === "add-connector") { closePlus(); return F.customConnectors?.open({ onChange: () => F.mcp?.refresh?.(true) }); }
     if (d.ps === "manage-connections") { closePlus(); return openSettings("connections"); }
@@ -2383,6 +2420,35 @@
     if (b.dataset.project !== state.projectId) selectProject(b.dataset.project);
     if (b.dataset.chat) { state.chatId = b.dataset.chat; renderAll(); closeDrawer(); if (isPhone()) setView("chat"); }
   });
+  /** + → Hooks: add an example, trust the file, or open it. */
+  async function openHooks() {
+    const p = project();
+    const h = F.hooks.config(p);
+    const items = [];
+    if (h.count && !F.hooks.trusted(p)) items.push({ k: "trust", html: `Trust these ${h.count} hook${h.count === 1 ? "" : "s"}…<small>They were added or changed outside the editor; they don't run until you trust them</small>` });
+    items.push({ label: "Add a hook" }, ...F.hooks.EXAMPLES.map(([name, ev], i) => ({ k: `ex${i}`, html: `${esc(name)}<small>${ev}</small>` })), "-", { k: "open", html: `Edit ${F.hooks.FILE}` });
+    await new Promise((r) => setTimeout(r, 0)); // after the click that opened it, or that click closes the menu
+    const k = await menu($("#attach"), items);
+    if (!k) return;
+    if (k === "trust") {
+      const list = F.hooks.EVENTS.flatMap((e) => h.hooks[e].map((x) => `${e}: ${x.run}`)).join("\n");
+      const ok = await dialog({ title: "Trust these hooks?", desc: `They run by themselves in this project:\n\n${list}\n\nOnly trust commands you understand.`, fields: [], ok: "Trust" });
+      if (ok) { F.hooks.trust(p); save(); F.toast("Hooks trusted."); }
+      return;
+    }
+    if (k.startsWith("ex")) {
+      const [name, ev, hook] = F.hooks.EXAMPLES[+k.slice(2)];
+      let json = {};
+      try { json = JSON.parse(p.files[F.hooks.FILE] || "{}"); } catch { return F.toast(`${F.hooks.FILE} isn't valid JSON — fix it first.`); }
+      (json[ev] ||= []).push(hook);
+      writeFile(F.hooks.FILE, `${JSON.stringify(json, null, 2)}\n`, { source: "user" });
+      F.hooks.trust(p);
+      save(); renderTree();
+      F.toast(`Hook added: ${name}`);
+    } else if (p.files[F.hooks.FILE] === undefined) { writeFile(F.hooks.FILE, F.hooks.TEMPLATE, { source: "user" }); F.hooks.trust(p); save(); renderTree(); }
+    showTab("code");
+    openFile(F.hooks.FILE);
+  }
   $("#new-project").setAttribute("aria-haspopup", "menu"); // it opens a menu now (and so the click that opens it doesn't close it)
   $("#new-project").addEventListener("click", async (e) => {
     const how = await menu(e.currentTarget, [{ k: "empty", html: "Empty project" }, { k: "import", html: "Import a repository from GitHub…" }]);
@@ -2633,6 +2699,7 @@
       { g: "Files", label: "Download as one HTML file", run: () => moreAction("html1") },
       { g: "Files", label: "Make app icons…", run: () => moreAction("icons") },
       { g: "Files", label: "Project memory (FIZZ.md)…", run: () => openMemory() },
+      { g: "Files", label: "Hooks (.fizz/hooks.json)…", run: () => openHooks() },
       { g: "Chat", label: "Export this chat (Markdown)", run: () => exportChat() },
       { g: "Settings", label: "Keyboard shortcuts", hint: "?", run: () => shortcuts() },
       { g: "Ship", label: "Push to GitHub", run: () => githubPush() },

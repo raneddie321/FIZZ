@@ -42,6 +42,7 @@
 <script src="assets/agent-tools.js?v=20261111-p0"></script>
 <script src="assets/permissions.js?v=20261111-p0"></script>
 <script src="assets/code-tools.js?v=20261111-p2"></script>
+<script src="assets/hooks.js?v=20261112-p3"></script>
 <script src="assets/docs.js"></script>
 <script src="assets/skills.js"></script>
 <script src="assets/cloud-tools.js?v=20261111-p0"></script>
@@ -222,6 +223,6 @@
   if (S) return S.boot(list);
   // idb.js didn't load: start the apps anyway (data stays in localStorage, as before).
   list.forEach(function (src) { var s = document.createElement("script"); s.src = src; s.async = false; document.body.appendChild(s); });
-})(["assets/chat.js?v=20261112-att", "assets/dev.js?v=20261112-att"]);</script>
+})(["assets/chat.js?v=20261112-att", "assets/dev.js?v=20261112-p3"]);</script>
 </body>
 </html>

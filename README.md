@@ -253,6 +253,14 @@ The plan for what comes next is in [`docs/roadmap/`](docs/roadmap/README.md).
   (`static-site/assets/code-tools.js`). These only read, so they work in Read-only and Plan-first mode, and `.env`
   values are never shown.
 
+### Hooks
+Commands that run by themselves, per project, in `.fizz/hooks.json` ("+" → Hooks has ready-made examples):
+`afterEdit` (with `"match": "*.{js,css}"`, `{file}`/`{files}` in the command), `afterTurn`, `beforeCommand` (`{command}`),
+`beforePush`, `beforeDeploy`. They run in the cloud sandbox (or `"where": "terminal"`), with a `timeout` in seconds.
+A failing `before…` hook stops the action; a failing `afterEdit`/`afterTurn` hook is sent to Fizz Code to fix (twice at
+most per task). Hooks run only after you trust exactly that file — editing it yourself trusts it; a file that came from an
+import or from the agent waits for "+" → Hooks → Trust — and every hook command still goes through the permission rules.
+
 ### Long conversations
 FIZZ DEV works out the model's context size (Settings → Tools → Context size overrides it), summarises a chat when it
 reaches 70% — goal, decisions, files, open problems, next steps — and keeps the last six messages as they are. If a
