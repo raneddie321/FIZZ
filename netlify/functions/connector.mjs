@@ -67,6 +67,20 @@ const redactToken = (text, token) => (token ? String(text).split(token).join("â€
  */
 export default async (req, context) => {
   const { service, action } = context.params;
+  // A Shopify store signed in with OAuth: its Admin GraphQL API.
+  if (service === "shopify-store" && action === "call") {
+    if (req.method !== "POST" || !sameOrigin(req)) return error(403, "Not allowed.");
+    const saved = unseal(getBigCookie(req, "fizz_sh"));
+    if (!saved?.t || !saved.shop) return error(401, "No Shopify store is connected. Connect it in Settings â†’ Connections.", "not_connected");
+    let body;
+    try { body = await readJson(req, 1_000_000); } catch (e) { return error(e.status || 400, e.message); }
+    if (typeof body.query !== "string" || !body.query.trim()) return error(400, "A GraphQL query is required.");
+    try {
+      const res = await fetch(`https://${saved.shop}/admin/api/${env("SHOPIFY_API_VERSION") || "2026-07"}/graphql.json`, { method: "POST", headers: { "X-Shopify-Access-Token": saved.t, "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ query: body.query, variables: body.variables || {} }), signal: AbortSignal.timeout(25_000) });
+      const data = await res.json().catch(() => null);
+      return new Response(redactToken(JSON.stringify({ ok: res.ok && !data?.errors, status: res.status, shop: saved.shop, data: data?.data ?? null, errors: data?.errors ?? (res.ok ? null : data) }), saved.t), { status: 200, headers: { "content-type": "application/json", "cache-control": "no-store" } });
+    } catch { return error(502, "The Shopify store didn't answer in time.", "unreachable"); }
+  }
   if (service === "canva" && action === "call") {
     if (req.method !== "POST" || !sameOrigin(req)) return error(403, "Not allowed.");
     if (!secretConfigured()) return error(503, "FIZZ_SECRET isn't set on this server.", "not_configured");

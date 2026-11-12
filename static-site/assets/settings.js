@@ -8,6 +8,7 @@
     { id: "github", name: "GitHub", desc: "Import repositories and push your projects as commits.", icon: '<svg viewBox="0 0 24 24" class="i" aria-hidden="true"><path fill="currentColor" stroke="none" d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.46-1.16-1.11-1.47-1.11-1.47-.9-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02a9.6 9.6 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2z"/></svg>' },
     { id: "vercel", name: "Vercel", desc: "Deploy projects and get a live URL.", icon: '<svg viewBox="0 0 24 24" class="i conn-logo logo-vercel" aria-hidden="true"><path fill="currentColor" stroke="none" d="M12 3l10 18H2z"/></svg>' },
     { id: "canva", name: "Canva", desc: "Connect Canva to prepare design workflows in FIZZ DEV.", icon: '<svg viewBox="0 0 24 24" class="i conn-logo logo-canva" aria-hidden="true"><defs><linearGradient id="fizz-canva-gradient" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#00C4CC"/><stop offset=".5" stop-color="#7D2AE8"/><stop offset="1" stop-color="#00C4CC"/></linearGradient></defs><rect x="1" y="1" width="22" height="22" rx="7" fill="url(#fizz-canva-gradient)"/><path d="M15.8 8.2c-1.2-1.1-3.1-.6-4.4.6-1.5 1.4-2.3 3.6-1.6 5.2.6 1.4 2.1 1.4 3.2.6.5-.4.9-.9 1.2-1.4.2-.3.5-.4.8-.2.3.2.3.5.1.8-1.1 1.9-3.1 3.1-5 2.5-2.5-.8-2.5-4.2-.6-6.8 1.8-2.5 5.1-3.7 7.3-1.8.4.4.4.8.1 1.1-.3.3-.7.2-1.1-.2z" fill="#fff"/></svg>' },
+    { id: "shopify", name: "Shopify store", desc: "Connect your Shopify store — Fizz Code can read and update products, orders, inventory and pages.", icon: '<svg viewBox="0 0 24 24" class="i conn-logo" aria-hidden="true"><path fill="#95BF47" stroke="none" d="M15.3 3.1c-.1 0-.2 0-.3.1l-.5 1.5c-.3-.9-.9-1.7-1.9-1.7h-.1C12.2 2.4 11.8 2.2 11.4 2.2 8.9 2.2 7.7 5.3 7.3 6.9l-1.7.5c-.5.2-.6.2-.6.7L3.6 19.2 14.5 21.2l5.9-1.3S15.4 3.2 15.3 3.1zM12.6 4l-.9.3c0-.5-.1-1.2-.3-1.8.6.1.9.8 1.2 1.5zm-1.6.5-2 .6c.2-.8.6-1.6 1.1-2.1.2-.2.5-.4.8-.5.2.6.2 1.4.1 2zM11.4 2.7c.2 0 .4.1.5.2-.6.3-1.3 1-1.6 2.5l-1.5.5c.4-1.4 1.4-3.2 2.6-3.2z"/></svg>' },
     { id: "google", name: "Google Workspace", desc: "Gmail, Calendar, Docs, Sheets, Slides, Drive, Tasks and Contacts — Fizz Code can use them for you.", icon: '<svg viewBox="0 0 24 24" class="i conn-logo logo-google" aria-hidden="true"><path fill="#4285F4" stroke="none" d="M21.6 12.23c0-.72-.06-1.42-.18-2.09H12v3.95h5.38a4.6 4.6 0 0 1-2 3.02v2.56h3.23c1.89-1.74 2.99-4.3 2.99-7.44z"/><path fill="#34A853" stroke="none" d="M12 22c2.7 0 4.97-.9 6.62-2.43l-3.23-2.56c-.9.6-2.05.96-3.39.96-2.6 0-4.8-1.75-5.59-4.1H3.08v2.64A10 10 0 0 0 12 22z"/><path fill="#FBBC05" stroke="none" d="M6.41 13.87a6 6 0 0 1 0-3.74V7.49H3.08a10 10 0 0 0 0 9.02z"/><path fill="#EA4335" stroke="none" d="M12 6.03c1.47 0 2.79.5 3.82 1.5l2.86-2.86A9.6 9.6 0 0 0 12 2a10 10 0 0 0-8.92 5.49l3.33 2.64C7.2 7.78 9.4 6.03 12 6.03z"/></svg>' },
   ];
 
@@ -128,7 +129,7 @@
       action = !ok ? "" : on ? `<button type="button" class="btn btn-outline btn-sm" data-disconnect="google">Disconnect</button>` : `<button type="button" class="btn btn-sm" data-connect="google">Connect</button>`;
     } else {
       const s = st.connections?.[c.id] || {};
-      const ready = c.id === "canva" ? Boolean(s.oauth) : Boolean(s.configured);
+      const ready = c.id === "canva" || c.id === "shopify" ? Boolean(s.oauth) : Boolean(s.configured);
       state = !ready ? "Not available yet" : s.connected ? `Connected · ${esc(s.account || "")}` : "Not connected";
       action = !ready ? "" : s.connected ? `<button type="button" class="btn btn-outline btn-sm" data-disconnect="${c.id}">Disconnect</button>` : `<button type="button" class="btn btn-sm" data-connect="${c.id}">Connect</button>`;
       if (s.connected && s.scopes?.length) state += ` <span class="mono muted-sm">(${esc(s.scopes.join(", "))})</span>`;
@@ -384,6 +385,13 @@
         if (!v) { F.toast("Paste the token first."); return; }
         t.disabled = true;
         try { const r = await F.conn.connectToken(t.dataset.tokenSave, v); F.toast(`Connected${r.account ? ` · ${r.account}` : ""}`); renderConnections(d); } catch (err) { F.toast(err.message); t.disabled = false; }
+      }
+      if (t.dataset.connect === "shopify") {
+        // Each store signs in on its own: ask which one.
+        const shop = (prompt("Your Shopify store's address (e.g. my-store or my-store.myshopify.com):", "") || "").trim();
+        if (!shop) return;
+        if (!/^[a-z0-9][a-z0-9-]*(\.myshopify\.com)?$/i.test(shop.replace(/^https?:\/\//, "").replace(/\/.*$/, ""))) return F.toast("Use the store's myshopify address, like my-store.myshopify.com (Shopify admin → Settings → Domains).");
+        return F.conn.connect("shopify", { shop });
       }
       if (t.dataset.connect) {
         try { await F.conn.connect(t.dataset.connect); renderConnections(d); } catch (err) { F.toast(err.message); }

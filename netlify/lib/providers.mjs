@@ -1,10 +1,48 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { env } from "./util.mjs";
 
 // OAuth providers handled on the server. Google uses Google Identity Services in the
 // browser (client ID only), so it is not listed here.
 /** What FIZZ asks Canva for: the profile, designs (list, create, export) and uploads. Tick the same scopes in the Canva Developer Portal. */
 export const CANVA_SCOPES = "profile:read design:meta:read design:content:read design:content:write asset:read asset:write";
+// Shopify: each store signs in on its own (the store's address is part of every URL). The Vercel variables may be
+// named SHOPIFY_CLIENT_ID/SECRET or SHOPIFY_CLINET_ID/SECRET (as first typed).
+export const shopifyId = () => env("SHOPIFY_CLIENT_ID") || env("SHOPIFY_CLINET_ID") || env("SHOPIFY_API_KEY");
+export const shopifySecret = () => env("SHOPIFY_CLIENT_SECRET") || env("SHOPIFY_CLINET_SECRET") || env("SHOPIFY_API_SECRET");
+export const SHOPIFY_SCOPES = "read_products,write_products,read_orders,read_customers,read_inventory,write_inventory,read_content,write_content,read_files,write_files";
+/** "my-store", "my-store.myshopify.com" or "https://my-store.myshopify.com/admin" → "my-store.myshopify.com", or null. */
+export function shopDomain(input) {
+  let s = String(input || "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+  if (/^[a-z0-9][a-z0-9-]{0,60}$/.test(s)) s = `${s}.myshopify.com`;
+  return /^[a-z0-9][a-z0-9-]{0,60}\.myshopify\.com$/.test(s) ? s : null;
+}
+/** Shopify signs its redirect back: HMAC-SHA256 of the other query parameters, sorted, with the app's secret. */
+export function shopifyHmacOk(searchParams, secret) {
+  const given = searchParams.get("hmac") || "";
+  const msg = [...searchParams.entries()].filter(([k]) => k !== "hmac" && k !== "signature").sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}=${v}`).join("&");
+  const want = createHmac("sha256", secret).update(msg).digest("hex");
+  return given.length === want.length && timingSafeEqual(Buffer.from(given), Buffer.from(want));
+}
 export const PROVIDERS = {
+  shopify: {
+    cookie: "fizz_sh",
+    pkce: false,
+    configured: () => Boolean(shopifyId() && shopifySecret()),
+    /** The store comes with the start link (?shop=…) and is remembered for the callback. */
+    prepare: (url) => { const shop = shopDomain(url.searchParams.get("shop")); if (!shop) throw Object.assign(new Error("Enter your store's address, like my-store or my-store.myshopify.com."), { status: 400 }); return { shop }; },
+    authorizeUrl: (origin, state, _challenge, extra) => {
+      const q = { client_id: shopifyId(), scope: env("SHOPIFY_SCOPES") || SHOPIFY_SCOPES, redirect_uri: `${origin}/api/oauth/shopify/callback`, state };
+      return `https://${extra.shop}/admin/oauth/authorize?${Object.entries(q).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&")}`;
+    },
+    async exchange(origin, code, _verifier, extra, url) {
+      if (!shopifyHmacOk(url.searchParams, shopifySecret())) throw new Error("Shopify's reply couldn't be verified.");
+      if (shopDomain(url.searchParams.get("shop")) !== extra.shop) throw new Error("The store in Shopify's reply isn't the one you chose.");
+      const res = await fetch(`https://${extra.shop}/admin/oauth/access_token`, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ client_id: shopifyId(), client_secret: shopifySecret(), code }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.access_token) throw new Error(data.error_description || data.errors || data.error || `Shopify token request failed (${res.status}).`);
+      return { t: data.access_token, shop: extra.shop, label: extra.shop, scopes: String(data.scope || "").split(",").filter(Boolean), ...(data.refresh_token ? { r: data.refresh_token, at: Date.now() + (Number(data.expires_in) || 3600) * 1000 } : {}) };
+    },
+  },
   github: {
     cookie: "fizz_gh",
     configured: () => Boolean(env("GITHUB_CLIENT_ID") && env("GITHUB_CLIENT_SECRET")),

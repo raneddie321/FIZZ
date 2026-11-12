@@ -46,3 +46,5 @@ jobs:
         run: node tests/netlify/sandbox-repo.test.mjs
       - name: Test Canva
         run: node tests/netlify/canva.test.mjs
+      - name: Test Shopify
+        run: node tests/netlify/shopify.test.mjs

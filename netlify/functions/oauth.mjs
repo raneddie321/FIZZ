@@ -48,8 +48,10 @@ export default async (req, context) => {
   if (action === "start") {
     const state = randomId();
     const verifier = p.pkce ? randomId(48) : undefined;
-    const headers = new Headers({ Location: p.authorizeUrl(origin, state, verifier && pkceChallenge(verifier)) });
-    setCookie(headers, STATE_COOKIE, seal({ provider, state, verifier, exp: Date.now() + 10 * 60_000 }), { maxAge: 600 });
+    let extra = {};
+    try { extra = p.prepare ? p.prepare(new URL(req.url)) : {}; } catch (e) { return error(e.status || 400, e.message); }
+    const headers = new Headers({ Location: p.authorizeUrl(origin, state, verifier && pkceChallenge(verifier), extra) });
+    setCookie(headers, STATE_COOKIE, seal({ provider, state, verifier, extra, exp: Date.now() + 10 * 60_000 }), { maxAge: 600 });
     return new Response(null, { status: 302, headers });
   }
 
@@ -70,7 +72,7 @@ export default async (req, context) => {
       return new Response(null, { status: 302, headers });
     }
     try {
-      const session = await p.exchange(origin, url.searchParams.get("code"), saved.verifier);
+      const session = await p.exchange(origin, url.searchParams.get("code"), saved.verifier, saved.extra || {}, url);
       setBigCookie(headers, p.cookie, seal(session), { maxAge: 60 * 60 * 24 * 30 });
       headers.set("Location", back(origin, { connected: provider }));
     } catch (e) {

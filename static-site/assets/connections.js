@@ -175,10 +175,10 @@
   F.conn = {
     api,
     status: (force) => F.serverStatus(force),
-    connect(provider) {
+    connect(provider, params = null) {
       if (provider === "google") return googleConnect();
       sessionStorage.setItem("fizz.conn.return", location.pathname.split("/").pop() || "dev.html");
-      location.href = `/api/oauth/${provider}/start`;
+      location.href = `/api/oauth/${provider}/start${params ? `?${new URLSearchParams(params)}` : ""}`;
     },
     async disconnect(provider) {
       if (provider === "google") return google_.disconnect();
@@ -233,6 +233,7 @@
       call: (id, tool, arguments_) => mcpApi("call", { id, tool, arguments: arguments_ }),
     },
     canva: { call: (req) => api("/api/connector/canva/call", { body: req }) },
+    shopify: { graphql: (query, variables) => api("/api/connector/shopify-store/call", { body: { query, variables } }) },
     connectToken: async (provider, token) => { const r = await api(`/api/oauth/${provider}/token`, { body: { token } }); await F.serverStatus(true); return r; },
     vercel: {
       connectToken: async (token) => { const r = await api("/api/oauth/vercel/token", { body: { token } }); await F.serverStatus(true); return r; },

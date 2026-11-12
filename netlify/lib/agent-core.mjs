@@ -4,7 +4,7 @@
 // after editing); the server will run it for automation. Keep it free of imports, DOM and Node APIs.
 
 // ---------------- tool tags ----------------
-export const TOOL_TYPES = ["run", "sandbox", "search", "fetch", "browser", "screenshot", "export", "attach", "ask", "build", "push", "memory", "collect", "google", "remember", "api", "mcp", "tree", "grep", "read", "symbols", "git", "canva"];
+export const TOOL_TYPES = ["run", "sandbox", "search", "fetch", "browser", "screenshot", "export", "attach", "ask", "build", "push", "memory", "collect", "google", "remember", "api", "mcp", "tree", "grep", "read", "symbols", "git", "canva", "shopify"];
 const TOOL_RE = /<fizz-([a-z]+)\b((?:\s+[a-zA-Z][\w-]*\s*=\s*"[^"]*")*)\s*(\/>|>([\s\S]*?)(<\/fizz-\1>|$))/g;
 const ATTR_RE = /([a-zA-Z][\w-]*)\s*=\s*"([^"]*)"/g;
 const unescapeAttr = (s) => s.replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
