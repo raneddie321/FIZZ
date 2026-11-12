@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="assets/site.css?v=20261112-att" />
 <link rel="stylesheet" href="vendor/codemirror/codemirror.css" />
 <link rel="stylesheet" href="vendor/xterm/xterm.css" />
-<link rel="stylesheet" href="assets/dev.css?v=20261112-nocl" />
+<link rel="stylesheet" href="assets/dev.css?v=20261112-repo" />
 <script>document.documentElement.dataset.app=/\/dev(\.html)?$/.test(location.pathname)?"dev":"chat";try{var t=localStorage.getItem("fizz.theme");t=t?JSON.parse(t):"system";if(t==="dark"||(t!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}</script>
 <script src="vendor/marked.min.js"></script>
 <script src="vendor/purify.min.js"></script>
@@ -147,6 +147,7 @@
     <div class="scroll" id="scroll"><div class="thread dev-thread" id="thread"></div></div>
     <div class="composer-area">
       <div class="composer-inner">
+        <div class="repo-bar" id="repo-bar"></div>
         <div id="notice"></div>
         <div class="slash hidden" id="slash" role="listbox"></div>
         <form class="composer" id="composer">
@@ -227,6 +228,6 @@
   if (S) return S.boot(list);
   // idb.js didn't load: start the apps anyway (data stays in localStorage, as before).
   list.forEach(function (src) { var s = document.createElement("script"); s.src = src; s.async = false; document.body.appendChild(s); });
-})(["assets/chat.js?v=20261112-att", "assets/dev.js?v=20261112-shop"]);</script>
+})(["assets/chat.js?v=20261112-att", "assets/dev.js?v=20261112-repo"]);</script>
 </body>
 </html>

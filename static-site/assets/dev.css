@@ -736,3 +736,8 @@
 .auth-link > div { flex: 1; min-width: 180px; display: grid; gap: 2px; }
 .auth-link small { color: var(--muted); }
 .auth-link code { font-size: 15px; letter-spacing: 1px; padding: 3px 8px; border-radius: 6px; background: var(--surface-2); }
+.repo-bar { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin:0 0 8px; }
+.repo-chip { display:inline-flex; align-items:center; gap:7px; padding:7px 14px; border:1px solid var(--border); border-radius:999px; background:var(--surface-2, transparent); color:var(--fg, inherit); font:inherit; font-size:13px; cursor:pointer; max-width:100%; }
+.repo-chip span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.repo-chip:hover { border-color:var(--fg-muted, currentColor); }
+.repo-bar:empty { display:none; }
