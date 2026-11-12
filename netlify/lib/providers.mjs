@@ -2,6 +2,8 @@ import { env } from "./util.mjs";
 
 // OAuth providers handled on the server. Google uses Google Identity Services in the
 // browser (client ID only), so it is not listed here.
+/** What FIZZ asks Canva for: the profile, designs (list, create, export) and uploads. Tick the same scopes in the Canva Developer Portal. */
+export const CANVA_SCOPES = "profile:read design:meta:read design:content:read design:content:write asset:read asset:write";
 export const PROVIDERS = {
   github: {
     cookie: "fizz_gh",
@@ -31,16 +33,19 @@ export const PROVIDERS = {
     cookie: "fizz_cv",
     pkce: true,
     configured: () => Boolean(env("CANVA_CLIENT_ID") && env("CANVA_CLIENT_SECRET")),
+    // Canva wants code_challenge_method "s256" (lowercase) and the scopes separated by %20, not "+":
+    // with URLSearchParams' "+" and "S256" it answers invalid_request.
     authorizeUrl: (origin, state, challenge) => {
-      const u = new URL("https://www.canva.com/api/oauth/authorize");
-      u.searchParams.set("client_id", env("CANVA_CLIENT_ID"));
-      u.searchParams.set("redirect_uri", `${origin}/api/oauth/canva/callback`);
-      u.searchParams.set("response_type", "code");
-      u.searchParams.set("scope", env("CANVA_SCOPES") || "asset:read asset:write folder:read folder:write profile:read");
-      u.searchParams.set("state", state);
-      u.searchParams.set("code_challenge", challenge);
-      u.searchParams.set("code_challenge_method", "S256");
-      return u.toString();
+      const q = {
+        client_id: env("CANVA_CLIENT_ID"),
+        redirect_uri: `${origin}/api/oauth/canva/callback`,
+        response_type: "code",
+        scope: env("CANVA_SCOPES") || CANVA_SCOPES,
+        state,
+        code_challenge: challenge,
+        code_challenge_method: "s256",
+      };
+      return `https://www.canva.com/api/oauth/authorize?${Object.entries(q).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&")}`;
     },
     async exchange(origin, code, verifier) {
       const body = new URLSearchParams({

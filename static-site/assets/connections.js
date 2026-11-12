@@ -232,6 +232,7 @@
       refresh: (id) => mcpApi("tools", { id }),
       call: (id, tool, arguments_) => mcpApi("call", { id, tool, arguments: arguments_ }),
     },
+    canva: { call: (req) => api("/api/connector/canva/call", { body: req }) },
     connectToken: async (provider, token) => { const r = await api(`/api/oauth/${provider}/token`, { body: { token } }); await F.serverStatus(true); return r; },
     vercel: {
       connectToken: async (token) => { const r = await api("/api/oauth/vercel/token", { body: { token } }); await F.serverStatus(true); return r; },

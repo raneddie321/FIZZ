@@ -44,3 +44,5 @@ jobs:
         run: node tests/netlify/github-git.test.mjs
       - name: Test big repositories in the sandbox
         run: node tests/netlify/sandbox-repo.test.mjs
+      - name: Test Canva
+        run: node tests/netlify/canva.test.mjs
