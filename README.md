@@ -253,6 +253,17 @@ The plan for what comes next is in [`docs/roadmap/`](docs/roadmap/README.md).
   (`static-site/assets/code-tools.js`). These only read, so they work in Read-only and Plan-first mode, and `.env`
   values are never shown.
 
+- **Big repositories in the cloud sandbox**: importing a GitHub repository too big for the browser (over 200 files)
+  clones it into the project's cloud sandbox instead (`git clone --depth 1`; a private repository's token goes in a file
+  that is deleted right after, never on a command line). The tree, `<fizz-grep>` (git grep) and `<fizz-read>` work
+  there; a file Fizz Code reads is brought into the project so it can be edited, and `<fizz-sandbox>` commands run on the
+  whole repository with those edits copied in. Committing with `<fizz-git>` keeps the repository's other files.
+
+### Cloud terminal and sign-in links
+The terminal's **Cloud Linux** switch runs every command in real bash in your own cloud sandbox. When a command there
+prints a sign-in link (`vercel login`, `gh auth login`, `wrangler login`, any device code), FIZZ shows it as a card with
+the code, a copy button and how long it stays valid, and the command waits (up to 15 minutes).
+
 ### Hooks
 Commands that run by themselves, per project, in `.fizz/hooks.json` ("+" → Hooks has ready-made examples):
 `afterEdit` (with `"match": "*.{js,css}"`, `{file}`/`{files}` in the command), `afterTurn`, `beforeCommand` (`{command}`),

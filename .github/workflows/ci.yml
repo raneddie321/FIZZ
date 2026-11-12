@@ -42,3 +42,5 @@ jobs:
         run: node tests/netlify/agent-core.test.mjs
       - name: Test the GitHub Git workflow actions
         run: node tests/netlify/github-git.test.mjs
+      - name: Test big repositories in the sandbox
+        run: node tests/netlify/sandbox-repo.test.mjs
