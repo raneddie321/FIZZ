@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /chat.html
+Disallow: /dev.html
+
+Sitemap: https://fizz.raneddie.com/sitemap.xml
