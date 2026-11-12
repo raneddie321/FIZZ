@@ -259,8 +259,8 @@ The plan for what comes next is in [`docs/roadmap/`](docs/roadmap/README.md).
   there; a file Fizz Code reads is brought into the project so it can be edited, and `<fizz-sandbox>` commands run on the
   whole repository with those edits copied in. Committing with `<fizz-git>` keeps the repository's other files.
 
-### Cloud terminal and sign-in links
-The terminal's **Cloud Linux** switch runs every command in real bash in your own cloud sandbox. When a command there
+### Sign-in links from the cloud sandbox
+When a command Fizz Code runs in its cloud sandbox
 prints a sign-in link (`vercel login`, `gh auth login`, `wrangler login`, any device code), FIZZ shows it as a card with
 the code, a copy button and how long it stays valid, and the command waits (up to 15 minutes).
 

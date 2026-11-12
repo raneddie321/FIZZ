@@ -1477,15 +1477,6 @@
     termAuth.t = setTimeout(() => $("#term-auth")?.remove(), 15 * 60_000);
   }
   document.addEventListener("click", (e) => { if (e.target.closest("[data-term-auth-x]")) $("#term-auth")?.remove(); });
-  function renderTermSwitch() {
-    const has = Boolean(F.serverStatusCached?.()?.tools?.sandbox);
-    const on = has && Boolean(term?.isCloud());
-    $("#term-cloud").hidden = !has;
-    $("#term-cloud").setAttribute("aria-pressed", String(on));
-    $("#term-where").textContent = !has ? "Commands run in the browser (the cloud sandbox isn't turned on for this site)." : on ? "Every command runs in real Linux (bash) in your own cloud sandbox." : "Commands run in the browser; npm, git and other programs go to the cloud by themselves.";
-  }
-  $("#term-cloud").addEventListener("click", () => { ensureTerm().setCloud(!term.isCloud()); renderTermSwitch(); term.focus?.(); });
-  F.serverStatus?.().then(renderTermSwitch, () => {});
   function ensureTerm() {
       if (!term) term = F.createTerminal($("#term-host"), {
         files: () => project().files,

@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="assets/site.css?v=20261112-att" />
 <link rel="stylesheet" href="vendor/codemirror/codemirror.css" />
 <link rel="stylesheet" href="vendor/xterm/xterm.css" />
-<link rel="stylesheet" href="assets/dev.css?v=20261112-p4" />
+<link rel="stylesheet" href="assets/dev.css?v=20261112-nocl" />
 <script>document.documentElement.dataset.app=/\/dev(\.html)?$/.test(location.pathname)?"dev":"chat";try{var t=localStorage.getItem("fizz.theme");t=t?JSON.parse(t):"system";if(t==="dark"||(t!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}</script>
 <script src="vendor/marked.min.js"></script>
 <script src="vendor/purify.min.js"></script>
@@ -192,7 +192,7 @@
 
     <div class="pane pane-activity" data-pane="activity"><div class="activity-pane" id="activity"></div></div>
 
-    <div class="pane pane-terminal" data-pane="terminal"><div class="term-bar"><button type="button" class="term-switch" id="term-cloud" aria-pressed="false" title="Run every command in real Linux (bash) in your own cloud sandbox"><span class="dot"></span><span>Cloud Linux</span></button><small class="muted-sm" id="term-where">Commands run in the browser; npm, git and other programs go to the cloud by themselves.</small></div><div class="term-host" id="term-host"></div></div>
+    <div class="pane pane-terminal" data-pane="terminal"><div class="term-host" id="term-host"></div></div>
 
     <div class="pane pane-browser" data-pane="browser" data-mode="preview">
       <div class="br-tabs" id="br-tabs" role="tablist" aria-label="Browser tabs"></div>
@@ -225,6 +225,6 @@
   if (S) return S.boot(list);
   // idb.js didn't load: start the apps anyway (data stays in localStorage, as before).
   list.forEach(function (src) { var s = document.createElement("script"); s.src = src; s.async = false; document.body.appendChild(s); });
-})(["assets/chat.js?v=20261112-att", "assets/dev.js?v=20261112-p2b"]);</script>
+})(["assets/chat.js?v=20261112-att", "assets/dev.js?v=20261112-nocl"]);</script>
 </body>
 </html>

@@ -663,14 +663,7 @@ for (const app of ["chat", "dev"]) {
   release = true;
   await lastReply(p, "#dev-app", "You're signed in to Vercel.");
   check("sign-in: the command finished after the sign-in", waits >= 1);
-  // The terminal's Cloud Linux switch.
-  await p.click('#dev-app [data-tab="terminal"]');
-  await p.waitForSelector("#term-cloud:not([hidden])", { timeout: 5000 }).then(() => check("terminal: the Cloud Linux switch shows when there is a sandbox", true)).catch(() => check("terminal: the Cloud Linux switch shows when there is a sandbox", false));
-  await p.click("#term-cloud");
-  check("terminal: the switch turns cloud mode on", (await p.getAttribute("#term-cloud", "aria-pressed")) === "true" && /real Linux/.test(await p.locator("#term-where").innerText()));
-  await p.click("#term-host"); await p.keyboard.type("ls -la"); await p.keyboard.press("Enter");
-  await p.waitForTimeout(800);
-  check("terminal: in cloud mode even ls runs in the sandbox", cmds.some((c) => /ls -la/.test(c)), cmds.join(" | "));
+  check("terminal: no Cloud Linux switch is shown", (await p.locator("#term-cloud").count()) === 0);
   check("sign-in/terminal: no script errors", !errs.length, errs.join(" | "));
   await ctx.close();
 }
