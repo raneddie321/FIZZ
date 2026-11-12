@@ -731,3 +731,27 @@ dialog.settings-dlg#fizz-settings > .dlg-body { height: 100%; max-height: none; 
   #fizz-settings .dlg-tabs button { padding: 8px 12px; }
   dialog.settings-dlg#fizz-settings > .dlg-body { grid-auto-rows: min-content; align-content: start; }
 }
+/* Settings polish: quieter header, icon sidebar, section titles, lighter cards. */
+#fizz-settings { background: var(--popover); border: 1px solid var(--border); box-shadow: 0 30px 80px rgba(0,0,0,.45); }
+#fizz-settings .settings-kicker { display: none; }
+#fizz-settings .settings-heading h2 { font-size: 20px; letter-spacing: -.02em; margin: 0; }
+#fizz-settings .settings-heading p { font-size: 13px; }
+#fizz-settings .dlg-tabs button { display: inline-flex; align-items: center; gap: 10px; font-size: 13.5px; }
+#fizz-settings .dlg-tabs button svg { flex: none; opacity: .8; }
+#fizz-settings .dlg-tabs button.on svg { opacity: 1; }
+#fizz-settings [data-pane]::before { content: attr(data-title); display: block; grid-column: 1 / -1; font-size: 17px; font-weight: 650; letter-spacing: -.01em; margin: 0 0 14px; color: var(--fg); }
+#fizz-settings [data-pane="connections"] .conn, #fizz-settings [data-pane="tools"] .conn { background: transparent; border: 1px solid var(--border); box-shadow: none; }
+#fizz-settings [data-pane="connections"] .conn:hover { background: color-mix(in srgb, var(--fg) 3%, transparent); }
+#fizz-settings .conn-body b { font-size: 14px; font-weight: 600; }
+#fizz-settings .conn-body small { font-size: 12.5px; }
+#fizz-settings .conn .btn-sm, #fizz-settings .conn .btn { height: 32px; padding: 0 14px; font-size: 13px; border-radius: 8px; }
+#fizz-settings .conn-group { font-size: 15px; font-weight: 650; margin: 22px 0 4px; }
+#fizz-settings .settings-close { width: 30px; height: 30px; font-size: 18px; border-color: transparent; background: transparent; }
+#fizz-settings .settings-close:hover { background: var(--surface); }
+@media (min-width: 820px) {
+  #fizz-settings > .dlg-body { padding-top: 0; }
+  #fizz-settings .settings-heading { padding: 20px 0 16px; margin-bottom: 20px; }
+  #fizz-settings .dlg-tabs { top: 84px; padding-right: 20px; border-right: 1px solid var(--border); min-height: 420px; justify-content: flex-start; }
+  #fizz-settings .dlg-tabs button { flex: none; }
+}
+@media (max-width: 819px) { #fizz-settings .dlg-tabs button svg { display: none; } #fizz-settings [data-pane]::before { font-size: 16px; } }

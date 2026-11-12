@@ -21,17 +21,17 @@
     d.innerHTML = `<form method="dialog" class="dlg-body">
       <div class="settings-heading"><div><span class="settings-kicker">FIZZ PREFERENCES</span><h2>Settings</h2><p>Customize your workspace, AI models and connected tools.</p></div><button type="button" class="settings-close" aria-label="Close settings" data-settings-close>×</button></div>
       <div class="dlg-tabs" role="tablist">
-        <button type="button" data-tab="general">General</button><button type="button" data-tab="ai">AI</button>
-        <button type="button" data-tab="connections">Connections</button><button type="button" data-tab="tools">Tools</button><button type="button" data-tab="account">Account</button>
+        <button type="button" data-tab="general"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span>General</span></button><button type="button" data-tab="ai"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg><span>AI</span></button>
+        <button type="button" data-tab="connections"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 7V3M15 7V3M7 7h10v4a5 5 0 0 1-10 0z"/><path d="M12 16v5"/></svg><span>Connections</span></button><button type="button" data-tab="tools"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/></svg><span>Tools</span></button><button type="button" data-tab="account"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span>Account</span></button>
       </div>
-      <div data-pane="general" class="form">
+      <div data-pane="general" class="form" data-title="General">
         <label class="field"><span>Name</span><input class="input" name="name" maxlength="80" /></label>
         <label class="field"><span>Theme</span><select class="select" name="theme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
         <label class="field"><span>Response style</span><select class="select" name="style"><option value="balanced">Balanced</option><option value="concise">Concise</option><option value="detailed">Detailed</option></select></label>
         <label class="field"><span>Custom instructions</span><textarea class="textarea" name="instructions" maxlength="2000" rows="3" placeholder="Anything FIZZ should know about you or how to respond"></textarea></label>
         <label class="field"><span>What Fizz remembers about you</span><textarea class="textarea" name="memory" maxlength="12000" rows="4" placeholder="One fact per line. Fizz adds things here when you tell it to remember them; edit or delete freely."></textarea><small class="muted-sm">Kept in this browser. Never put passwords or card numbers here.</small></label>
       </div>
-      <div data-pane="ai" class="form">
+      <div data-pane="ai" class="form" data-title="AI">
         <div class="provider-list" role="radiogroup" aria-label="AI provider">
           <label class="provider"><input type="radio" name="provider" value="fizz" /><span><b>FIZZ AI</b><small data-ai-status>Checking…</small></span></label>
           <label class="provider"><input type="radio" name="provider" value="openrouter" /><span><b>Your OpenRouter account</b><small>Hundreds of models (GLM, Qwen, DeepSeek, Llama, Claude, GPT…). Usage is billed to your OpenRouter account; free models available.</small></span></label>
@@ -96,9 +96,9 @@
         </div>
         <p class="muted-sm">Tests the selected provider with one short request using the values currently in this form. It doesn't save your settings.</p>
       </div>
-      <div data-pane="connections" class="form"><div class="conn-list" data-conn-list></div>
+      <div data-pane="connections" class="form" data-title="Connections"><div class="conn-list" data-conn-list></div>
         <p class="muted-sm">Connected services use scoped access where supported. App tokens are stored by the FIZZ server in secure, HttpOnly cookies; FIZZ does not display saved secrets. You can disconnect an integration at any time. Google access is temporary and stays in this tab only.</p></div>
-      <div data-pane="tools" class="form">
+      <div data-pane="tools" class="form" data-title="Tools">
         <div class="conn-list" data-tools></div>
         <label class="check"><input type="checkbox" name="cloudSync" /><span>Sync chats and projects to my RanEddie ID<small>Use them on every device. Images and PDFs stay in the browser that made them.</small></span></label>
         <label class="check"><input type="checkbox" name="autoFixBuilds" /><span>Fix failed app builds automatically<small>When an APK, AAB or desktop build fails, Fizz Code reads the log on GitHub, fixes the project and builds again (up to 6 attempts). Keep FIZZ DEV open while it works.</small></span></label>
@@ -112,7 +112,7 @@
         <label class="check"><input type="checkbox" name="autoActions" /><span>Allow automatic GitHub Push and Vercel deploys<small>When enabled, FIZZ DEV can publish the current project after you request it, without an extra confirmation dialog. It still must be connected and must report the real result.</small></span></label>
 
       </div>
-      <div data-pane="account" class="form"><div data-acct></div></div>
+      <div data-pane="account" class="form" data-title="Account"><div data-acct></div></div>
       <p class="err" data-err style="color:var(--danger);margin:0;font-size:14px"></p>
       <div class="dlg-actions"><button class="btn btn-outline" value="cancel" formnovalidate>Cancel</button><button class="btn" value="save" data-save>Save</button></div>
     </form>`;
