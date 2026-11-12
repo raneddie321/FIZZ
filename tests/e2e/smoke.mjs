@@ -701,9 +701,8 @@ for (const app of ["chat", "dev"]) {
   check("repo in sandbox: a big repository is cloned into the sandbox, not copied", looks[0]?.action === "clone" && pr.tree === 3002 && pr.files.length <= 5 && pr.git === "huge", JSON.stringify(pr));
   script.push('<fizz-grep pattern="redirect"/>\n<fizz-read path="src/auth/login.js"/>\nLooking.');
   script.push("<fizz-edit path=\"src/auth/login.js\">\n<<<<<<< SEARCH\n  redirect('/home');\n=======\n  redirect('/dashboard');\n>>>>>>> REPLACE\n</fizz-edit>\nChanged the redirect.");
-  script.push("Done.");
   await p.fill("#dev-app #input", "make login redirect to /dashboard"); await p.keyboard.press("Enter");
-  await lastReply(p, "#dev-app", "Done.");
+  await lastReply(p, "#dev-app", "Changed the redirect.");
   const sys = bodies[0].system;
   check("repo in sandbox: the prompt has the tree and says where the repo lives", sys.includes("lives in your cloud sandbox") && sys.includes("3002 files") && sys.includes("src/"));
   check("repo in sandbox: grep and read run there", looks.some((x) => x.kind === "grep" && x.pattern === "redirect") && looks.some((x) => x.kind === "read" && x.paths.includes("src/auth/login.js")));
