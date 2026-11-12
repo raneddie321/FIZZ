@@ -1,7 +1,7 @@
 import { storageKind } from "../lib/mcp-store.mjs";
 import { sandboxBrowserEnabled } from "../lib/sandbox-browser.mjs";
 import { sandboxEnabled } from "../lib/sandbox.mjs";
-import { env, getCookie, json, secretConfigured, unseal } from "../lib/util.mjs";
+import { env, getBigCookie, getCookie, json, secretConfigured, unseal } from "../lib/util.mjs";
 import { PROVIDERS } from "../lib/providers.mjs";
 import { CONNECTORS, cookieFor } from "../lib/connectors.mjs";
 import { aiBackend } from "../lib/ai-chat-core.mjs";
@@ -14,7 +14,7 @@ export default async (req) => {
   const secret = secretConfigured();
   const connections = {};
   for (const [id, p] of Object.entries(PROVIDERS)) {
-    const session = secret ? unseal(getCookie(req, p.cookie)) : null;
+    const session = secret ? unseal(getBigCookie(req, p.cookie)) : null;
     // GitHub and Vercel can always connect with a personal token; `oauth` says whether the sign-in button is set up.
     connections[id] = { configured: secret, oauth: secret && p.configured(), connected: Boolean(session), account: session?.label ?? null, scopes: session?.scopes ?? [] };
   }

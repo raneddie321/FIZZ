@@ -1,4 +1,4 @@
-import { error, getCookie, json, normalizePath, readJson, sameOrigin, unseal } from "../lib/util.mjs";
+import { error, getBigCookie, getCookie, json, normalizePath, readJson, sameOrigin, unseal } from "../lib/util.mjs";
 
 const API = "https://api.github.com";
 const MAX_IMPORT_FILES = 200;
@@ -25,7 +25,7 @@ const validName = (s) => typeof s === "string" && /^[A-Za-z0-9_.-]{1,100}$/.test
 const validBranch = (s) => typeof s === "string" && /^[A-Za-z0-9._/-]{1,200}$/.test(s) && !s.includes("..");
 
 export default async (req, context) => {
-  const session = unseal(getCookie(req, "fizz_gh"));
+  const session = unseal(getBigCookie(req, "fizz_gh"));
   if (!session) return error(401, "Connect GitHub first.", "not_connected");
   if (!sameOrigin(req)) return error(403, "Not allowed.");
   const t = session.t;

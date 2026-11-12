@@ -1,4 +1,4 @@
-import { env, error, getCookie, json, readJson, sameOrigin, unseal } from "../netlify/lib/util.mjs";
+import { env, error, getBigCookie, getCookie, json, readJson, sameOrigin, unseal } from "../netlify/lib/util.mjs";
 import { requireUser } from "../netlify/lib/auth.mjs";
 import { quotaCounter, today } from "../netlify/lib/kv.mjs";
 import { Sandbox } from "@vercel/sandbox";
@@ -28,7 +28,7 @@ export async function POST(req) {
     // A big repository that lives in the sandbox: clone it once, then look at it (tree, grep, read) without running user code.
     if (body.action === "clone") {
       if (!(await quotaCounter()(`${today()}/sandbox/${who.userId}`, Number(env("FIZZ_SANDBOX_LIMIT") || 60)))) return error(429, "You've reached today's sandbox limit. Try again tomorrow.", "quota");
-      const gh = unseal(getCookie(req, "fizz_gh")); // the user's own GitHub connection, for private repositories
+      const gh = unseal(getBigCookie(req, "fizz_gh")); // the user's own GitHub connection, for private repositories
       return json(await clone({ ...args, url: String(body.url || ""), branch: String(body.branch || ""), token: gh?.t || "" }));
     }
     if (body.action === "look") {

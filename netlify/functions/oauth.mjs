@@ -1,4 +1,4 @@
-import { clearCookie, error, getCookie, json, pkceChallenge, randomId, readJson, safeEqual, sameOrigin, seal, secretConfigured, setCookie, unseal } from "../lib/util.mjs";
+import { clearBigCookie, clearCookie, error, getCookie, setBigCookie, json, pkceChallenge, randomId, readJson, safeEqual, sameOrigin, seal, secretConfigured, setCookie, unseal } from "../lib/util.mjs";
 import { PROVIDERS } from "../lib/providers.mjs";
 
 const STATE_COOKIE = "fizz_oauth";
@@ -71,7 +71,7 @@ export default async (req, context) => {
     }
     try {
       const session = await p.exchange(origin, url.searchParams.get("code"), saved.verifier);
-      setCookie(headers, p.cookie, seal(session), { maxAge: 60 * 60 * 24 * 30 });
+      setBigCookie(headers, p.cookie, seal(session), { maxAge: 60 * 60 * 24 * 30 });
       headers.set("Location", back(origin, { connected: provider }));
     } catch (e) {
       console.error(`[oauth:${provider}]`, e);
@@ -84,7 +84,7 @@ export default async (req, context) => {
   if (action === "disconnect") {
     if (req.method !== "POST" || !sameOrigin(req)) return error(403, "Not allowed.");
     const headers = new Headers();
-    clearCookie(headers, p.cookie);
+    clearBigCookie(headers, p.cookie);
     return json({ ok: true }, { headers });
   }
 

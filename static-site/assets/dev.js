@@ -2178,6 +2178,7 @@
     const rows = [
       row("GitHub", c.github?.connected, c.github?.connected ? c.github.account || "connected" : "not connected"),
       row("Vercel", c.vercel?.connected, c.vercel?.connected ? c.vercel.account || "connected" : "not connected"),
+      ...(c.canva?.oauth ? [row("Canva", c.canva.connected, c.canva.connected ? c.canva.account || "connected" : "not connected")] : []),
       row("Google Workspace", F.conn.google?.connected?.(), F.conn.google?.connected?.() ? F.conn.google.account() : st.google?.clientId ? "signs in when needed" : "not set up"),
       ...(st.apps || []).filter((a) => a.connected).map((a) => row(a.name, true, a.account || "connected")),
       ...(F.mcp?.servers?.() || []).map((sv) => row(sv.name, true, `${sv.toolCount ?? (sv.tools || []).length} tools · custom`)),
@@ -2189,7 +2190,7 @@
     const modeName = MODES.find((m) => m[0] === forced)?.[1] || "Automatic";
     const skills = F.skills.all(data).filter((k) => k.enabled);
     const pinned = project().skills || [];
-    const connected = (() => { const st = F.serverStatusCached?.() || {}; const c = st.connections || {}; return [c.github?.connected, c.vercel?.connected, F.conn.google?.connected?.(), ...(st.apps || []).map((a) => a.connected)].filter(Boolean).length + (F.mcp?.servers?.() || []).length; })();
+    const connected = (() => { const st = F.serverStatusCached?.() || {}; const c = st.connections || {}; return [c.github?.connected, c.vercel?.connected, c.canva?.connected, F.conn.google?.connected?.(), ...(st.apps || []).map((a) => a.connected)].filter(Boolean).length + (F.mcp?.servers?.() || []).length; })();
     const back = (title) => `<div class="ps-head"><button type="button" class="icon-btn" data-ps="back" aria-label="Back">${F.icon("back")}</button><strong>${title}</strong><button type="button" class="icon-btn" data-ps="close" aria-label="Close">${F.icon("x")}</button></div>`;
     if (plusView === "mode") return back("Mode") + `<div class="ps-list">${MODES.map(([k, name, desc]) => `<button type="button" class="ps-row" data-ps-mode="${k}"><span class="ps-txt"><b>${name}</b><small>${desc}</small></span>${tick(k === forced)}</button>`).join("")}</div>`;
     if (plusView === "connectors") return back("Connectors") + `<div class="ps-list">${connectorRows()}<button type="button" class="ps-row" data-ps="add-connector"><span class="ps-ic">${F.icon("plus")}</span><span class="ps-txt"><b>Add custom connector</b><small>Any MCP server by its URL</small></span></button><button type="button" class="ps-row" data-ps="manage-connections"><span class="ps-ic">${F.icon("plug")}</span><span class="ps-txt"><b>Manage connections</b><small>GitHub, Vercel, Google, apps and custom connectors</small></span>${chev}</button></div>`;

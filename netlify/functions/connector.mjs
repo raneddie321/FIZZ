@@ -1,11 +1,11 @@
 import { clearCookie, error, getCookie, json, readJson, sameOrigin, seal, secretConfigured, setCookie, unseal } from "../lib/util.mjs";
 import { CONNECTORS, buildRequest, cookieFor } from "../lib/connectors.mjs";
-import { env } from "../lib/util.mjs";
+import { env, getBigCookie, setBigCookie } from "../lib/util.mjs";
 
 // ---------- Canva (signed in with OAuth: the token is in the fizz_cv cookie and is refreshed here) ----------
 const CANVA_API = "https://api.canva.com/rest/v1";
 async function canvaToken(req, headers) {
-  const saved = unseal(getCookie(req, "fizz_cv"));
+  const saved = unseal(getBigCookie(req, "fizz_cv"));
   if (!saved?.t) throw Object.assign(new Error("Canva isn't connected. Connect it in Settings → Connections."), { status: 401, code: "not_connected" });
   if (saved.at && saved.at > Date.now() + 60_000) return saved.t;
   if (!saved.r) throw Object.assign(new Error("The Canva sign-in expired. Connect Canva again."), { status: 401, code: "not_connected" });
@@ -17,7 +17,7 @@ async function canvaToken(req, headers) {
   const d = await res.json().catch(() => ({}));
   if (!res.ok || !d.access_token) throw Object.assign(new Error("The Canva sign-in expired. Connect Canva again."), { status: 401, code: "not_connected" });
   // Canva's refresh tokens are single-use: keep the new one.
-  setCookie(headers, "fizz_cv", seal({ ...saved, t: d.access_token, r: d.refresh_token || saved.r, at: Date.now() + (Number(d.expires_in) || 3600) * 1000 }), { maxAge: 60 * 60 * 24 * 30 });
+  setBigCookie(headers, "fizz_cv", seal({ ...saved, t: d.access_token, r: d.refresh_token || saved.r, at: Date.now() + (Number(d.expires_in) || 3600) * 1000 }), { maxAge: 60 * 60 * 24 * 30 });
   return d.access_token;
 }
 const CANVA_PATH = /^\/(users\/me(\/profile)?|designs(\/[\w-]{1,80}(\/(pages|export-formats))?)?|exports(\/[\w-]{1,80})?|asset-uploads(\/[\w-]{1,80})?|assets\/[\w-]{1,80}|folders\/[\w-]{1,80}(\/items)?)$/;

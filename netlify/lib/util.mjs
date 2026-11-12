@@ -102,3 +102,23 @@ export function normalizePath(p) {
   if (!s || s.length > 400 || s.split("/").some((x) => !x || x === "." || x === "..")) return null;
   return s;
 }
+
+// A sealed value too big for one cookie (browsers drop a cookie over ~4 KB without a word — Canva's tokens are long):
+// split over name, name_1 … name_3, and read back the same way. Short values stay in one cookie as before.
+const BIG_CHUNK = 3600, BIG_PARTS = 4;
+export function setBigCookie(headers, name, value, opts = {}) {
+  const v = String(value);
+  if (v.length > BIG_CHUNK * BIG_PARTS) throw Object.assign(new Error("This sign-in is too large to keep."), { status: 507 });
+  for (let i = 0; i < BIG_PARTS; i++) {
+    const part = v.slice(i * BIG_CHUNK, (i + 1) * BIG_CHUNK);
+    const n = i ? `${name}_${i}` : name;
+    if (part) setCookie(headers, n, part, opts);
+    else if (i) clearCookie(headers, n, opts.path);
+  }
+}
+export function getBigCookie(req, name) {
+  let v = getCookie(req, name) || "";
+  for (let i = 1; i < BIG_PARTS && v; i++) { const part = getCookie(req, `${name}_${i}`); if (!part) break; v += part; }
+  return v || null;
+}
+export function clearBigCookie(headers, name, path) { for (let i = 0; i < BIG_PARTS; i++) clearCookie(headers, i ? `${name}_${i}` : name, path); }

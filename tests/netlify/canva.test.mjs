@@ -43,4 +43,14 @@ j = await (await call({ download: "https://export-download.canva.com/x.png" }, e
 assert.equal(j.data.base64, "AQID");
 assert.equal((await call({ download: "https://evil.example/x.png" }, expired)).status, 400, "only Canva's export links");
 assert.equal((await connector(new Request(`${O}/api/connector/canva/call`, { method: "POST", headers: { origin: "https://evil.example" }, body: "{}" }), { params: { service: "canva", action: "call" } })).status, 403);
+// A long Canva sign-in (Canva's tokens are long) is split over several cookies and read back as connected.
+const { setBigCookie, getBigCookie } = await import("../../netlify/lib/util.mjs");
+const status = (await import("../../netlify/functions/status.mjs")).default;
+const h = new Headers();
+setBigCookie(h, "fizz_cv", seal({ t: "a".repeat(3000), r: "b".repeat(2000), label: "Canva account", at: Date.now() + 3600_000 }), { maxAge: 100 });
+const parts = h.getSetCookie().map((c) => c.split(";")[0]).filter((c) => !c.endsWith("="));
+assert.ok(parts.length >= 2 && parts.every((c) => c.length < 4000), "split into cookies under the browser's limit");
+const back = new Request(`${O}/api/status`, { headers: { cookie: parts.join("; ") } });
+assert.equal(unseal(getBigCookie(back, "fizz_cv")).t.length, 3000);
+assert.equal((await (await status(back)).json()).connections.canva.connected, true, "status sees Canva connected");
 console.log("Canva tests passed");
