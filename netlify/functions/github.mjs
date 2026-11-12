@@ -20,6 +20,7 @@ async function inBatches(items, size, fn) {
   return out;
 }
 
+const prJson = (p) => ({ number: p.number, title: p.title, state: p.merged_at ? "merged" : p.state, draft: Boolean(p.draft), head: p.head?.ref, base: p.base?.ref, sha: p.head?.sha, url: p.html_url, user: p.user?.login, updatedAt: p.updated_at });
 const validName = (s) => typeof s === "string" && /^[A-Za-z0-9_.-]{1,100}$/.test(s);
 const validBranch = (s) => typeof s === "string" && /^[A-Za-z0-9._/-]{1,200}$/.test(s) && !s.includes("..");
 
@@ -73,7 +74,15 @@ export default async (req, context) => {
           baseTree = (await gh(t, `${base}/git/commits/${parent}`)).tree.sha;
         } catch (e) {
           if (e.status !== 404 && e.status !== 409) throw e;
+          // A new branch starts from another one (e.g. main), so it keeps that history and those files.
+          if (body.from && validBranch(body.from)) {
+            const from = await gh(t, `${base}/git/ref/heads/${encodeURIComponent(body.from)}`);
+            parent = from.object.sha;
+            baseTree = (await gh(t, `${base}/git/commits/${parent}`)).tree.sha;
+            body.newBranch = true;
+          }
         }
+        const deletions = (Array.isArray(body.deleted) ? body.deleted : []).map(normalizePath).filter(Boolean).slice(0, 500).map((p) => ({ path: p, mode: "100644", type: "blob", sha: null }));
         const tree = await inBatches(entries, 10, async ([path, content]) => {
           const p = normalizePath(path);
           if (!p) throw Object.assign(new Error(`Invalid file path: ${path}`), { status: 400 });
@@ -83,9 +92,9 @@ export default async (req, context) => {
           return { path: p, mode: "100644", type: "blob", sha: blob.sha };
         });
         // base_tree keeps repository files that aren't part of this project.
-        const newTree = await gh(t, `${base}/git/trees`, { method: "POST", body: JSON.stringify({ tree, ...(baseTree ? { base_tree: baseTree } : {}) }) });
+        const newTree = await gh(t, `${base}/git/trees`, { method: "POST", body: JSON.stringify({ tree: baseTree ? [...tree, ...deletions] : tree, ...(baseTree ? { base_tree: baseTree } : {}) }) });
         const c = await gh(t, `${base}/git/commits`, { method: "POST", body: JSON.stringify({ message: String(body.message || "Update from FIZZ DEV").slice(0, 500), tree: newTree.sha, parents: parent ? [parent] : [] }) });
-        if (parent) await gh(t, `${base}/git/refs/heads/${encodeURIComponent(body.branch)}`, { method: "PATCH", body: JSON.stringify({ sha: c.sha }) });
+        if (parent && !body.newBranch) await gh(t, `${base}/git/refs/heads/${encodeURIComponent(body.branch)}`, { method: "PATCH", body: JSON.stringify({ sha: c.sha }) });
         else await gh(t, `${base}/git/refs`, { method: "POST", body: JSON.stringify({ ref: `refs/heads/${body.branch}`, sha: c.sha }) });
         return json({ sha: c.sha, url: `https://github.com/${body.owner}/${body.repo}/commit/${c.sha}`, files: tree.length });
       }
@@ -142,6 +151,73 @@ export default async (req, context) => {
           throw e;
         }
         return json({ ok: true });
+      }
+      // ---------- pull requests and CI (FIZZ DEV's Git workflow) ----------
+      case "prs": {
+        const q = new URL(req.url).searchParams;
+        if (!validName(q.get("owner")) || !validName(q.get("repo"))) return error(400, "Invalid repository.");
+        const state = ["open", "closed", "all"].includes(q.get("state")) ? q.get("state") : "open";
+        const head = q.get("head");
+        const list = await gh(t, `/repos/${q.get("owner")}/${q.get("repo")}/pulls?state=${state}&per_page=30${head && validBranch(head) ? `&head=${encodeURIComponent(`${q.get("owner")}:${head}`)}` : ""}`);
+        return json({ prs: list.map(prJson) });
+      }
+      case "pr-create": {
+        const body = await readJson(req);
+        if (!validName(body.owner) || !validName(body.repo) || !validBranch(body.head) || !validBranch(body.base)) return error(400, "Invalid repository or branches.");
+        if (body.head === body.base) return error(400, "A pull request needs a branch other than the one it goes into.");
+        const pr = await gh(t, `/repos/${body.owner}/${body.repo}/pulls`, { method: "POST", body: JSON.stringify({ title: String(body.title || "Changes from FIZZ DEV").slice(0, 250), body: String(body.body || "").slice(0, 60000), head: body.head, base: body.base, draft: Boolean(body.draft) }) });
+        return json({ pr: prJson(pr) });
+      }
+      case "pr": {
+        // Everything Fizz Code needs to drive a PR: its state, checks (with the end of each failing job's log) and review comments.
+        const q = new URL(req.url).searchParams;
+        if (!validName(q.get("owner")) || !validName(q.get("repo")) || !/^\d{1,9}$/.test(q.get("number") || "")) return error(400, "Invalid pull request.");
+        const base = `/repos/${q.get("owner")}/${q.get("repo")}`;
+        const pr = await gh(t, `${base}/pulls/${q.get("number")}`);
+        const [runs, reviews, review, issue] = await Promise.all([
+          gh(t, `${base}/commits/${pr.head.sha}/check-runs?per_page=50`).catch(() => ({ check_runs: [] })),
+          gh(t, `${base}/pulls/${pr.number}/reviews?per_page=50`).catch(() => []),
+          gh(t, `${base}/pulls/${pr.number}/comments?per_page=100`).catch(() => []),
+          gh(t, `${base}/issues/${pr.number}/comments?per_page=50`).catch(() => []),
+        ]);
+        const checks = (runs.check_runs || []).map((c) => ({ id: c.id, name: c.name, status: c.status, conclusion: c.conclusion, url: c.html_url, jobId: /\/job\/(\d+)/.exec(c.html_url || "")?.[1] || null, summary: String(c.output?.summary || c.output?.title || "").slice(0, 600) }));
+        const failing = checks.filter((c) => ["failure", "timed_out", "cancelled", "action_required"].includes(c.conclusion)).slice(0, 4);
+        await Promise.all(failing.map(async (c) => {
+          if (!c.jobId) return;
+          const res = await fetch(`${API}${base}/actions/jobs/${c.jobId}/logs`, { headers: { Authorization: `Bearer ${t}`, Accept: "application/vnd.github+json", "User-Agent": "FIZZ-DEV" } }).catch(() => null);
+          if (res?.ok) c.log = (await res.text()).replace(/^\d{4}-\d\d-\d\dT[\d:.]+Z /gm, "").slice(-5000);
+        }));
+        return json({
+          pr: prJson(pr), mergeable: pr.mergeable, mergeableState: pr.mergeable_state,
+          checks,
+          reviews: reviews.filter((r) => r.state !== "PENDING").map((r) => ({ id: r.id, user: r.user?.login, state: r.state, body: String(r.body || "").slice(0, 3000) })),
+          comments: review.map((c) => ({ id: c.id, user: c.user?.login, path: c.path, line: c.line || c.original_line, body: String(c.body || "").slice(0, 3000), replyTo: c.in_reply_to_id || null })),
+          discussion: issue.map((c) => ({ id: c.id, user: c.user?.login, body: String(c.body || "").slice(0, 3000) })),
+        });
+      }
+      case "pr-reply": {
+        const body = await readJson(req);
+        if (!validName(body.owner) || !validName(body.repo) || !/^\d{1,9}$/.test(String(body.number))) return error(400, "Invalid pull request.");
+        const text = String(body.body || "").trim().slice(0, 20000);
+        if (!text) return error(400, "The reply is empty.");
+        const base = `/repos/${body.owner}/${body.repo}`;
+        const c = body.commentId && /^\d{1,20}$/.test(String(body.commentId))
+          ? await gh(t, `${base}/pulls/${body.number}/comments/${body.commentId}/replies`, { method: "POST", body: JSON.stringify({ body: text }) })
+          : await gh(t, `${base}/issues/${body.number}/comments`, { method: "POST", body: JSON.stringify({ body: text }) });
+        return json({ id: c.id, url: c.html_url });
+      }
+      case "rerun": {
+        const body = await readJson(req);
+        if (!validName(body.owner) || !validName(body.repo) || !/^\d{1,20}$/.test(String(body.runId))) return error(400, "Invalid run.");
+        await gh(t, `/repos/${body.owner}/${body.repo}/actions/runs/${body.runId}/rerun-failed-jobs`, { method: "POST" });
+        return json({ ok: true });
+      }
+      case "merge": {
+        const body = await readJson(req);
+        if (!validName(body.owner) || !validName(body.repo) || !/^\d{1,9}$/.test(String(body.number))) return error(400, "Invalid pull request.");
+        const method = ["merge", "squash", "rebase"].includes(body.method) ? body.method : "squash";
+        const r = await gh(t, `/repos/${body.owner}/${body.repo}/pulls/${body.number}/merge`, { method: "PUT", body: JSON.stringify({ merge_method: method }) });
+        return json({ merged: Boolean(r.merged), sha: r.sha, message: r.message });
       }
       default:
         return error(404, "Unknown action.");

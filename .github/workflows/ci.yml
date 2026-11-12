@@ -40,3 +40,5 @@ jobs:
         run: node tests/netlify/mcp-store.test.mjs
       - name: Test the shared agent core (tool tags, modes, permissions, loop)
         run: node tests/netlify/agent-core.test.mjs
+      - name: Test the GitHub Git workflow actions
+        run: node tests/netlify/github-git.test.mjs

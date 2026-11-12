@@ -596,6 +596,49 @@ for (const app of ["chat", "dev"]) {
   await ctx.close();
 }
 
+// ---------- Git workflow: branch, commit, pull request, failing CI fixed (phase 4) ----------
+{
+  const { ctx, p, errs, bodies, script } = await open({ width: 1280, height: 800 });
+  await ctx.route("**/api/status", (r) => r.fulfill({ json: { server: true, apps: [], ai: { configured: true, model: "test-model", dailyLimit: 50 }, connections: { github: { configured: true, connected: true, account: "@octo" } }, google: {}, tools: { search: "wikipedia" } } }));
+  const gh = [];
+  let checksGreen = false;
+  await ctx.route("**/api/github/**", async (r) => {
+    const u = new URL(r.request().url()); const action = u.pathname.split("/").pop(); const body = r.request().postDataJSON?.() || null;
+    gh.push({ action, body, query: Object.fromEntries(u.searchParams) });
+    if (action === "push") return r.fulfill({ json: { sha: `c${gh.length}0000000`, url: `https://github.com/me/app/commit/c${gh.length}`, files: Object.keys(body.files).length } });
+    if (action === "prs") return r.fulfill({ json: { prs: [] } });
+    if (action === "pr-create") return r.fulfill({ json: { pr: { number: 7, title: body.title, url: "https://github.com/me/app/pull/7", head: body.head, base: body.base } } });
+    if (action === "pr") return r.fulfill({ json: { pr: { number: 7, title: "Fix", state: "open", head: "fizz/fix", base: "main", url: "u" }, mergeable: true, mergeableState: "clean", reviews: [], comments: [], discussion: [], checks: checksGreen ? [{ name: "test", status: "completed", conclusion: "success" }] : [{ name: "test", status: "completed", conclusion: "failure", log: "FAIL sum.test.js: expected 4, got 5" }] } });
+    r.fulfill({ status: 404, json: { error: { message: "unexpected" } } });
+  });
+  await p.goto(B + "dev.html"); await p.waitForTimeout(900);
+  await p.evaluate(() => { const u = FIZZ.auth.current(), d = FIZZ.loadData(u); d.settings.autoVerify = false; d.projects[0].git = { owner: "me", repo: "app", branch: "main", lastSha: "abc1234", pushed: ["old.js"] }; d.projects[0].files["sum.js"] = "export const sum = (a, b) => a + b + 1;"; FIZZ.saveData(u, d); });
+  const F = (path, body) => `<fizz-file path="${path}">\n${body}\n</fizz-file>\n`;
+  script.push('<fizz-git action="branch" name="fizz/fix" from="main"/>\n<fizz-git action="commit" message="Add the sum helper"/>\n<fizz-git action="pr" title="Fix" base="main">Adds sum.</fizz-git>\n<fizz-git action="pr-status" number="7"/>\nOpened the PR.');
+  script.push(F("sum.js", "export const sum = (a, b) => a + b;") + '<fizz-git action="commit" message="Fix sum: no extra 1"/>\nFixed the failing test.');
+  script.push('<fizz-git action="pr-status" number="7"/>\nChecking again.');
+  script.push("CI is green on PR #7.");
+  await p.fill("#dev-app #input", "open a PR with the sum helper and make CI pass"); await p.keyboard.press("Enter");
+  await lastReply(p, "#dev-app", "Fixed the failing test.");
+  checksGreen = true;
+  await lastReply(p, "#dev-app", "CI is green on PR #7.");
+  const pushes = gh.filter((x) => x.action === "push");
+  check("git: the first commit goes to the new branch, from main", pushes[0]?.body.branch === "fizz/fix" && pushes[0]?.body.from === "main", JSON.stringify(pushes[0]?.body || {}).slice(0, 200));
+  check("git: files removed since the last push are deleted in the commit", pushes[0]?.body.deleted?.includes("old.js"));
+  check("git: the pull request goes from the branch into main", gh.some((x) => x.action === "pr-create" && x.body.head === "fizz/fix" && x.body.base === "main"));
+  const sent = bodies.map((b) => JSON.stringify(b.messages.at(-1))).join(" ");
+  check("git: the failing check's log reaches Fizz Code", sent.includes("FAIL sum.test.js: expected 4, got 5"));
+  check("git: the fix is committed to the same branch", pushes[1]?.body.branch === "fizz/fix" && pushes[1]?.body.files["sum.js"].includes("a + b;"));
+  check("git: the second check sees green", sent.includes("1 passed, 0 failed"));
+  // Merging always asks, even in Auto mode.
+  script.push('<fizz-git action="merge" number="7"/>\nMerging.');
+  await p.fill("#dev-app #input", "merge it"); await p.keyboard.press("Enter");
+  await p.waitForSelector("#dev-app [data-approve]", { timeout: 10000 }).then(() => check("git: merging always asks", true)).catch(() => check("git: merging always asks", false));
+  check("git: nothing merged before the OK", !gh.some((x) => x.action === "merge"));
+  check("git: no script errors", !errs.length, errs.join(" | "));
+  await ctx.close();
+}
+
 // ---------- app switch keeps one page ----------
 {
   const { ctx, p, errs } = await open({ width: 1280, height: 800 });

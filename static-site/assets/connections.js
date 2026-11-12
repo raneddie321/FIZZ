@@ -196,6 +196,13 @@
       artifacts: (owner, repo, runId) => api(`/api/github/artifacts?${new URLSearchParams({ owner, repo, runId })}`),
       artifactUrl: (owner, repo, id) => api(`/api/github/artifact?${new URLSearchParams({ owner, repo, id })}`),
       dispatch: (owner, repo, branch, workflow, inputs) => api("/api/github/dispatch", { body: { owner, repo, branch, workflow, inputs } }),
+      pushTo: (opts) => api("/api/github/push", { body: opts }),
+      prs: (owner, repo, opts = {}) => api(`/api/github/prs?${new URLSearchParams({ owner, repo, ...opts })}`),
+      prCreate: (opts) => api("/api/github/pr-create", { body: opts }),
+      pr: (owner, repo, number) => api(`/api/github/pr?${new URLSearchParams({ owner, repo, number })}`),
+      prReply: (opts) => api("/api/github/pr-reply", { body: opts }),
+      rerun: (owner, repo, runId) => api("/api/github/rerun", { body: { owner, repo, runId } }),
+      merge: (owner, repo, number, method) => api("/api/github/merge", { body: { owner, repo, number, method } }),
     },
     web: {
       search: (q, count = 8) => api(`/api/web/search?${new URLSearchParams({ q, count })}`, { auth: true }),

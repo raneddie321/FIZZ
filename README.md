@@ -261,6 +261,15 @@ A failing `before…` hook stops the action; a failing `afterEdit`/`afterTurn` h
 most per task). Hooks run only after you trust exactly that file — editing it yourself trusts it; a file that came from an
 import or from the agent waits for "+" → Hooks → Trust — and every hook command still goes through the permission rules.
 
+### Git and GitHub
+With GitHub connected and the project linked to a repository, Fizz Code works like a developer with `<fizz-git>`:
+a branch per task (made from `main` on the first commit), commits of the project's files (deletions included), a pull
+request with a description, then `pr-status` — the checks with the end of each failing job's log, reviews and review
+comments — so it can fix a failing check and commit again (at most three rounds, never by disabling a test), answer
+review comments and re-run failed jobs. Commits and pull requests go through the permission rules as `git-push`;
+replies, re-runs and merges always ask. Server side: `prs`, `pr-create`, `pr`, `pr-reply`, `rerun`, `merge` in
+`netlify/functions/github.mjs`; `push` accepts `from` (base for a new branch) and `deleted`.
+
 ### Long conversations
 FIZZ DEV works out the model's context size (Settings → Tools → Context size overrides it), summarises a chat when it
 reaches 70% — goal, decisions, files, open problems, next steps — and keeps the last six messages as they are. If a

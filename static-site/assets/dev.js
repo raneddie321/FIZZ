@@ -1098,6 +1098,7 @@
       canSeeImages: () => visionModel(),
       needConnection,
       filesForUpload,
+      hooks: (event, extra) => runHooks(event, reply, extra),
       isBinary,
     };
   }
