@@ -446,7 +446,7 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
     await r.fulfill({ status: 200, headers: { "content-type": "text/event-stream" }, body: sse(summary ? "GOAL — a long test chat.\nDECISIONS — none.\nFILES — none.\nOPEN — none.\nNEXT — keep answering." : `Answer #${++n}#. ` + "lorem ipsum ".repeat(300)) });
   });
   await p.goto(B + "dev.html"); await p.waitForTimeout(900);
-  await p.evaluate(() => { FIZZ.loadData(FIZZ.auth.current()).settings.autoVerify = false; });
+  await p.evaluate(() => { const st = FIZZ.loadData(FIZZ.auth.current()).settings; st.autoVerify = false; st.cloudRun = false; });
   const text = (m) => (typeof m.content === "string" ? m.content : (m.content || []).map((x) => x.text || "").join(""));
   const tokens = (b) => Math.ceil((String(b.system || "").length + (b.messages || []).reduce((k, m) => k + (typeof m.content === "string" ? m.content.length : JSON.stringify(m.content).length), 0)) / 3.6);
   const ask = async (k) => { const want = `Answer #${n + 1}#`; await p.fill("#dev-app #input", `what about detail number ${k}?`); await p.keyboard.press("Enter"); await lastReply(p, "#dev-app", want); };
@@ -653,7 +653,7 @@ for (const app of ["chat", "dev"]) {
     r.fulfill({ json: release ? { running: false, exitCode: 0, text: "> Success! Logged in.\n", files: {} } : { running: true, cmdId: "c1", text: "Vercel CLI 50.0.0\n> Visit https://vercel.com/oauth/device?user_code=ABCD-EFGH to log in\nWaiting for authentication...\n" } });
   });
   await p.goto(B + "dev.html"); await p.waitForTimeout(900);
-  await p.evaluate(() => { FIZZ.loadData(FIZZ.auth.current()).settings.autoVerify = false; });
+  await p.evaluate(() => { const st = FIZZ.loadData(FIZZ.auth.current()).settings; st.autoVerify = false; st.cloudRun = false; });
   script.push("<fizz-sandbox>npx --yes vercel login</fizz-sandbox>\nSigning in to Vercel.");
   script.push("You're signed in to Vercel.");
   await p.fill("#dev-app #input", "log in to vercel in the sandbox"); await p.keyboard.press("Enter");
@@ -665,6 +665,62 @@ for (const app of ["chat", "dev"]) {
   check("sign-in: the command finished after the sign-in", waits >= 1);
   check("terminal: no Cloud Linux switch is shown", (await p.locator("#term-cloud").count()) === 0);
   check("sign-in/terminal: no script errors", !errs.length, errs.join(" | "));
+  await ctx.close();
+}
+
+// ---------- Keep working when I leave: the task runs in the cloud sandbox and the page follows it ----------
+{
+  const { ctx, p, errs, script } = await open({ width: 1280, height: 800 });
+  await ctx.route("**/api/status", (r) => r.fulfill({ json: { server: true, apps: [], ai: { configured: true, model: "test-model", dailyLimit: 50 }, connections: {}, google: {}, tools: { search: "wikipedia", sandbox: true } } }));
+  const calls = [];
+  let polls = 0;
+  const final = { id: "r1", role: "assistant", mode: "build", step: 1, pending: false, content: '<fizz-file path="cloud.html">\n<h1>From the cloud</h1>\n</fizz-file>\n<fizz-run>echo handed-back</fizz-run>\nMade it in the cloud.', tools: [{ type: "run", attrs: {}, body: "echo handed-back", status: "queued" }] };
+  await ctx.route("**/api/sandbox", (r) => {
+    const b = r.request().postDataJSON(); calls.push(b);
+    if (b.action === "agent-start") return r.fulfill({ json: { runId: "run1abcdef" } });
+    if (b.action === "agent-poll") {
+      polls++;
+      if (polls < 3) return r.fulfill({ json: { status: "running", total: 1, from: 0, steps: [{ reply: { ...final, pending: true, content: "Making it…", tools: undefined } }] } });
+      return r.fulfill({ json: { status: "handoff", total: 1, from: 0, steps: [{ reply: final }] } });
+    }
+    r.fulfill({ json: { running: false, exitCode: 0, text: "", files: {} } });
+  });
+  await p.goto(B + "dev.html"); await p.waitForTimeout(900);
+  await p.evaluate(() => { FIZZ.loadData(FIZZ.auth.current()).settings.autoVerify = false; });
+  script.push("Finished here after the cloud handed back.");
+  await p.fill("#dev-app #input", "build a cloud page"); await p.keyboard.press("Enter");
+  await p.waitForSelector("#dev-app .cloud-note", { timeout: 10000 });
+  const label = await p.locator("#dev-app .cloud-note").first().innerText().catch(() => "");
+  check("cloud run: the task starts in the cloud and says the page can be left", /Working in the cloud/.test(label), label);
+  const start = calls.find((c) => c.action === "agent-start");
+  check("cloud run: the start sends the prompt, the messages and the project", Boolean(start?.run?.system && start.run.messages.length && start.run.perm?.mode === "auto"), JSON.stringify(start?.run?.perm));
+  await lastReply(p, "#dev-app", "Finished here after the cloud handed back.");
+  const st = await p.evaluate(() => { const d = FIZZ.loadData(FIZZ.auth.current()); const pr = d.projects[0]; const c = pr.chats.find((x) => x.messages.length); const r1 = c.messages.find((m) => m.id === "r1"); return { file: pr.files["cloud.html"], cloud: Boolean(c.cloud), tool: r1?.tools?.[0]?.status, out: r1?.tools?.[0]?.result?.text || "" }; });
+  check("cloud run: the cloud's files land in the project", st.file === "<h1>From the cloud</h1>", st.file);
+  check("cloud run: a step the cloud handed back runs here and the task finishes here", st.tool === "done" && /handed-back/.test(st.out) && !st.cloud, JSON.stringify(st));
+  check("cloud run: no script errors", !errs.length, errs.join(" | "));
+  await ctx.close();
+}
+
+// ---------- FIZZ chat: an answer written in the cloud ----------
+{
+  const { ctx, p, errs } = await open({ width: 1280, height: 800 });
+  await ctx.route("**/api/status", (r) => r.fulfill({ json: { server: true, apps: [], ai: { configured: true, model: "test-model", dailyLimit: 50 }, connections: {}, google: {}, tools: { search: "wikipedia", sandbox: true } } }));
+  let polls = 0, start = null;
+  await ctx.route("**/api/sandbox", (r) => {
+    const b = r.request().postDataJSON();
+    if (b.action === "agent-start") { start = b; return r.fulfill({ json: { runId: "chatrun123" } }); }
+    polls++;
+    const id = start.run.replyId;
+    if (polls < 3) return r.fulfill({ json: { status: "running", total: 1, from: 0, steps: [{ reply: { id, content: "Looking it", pending: true, working: ["Searching the web for “x”"] } }] } });
+    r.fulfill({ json: { status: "done", total: 1, from: 0, steps: [{ reply: { id, content: "The answer from the cloud.", pending: false } }] } });
+  });
+  await p.goto(B + "chat.html"); await p.waitForTimeout(800);
+  await p.locator("#chat-app #input, [data-app=chat] #input").first().fill("what is x?"); await p.keyboard.press("Enter");
+  await lastReply(p, "#chat-app", "The answer from the cloud.");
+  const saved = await p.evaluate(() => { const d = FIZZ.loadData(FIZZ.auth.current()); const c = d.conversations.at(-1); const m = c.messages.at(-1); return { cloud: Boolean(c.cloud), pending: m.pending, content: m.content }; });
+  check("chat cloud: the answer is written in the cloud and followed here", start?.run?.kind === "chat" && start.projectId === "fizz-chat" && saved.content === "The answer from the cloud." && !saved.pending && !saved.cloud, JSON.stringify(saved));
+  check("chat cloud: no script errors", !errs.length, errs.join(" | "));
   await ctx.close();
 }
 
@@ -683,7 +739,7 @@ for (const app of ["chat", "dev"]) {
     r.fulfill({ json: { running: false, exitCode: 0, text: "", files: {} } });
   });
   await p.goto(B + "dev.html"); await p.waitForTimeout(900);
-  await p.evaluate(() => { FIZZ.loadData(FIZZ.auth.current()).settings.autoVerify = false; });
+  await p.evaluate(() => { const st = FIZZ.loadData(FIZZ.auth.current()).settings; st.autoVerify = false; st.cloudRun = false; });
   await p.evaluate(() => document.querySelector("#dev-app #gh-btn").click());
   await p.waitForSelector('.menu [data-k="import"]', { state: "attached" });
   await p.evaluate(() => document.querySelector('.menu [data-k="import"]').click());

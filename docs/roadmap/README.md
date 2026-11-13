@@ -11,7 +11,7 @@ Eight phases, each shippable on its own (branch → Preview → tests → main, 
 | 4 | Full Git & GitHub: branches, commits, PRs, review replies, CI fix loop (inside `api/github/[action].mjs`) | built (`static-site/assets/git-tools.js`) |
 | 5 | FIZZ Bridge: the user's own computer (files, commands, screen, mouse, keyboard), paired by code | not started |
 | 6 | Every device: browser extension, Android companion, what iOS allows | not started |
-| 7 | Automation: headless agent API with personal tokens, scheduled tasks, `@fizz` GitHub Action, webhooks | not started |
+| 7 | Automation: headless agent API with personal tokens, scheduled tasks, `@fizz` GitHub Action, webhooks | started: tasks run in the cloud (below); the rest not started |
 
 ## Rules that hold for every phase
 
@@ -34,3 +34,21 @@ Eight phases, each shippable on its own (branch → Preview → tests → main, 
 | Upstash connected to the project (`KV_REST_API_URL`/`TOKEN`) | Bridge and device queues, reliable limits |
 | `FIZZ_SECRET` also for Preview | testing MCP and connections on Preview |
 | GitHub OAuth scopes `repo`, `workflow` | phase 4 |
+
+## Keep working when I leave (cloud runs)
+
+A new FIZZ DEV task, and a FIZZ chat answer, runs in the user's cloud sandbox when it can, so it keeps going when the
+page is closed or the phone locks. No database is needed: the run's state lives in the sandbox.
+
+- `netlify/lib/runner/agent-runner.mjs` is Fizz Code's loop for Node (files, edits, `run`/`sandbox` commands, web search
+  and reading, tree/grep/read/symbols). `node scripts/build-agent-core.mjs` bundles it with the shared core into
+  `netlify/lib/runner/bundle.mjs`, which `api/sandbox` (actions `agent-start`, `agent-poll`, `agent-stop`) writes into the
+  sandbox and starts detached. State: `/vercel/sandbox/fizz-run/<runId>/state.json`.
+- The runner never gets the user's keys or identity: it calls `/api/ai/chat` and `/api/web/{search,read}` with a sealed
+  run token (2 hours, only those calls). A key the user brought in Settings → AI is sealed inside that token.
+- Anything it can't do there (connected apps, the cloud browser, push/deploy, a question, anything the permission rules
+  want to ask about) stops the run as a handoff; the page continues from exactly that point with its normal loop,
+  permission gate and checks when it's open again. Tasks only go to the cloud in Auto permission mode without
+  "Review file changes first", and not for repositories that live in the sandbox.
+- Limits: the sandbox lives about 30 minutes past the start of a run; very long tasks finish on the page.
+  "+" → Permissions → "Keep working when I leave" turns it off.

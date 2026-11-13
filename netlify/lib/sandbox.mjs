@@ -185,3 +185,62 @@ export async function look({ userId, projectId, kind, pattern = "", path = "", g
   }
   throw Object.assign(new Error("Unknown look."), { status: 400 });
 }
+
+// ---------------- Fizz Code's cloud runner ----------------
+// A task runs in the sandbox (netlify/lib/runner/agent-runner.mjs) so it keeps going when the page is closed or the
+// phone locks; the page polls its progress. Runs live under /vercel/sandbox/fizz-run/<runId>.
+const RUNS = "/vercel/sandbox/fizz-run";
+const validRunId = (s) => /^[a-z0-9]{8,40}$/.test(String(s || ""));
+
+/** Copies the project in, writes the runner and its input, and starts it in the background. → { runId } */
+export async function agentStart({ userId, projectId, files = {}, input, runId, token, origin }) {
+  const { AGENT_CORE_SOURCE, RUNNER_SOURCE } = await import("./runner/bundle.mjs");
+  if (!validRunId(runId)) throw Object.assign(new Error("Bad run id."), { status: 400 });
+  const list = [];
+  for (const [original, content] of Object.entries(files || {})) {
+    if (typeof content !== "string" || original.split("/").some((part) => part === "node_modules")) continue;
+    const p = safeProjectPath(original);
+    if (p) list.push([p, content]);
+  }
+  if (list.length > FILE_LIMIT) throw Object.assign(new Error(`Too many project files (maximum ${FILE_LIMIT}).`), { status: 413 });
+  if (list.reduce((n, [, v]) => n + Buffer.byteLength(v, "utf8"), 0) > TEXT_LIMIT) throw Object.assign(new Error("The project is too large to run in the cloud (over 3 MB of text)."), { status: 413 });
+  const sbx = await open(userId, projectId);
+  try { await sbx.extendTimeout?.(30 * 60 * 1000); } catch {}
+  const dir = `${RUNS}/${runId}`;
+  await sbx.runCommand({ cmd: "mkdir", args: ["-p", APP, dir] });
+  const body = { ...input, files: Object.fromEntries(list), appDir: APP, origin, token, sandboxUrl: sbx.domain(PORT) };
+  await sbx.writeFiles([
+    ...list.map(([p, v]) => ({ path: `${APP}/${p}`, content: Buffer.from(v) })),
+    { path: `${RUNS}/agent-core.mjs`, content: Buffer.from(AGENT_CORE_SOURCE) },
+    { path: `${RUNS}/agent-runner.mjs`, content: Buffer.from(RUNNER_SOURCE) },
+    { path: `${dir}/input.json`, content: Buffer.from(JSON.stringify(body)) },
+  ]);
+  // Detached: the runner keeps going after this function returns (the same way background commands do).
+  await sbx.runCommand({ cmd: "bash", args: ["-c", `cd ${dir} && exec node ${RUNS}/agent-runner.mjs ${dir} > ${dir}/log.txt 2>&1`], detached: true });
+  return { runId };
+}
+
+/** The run's progress: { status, steps, error } — steps from index `from` on. */
+export async function agentPoll({ userId, projectId, runId, from = 0 }) {
+  if (!validRunId(runId)) throw Object.assign(new Error("Bad run id."), { status: 400 });
+  const sbx = await open(userId, projectId);
+  const buf = await sbx.readFileToBuffer({ path: `${RUNS}/${runId}/state.json` }).catch(() => null);
+  if (!buf) {
+    const log = await sbx.readFileToBuffer({ path: `${RUNS}/${runId}/log.txt` }).catch(() => null);
+    const input = await sbx.readFileToBuffer({ path: `${RUNS}/${runId}/input.json` }).catch(() => null);
+    if (!input) return { status: "lost", steps: [], error: "The cloud run isn't there any more (the sandbox restarted)." };
+    return { status: log && /Error/.test(log.toString()) ? "error" : "starting", steps: [], error: log ? log.toString().slice(-1500) : "" };
+  }
+  const state = JSON.parse(buf.toString("utf8"));
+  // A runner that stopped writing for 3 minutes while "running" has died with the sandbox process.
+  if (state.status === "running" && Date.now() - state.updatedAt > 3 * 60_000) { state.status = "error"; state.error = "The cloud run stopped responding."; }
+  const start = Math.max(0, Math.min(Number(from) || 0, state.steps.length));
+  return { status: state.status, error: state.error || "", total: state.steps.length, from: start, steps: state.steps.slice(start) };
+}
+
+export async function agentStop({ userId, projectId, runId }) {
+  if (!validRunId(runId)) throw Object.assign(new Error("Bad run id."), { status: 400 });
+  const sbx = await open(userId, projectId);
+  await sbx.writeFiles([{ path: `${RUNS}/${runId}/stop`, content: Buffer.from("1") }]);
+  return { stopping: true };
+}

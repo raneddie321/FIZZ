@@ -84,7 +84,7 @@
   // The partial answer has already been persisted by the stream handler below.
   for (const c of data.conversations) {
     for (const m of c.messages || []) {
-      if (m.role === "assistant" && m.pending && Date.now() - (m.savedAt || m.at || 0) > 30_000) {
+      if (m.role === "assistant" && m.pending && !c.cloud && Date.now() - (m.savedAt || m.at || 0) > 30_000) {
         m.pending = false;
         m.interrupted = true;
         m.error = "";
@@ -232,6 +232,8 @@
     state.controller = new AbortController();
     state.streamingId = c.id;
     renderAll();
+    // The answer is written in the cloud when it can, so it keeps going if the page is closed or the phone locks.
+    if (await cloudChat(c, reply)) return;
     const search = webTools();
     // Tool rounds stay in this request only — the saved chat keeps the question and FIZZ's answer.
     const msgs = c.messages.slice(0, -1);
@@ -293,6 +295,70 @@
       renderAll();
     }
   }
+
+  // ---------- answers written in the cloud (the same runner as FIZZ DEV, in "chat" mode) ----------
+  const following = new Set();
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  async function cloudChat(c, reply) {
+    if (data.settings.cloudRun === false || !F.serverStatusCached?.()?.tools?.sandbox) return false;
+    const ai = F.aiTarget(data.settings);
+    if (ai?.missing) return false;
+    const conv1 = ai?.kind === "anthropic" ? F.toApiContent : F.toOpenAI;
+    const history = c.messages.slice(0, -1).filter((m) => !m.error && (m.role === "user" || m.content));
+    reply.id = reply.id || F.uid();
+    try {
+      const r = await F.conn.sandbox({ action: "agent-start", projectId: "fizz-chat", files: {}, ai, run: { kind: "chat", web: Boolean(webTools()), replyId: reply.id, system: systemPrompt(), messages: history.map(conv1), modelLabel: reply.model } });
+      if (!r?.runId) return false;
+      c.cloud = { runId: r.runId, replyId: reply.id, from: 0 };
+    } catch { return false; }
+    reply.cloud = true;
+    save();
+    await followChat(c);
+    return true;
+  }
+  async function followChat(c) {
+    const run = c.cloud;
+    if (!run || following.has(run.runId)) return;
+    following.add(run.runId);
+    const reply = c.messages.find((m) => m.id === run.replyId);
+    if (!state.controller) state.controller = new AbortController();
+    state.streamingId = c.id;
+    state.controller.signal.addEventListener("abort", () => { run.stopping = true; F.conn.sandbox({ action: "agent-stop", projectId: "fizz-chat", runId: run.runId }).catch(() => {}); }, { once: true });
+    renderAll();
+    let fails = 0, r;
+    try {
+      for (;;) {
+        try { r = await F.conn.sandbox({ action: "agent-poll", projectId: "fizz-chat", runId: run.runId, from: 0 }); fails = 0; }
+        catch (e) { if (++fails <= 20) { await sleep(Math.min(15000, 1500 * fails)); continue; } r = { status: "error", error: `Lost touch with the cloud: ${e.message}`, steps: [] }; }
+        const src = r.steps?.[0]?.reply;
+        if (src && reply) { Object.assign(reply, { content: src.content, working: src.working || [], error: src.error, noKey: src.noKey }); c.updated = Date.now(); if (active()) renderThread(); }
+        if (r.status === "running" || r.status === "starting") { await sleep(document.hidden ? 5000 : 900); continue; }
+        break;
+      }
+    } finally {
+      following.delete(run.runId);
+      delete c.cloud;
+      if (reply) {
+        reply.pending = false;
+        reply.working = [];
+        reply.content = stripTools(reply.content || "");
+        if (r?.status === "stopped" || run.stopping) reply.stopped = true;
+        else if (r?.status !== "done" && !reply.error) reply.error = r?.error || "The cloud stopped before the answer was finished.";
+      }
+      state.controller = null;
+      state.streamingId = null;
+      if (c.title === "New chat") {
+        const first = c.messages.find((m) => m.role === "user");
+        const t = (first?.content || first?.attachments?.[0]?.name || "New chat").replace(/\s+/g, " ").trim();
+        c.title = t.length > 48 ? t.slice(0, 46) + "…" : t || "New chat";
+      }
+      c.updated = Date.now();
+      save();
+      renderAll();
+    }
+  }
+  // An answer that was being written in the cloud when the page closed: follow it again.
+  setInterval(() => { const c = conv(); if (c?.cloud && !following.has(c.cloud.runId)) followChat(c); }, 2500);
 
   async function send() {
     if (state.controller) { state.controller.abort(); return; }

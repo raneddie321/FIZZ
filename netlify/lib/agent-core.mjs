@@ -449,3 +449,89 @@ export function ignoreMatcher(text) {
     return ignored;
   };
 }
+
+// ---------------- replies: files, edits, plans (shared by FIZZ DEV and the cloud runner) ----------------
+const FILE_TAG_RE = /<fizz-file path="([^"]+)">\n?([\s\S]*?)(<\/fizz-file>|$)/g;
+const EDIT_TAG_RE = /<fizz-edit path="([^"]+)">\n?([\s\S]*?)(<\/fizz-edit>|$)/g;
+const HUNK_TAG_RE = /<{5,7} SEARCH\n([\s\S]*?)\n?={5,7}\n([\s\S]*?)\n?>{5,7} REPLACE/g;
+const PLAN_TAG_RE = /<fizz-plan>([\s\S]*?)(<\/fizz-plan>|$)/g;
+const PATH_TOKEN_RE = /([A-Za-z0-9_][\w.\/-]*\.[A-Za-z0-9]{1,10})/;
+export const validPath = (p) => Boolean(p) && p.length < 300 && !p.split("/").some((s) => !s || s === "." || s === "..");
+
+/** ```lang fences labelled with a file name, treated as files (models often answer that way). */
+export function fencedFiles(text) {
+  const lines = text.split("\n");
+  const files = [];
+  const keep = [];
+  for (let i = 0; i < lines.length; i++) {
+    const m = /^\s*```([^`]*)$/.exec(lines[i]);
+    if (!m) { keep.push(lines[i]); continue; }
+    let name = (m[1].match(/[:\s]([\w.\/-]+\.[A-Za-z0-9]{1,10})\s*$/) || m[1].match(/^([\w.\/-]+\.[A-Za-z0-9]{1,10})$/) || [])[1];
+    let labelIdx = -1;
+    if (!name) {
+      for (let k = keep.length - 1; k >= 0 && k >= keep.length - 2; k--) {
+        const prev = keep[k].trim();
+        if (!prev) continue;
+        const t = prev.length < 120 && /(`|\*\*|^#+\s|file|^[\w.\/-]+\.[A-Za-z0-9]{1,10}:?$)/i.test(prev) && PATH_TOKEN_RE.exec(prev.replace(/[`*#]/g, " "));
+        if (t && !/^https?:/.test(t[1])) { name = t[1]; labelIdx = k; }
+        break;
+      }
+    }
+    let j = i + 1;
+    const body = [];
+    while (j < lines.length && !/^\s*```\s*$/.test(lines[j])) body.push(lines[j++]);
+    const closed = j < lines.length;
+    if (name && validPath(name.replace(/^\.?\/+/, ""))) {
+      if (labelIdx >= 0 && /^\W*[\w.\/-]+\W*:?\s*$/.test(keep[labelIdx].trim())) keep.splice(labelIdx, 1);
+      files.push({ path: name.replace(/^\.?\/+/, ""), content: body.join("\n"), closed });
+    } else keep.push(lines[i], ...body, ...(closed ? [lines[j]] : []));
+    i = j;
+  }
+  return { files, prose: keep.join("\n") };
+}
+
+/** A reply → { prose, files, edits, tools, plan, push }. `known` is the set of tool types to read. */
+export function parseReply(text, { fences = false, known = TOOL_TYPES } = {}) {
+  let files = [];
+  const edits = [];
+  let prose = String(text || "").replace(FILE_TAG_RE, (_m, path, body, close) => {
+    files.push({ path: path.replace(/^\.?\/+/, "").trim(), content: body.replace(/\n$/, ""), closed: Boolean(close) });
+    return "";
+  });
+  prose = prose.replace(EDIT_TAG_RE, (_m, path, body, close) => {
+    const hunks = [...body.matchAll(HUNK_TAG_RE)].map((h) => ({ search: h[1], replace: h[2] }));
+    edits.push({ path: path.replace(/^\.?\/+/, "").trim(), hunks, closed: Boolean(close) });
+    return "";
+  });
+  const plans = [];
+  prose = prose.replace(PLAN_TAG_RE, (_m, body) => {
+    const items = body.split("\n").map((l) => /^\s*[-*]\s*\[( |x|X)\]\s*(.+)$/.exec(l)).filter(Boolean).map((m) => ({ done: m[1] !== " ", text: m[2].trim().slice(0, 160) }));
+    if (items.length) plans.push(items.slice(0, 14));
+    return "";
+  });
+  const t = parseTools(prose, known);
+  prose = t.prose;
+  if (fences && !files.length && !edits.length) ({ files, prose } = fencedFiles(prose));
+  const push = t.tools.find((x) => x.type === "push");
+  return { prose: prose.replace(/\n{3,}/g, "\n\n").trim(), files, edits, tools: t.tools, push: push ? { message: (push.attrs.message || "").slice(0, 200) } : null, plan: plans.at(-1) || null };
+}
+
+/** Applies SEARCH/REPLACE hunks; tolerates trailing-space and indentation differences when the match is unique. */
+export function applyHunks(text, hunks) {
+  if (!hunks.length) return { error: "No SEARCH/REPLACE blocks were found in the edit." };
+  let out = text;
+  for (const [i, h] of hunks.entries()) {
+    const at = out.indexOf(h.search);
+    if (h.search && at !== -1 && out.indexOf(h.search, at + 1) === -1) { out = out.slice(0, at) + h.replace + out.slice(at + h.search.length); continue; }
+    if (!h.search.trim()) { out = out + (out.endsWith("\n") ? "" : "\n") + h.replace; continue; }
+    if (at !== -1) return { error: `Block ${i + 1}: the SEARCH text appears more than once. Include more surrounding lines.` };
+    const norm = (l) => l.trim();
+    const lines = out.split("\n"), want = h.search.split("\n").map(norm);
+    const hits = [];
+    for (let k = 0; k + want.length <= lines.length; k++) if (want.every((w, j) => norm(lines[k + j]) === w)) hits.push(k);
+    if (hits.length !== 1) return { error: `Block ${i + 1}: the SEARCH text wasn't found in the file${hits.length > 1 ? " (it matches more than once)" : ""}.` };
+    lines.splice(hits[0], want.length, ...h.replace.split("\n"));
+    out = lines.join("\n");
+  }
+  return { text: out };
+}

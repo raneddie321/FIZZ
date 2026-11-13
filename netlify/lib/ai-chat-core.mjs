@@ -22,10 +22,12 @@ function cookie(req, name) {
   return null;
 }
 
-export async function handleChat(req, { env, ip, bump }) {
+export async function handleChat(req, { env, ip, bump, run = null }) {
   if (req.method !== "POST") return err(405, "Use POST.", "method");
-  if (req.headers.get("origin") !== new URL(req.url).origin) return err(403, "Not allowed.", "origin");
-  const backend = aiBackend(env);
+  // A cloud run (Fizz Code in the user's sandbox) has no page origin; it proves itself with its sealed run token.
+  if (!run && req.headers.get("origin") !== new URL(req.url).origin) return err(403, "Not allowed.", "origin");
+  const own = run?.ai || null; // the user's own provider, sealed in the run token
+  const backend = own ? { name: own.kind === "anthropic" ? "anthropic" : "byo", key: own.key, url: own.url, model: own.model, headers: own.headers || {} } : aiBackend(env);
   if (!backend) return err(503, "FIZZ AI isn't configured on this server yet.", "not_configured");
 
   let body;
@@ -47,20 +49,26 @@ export async function handleChat(req, { env, ip, bump }) {
   }
   const day = new Date().toISOString().slice(0, 10);
   try {
-    const okUser = await bump(`${day}/u/${uid}`, limit);
+    if (own) throw "skip"; // the user's own key: their provider's limits apply
+    const okUser = await bump(run ? `${day}/run/${run.u}` : `${day}/u/${uid}`, limit);
     const okIp = okUser && (await bump(`${day}/ip/${ip || "unknown"}`, limit * 3));
     if (!okUser || !okIp) return err(429, `You've used today's ${limit} free FIZZ messages. Connect your own OpenRouter account in Settings to keep going, or come back tomorrow.`, "quota");
   } catch (e) {
-    console.error("quota store unavailable", e);
+    if (e !== "skip") console.error("quota store unavailable", e);
   }
 
   const allowed = (env("FIZZ_MODELS") || "").split(",").map((s) => s.trim()).filter(Boolean);
-  const model = allowed.includes(body.model) ? body.model : backend.model;
+  const model = own ? backend.model : allowed.includes(body.model) ? body.model : backend.model;
 
   // Busy models (429/500/503) are retried once, then each model in FIZZ_FALLBACK_MODELS is tried in order.
-  const call = (m) => fetch(backend.url, {
+  const call = (m) => backend.name === "anthropic" ? fetch(backend.url, {
     method: "POST",
-    headers: { Authorization: `Bearer ${backend.key}`, "Content-Type": "application/json", ...(backend.name === "openrouter" ? { "HTTP-Referer": new URL(req.url).origin, "X-Title": "FIZZ" } : {}) },
+    headers: { "x-api-key": backend.key, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
+    body: JSON.stringify({ model: m, max_tokens: 32000, stream: true, system: String(body.system || "").slice(0, 200_000), messages: body.messages }),
+    signal: req.signal,
+  }).catch(() => null) : fetch(backend.url, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${backend.key}`, "Content-Type": "application/json", ...(backend.headers || {}), ...(backend.name === "openrouter" ? { "HTTP-Referer": new URL(req.url).origin, "X-Title": "FIZZ" } : {}) },
     body: JSON.stringify({
       model: m,
       stream: true,
@@ -70,7 +78,7 @@ export async function handleChat(req, { env, ip, bump }) {
     signal: req.signal,
   }).catch(() => null);
   const busy = (r) => r && [408, 425, 429, 500, 502, 503, 504].includes(r.status);
-  const fallbacks = (env("FIZZ_FALLBACK_MODELS") || "").split(",").map((x) => x.trim()).filter((x) => x && x !== model);
+  const fallbacks = own ? [] : (env("FIZZ_FALLBACK_MODELS") || "").split(",").map((x) => x.trim()).filter((x) => x && x !== model);
   let upstream = await call(model);
   // A rejected fetch is returned as null by call(); treat it like a transient outage so
   // one network blip doesn't skip the retry and prevent configured fallback models from running.

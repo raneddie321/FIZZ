@@ -1,4 +1,4 @@
-import { env, error, json, readJson, sameOrigin } from "../lib/util.mjs";
+import { env, error, json, readJson, sameOrigin, unseal } from "../lib/util.mjs";
 import { requireUser } from "../lib/auth.mjs";
 import { quotaCounter, today } from "../lib/kv.mjs";
 import { frameable, read, search, searchProvider } from "../lib/web.mjs";
@@ -6,8 +6,12 @@ import { frameable, read, search, searchProvider } from "../lib/web.mjs";
 /** Web search, page reading and frame checks for Fizz Code and the FIZZ DEV browser. */
 export default async (req, context) => {
   const action = context.params.action;
-  if (!sameOrigin(req)) return error(403, "Not allowed.");
-  const who = await requireUser(req);
+  // Fizz Code's cloud runner searches and reads pages with its sealed run token (only these two actions).
+  const tok = req.headers.get("x-fizz-run");
+  const run = tok ? unseal(tok) : null;
+  if (tok && (run?.kind !== "run" || !["search", "read"].includes(action))) return error(401, "The cloud run's token expired.");
+  if (!run && !sameOrigin(req)) return error(403, "Not allowed.");
+  const who = run ? { userId: run.u } : await requireUser(req);
   if (who.response) return who.response;
   const bump = quotaCounter();
   const limits = { search: Number(env("FIZZ_SEARCH_LIMIT") || 200), read: Number(env("FIZZ_READ_LIMIT") || 400), frame: 2000 };

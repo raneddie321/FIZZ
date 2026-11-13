@@ -398,6 +398,7 @@
       const last = m === lastAssistant;
       const thinking = m.pending && !prose && !html.includes('class="activity"')
         ? `<div class="thinking"><span class="st run"></span><span>${m.step > 1 ? "Working" : "Thinking"}</span><span class="t" data-since="${m.at}">${Math.round((Date.now() - m.at) / 1000)}s</span></div>` : "";
+      const cloudNote = m.pending && chat()?.cloud ? `<div class="cloud-note">${F.icon("globe")}<span>Working in the cloud — you can close this page or lock your phone; it keeps going.</span></div>` : "";
       const body = m.error
         ? `<div class="notice ${m.soft ? "warn" : ""}"><span>${esc(m.error)}</span>${m.soft ? `<button class="btn btn-sm" data-act="settings-ai">Open AI settings</button>` : last ? `<button class="btn btn-outline btn-sm" data-regen>Retry</button>` : ""}</div>`
         : prose ? `<div class="md">${F.markdown(prose)}</div>` : "";
@@ -413,7 +414,7 @@
       }).join("");
       const next = c.messages[i + 1];
       const turnEnd = !next || (next.role === "user" && !next.auto);
-      if (!turnEnd && !m.pending) return `<div class="a-msg mid">${body}${html}${thinking}${cards}${askHtml}</div>`;
+      if (!turnEnd && !m.pending) return `<div class="a-msg mid">${body}${html}${thinking}${cloudNote}${cards}${askHtml}</div>`;
       const reverted = m.changes?.length && m.reverted;
       const canRestore = !last && !m.pending && project().history.some((h) => !h.reverted && h.at > (m.doneAt || m.at));
       const actions = m.pending ? "" : `<div class="a-actions">${m.content ? `<button data-copy="${i}">Copy</button>` : ""}${m.mode === "plan" && last && !m.error ? `<button data-approve-plan="${m.id}" class="primary">Approve plan &amp; build</button>` : ""}${m.changes?.length && !m.reverted ? `<button data-revert="${m.id}">Revert ${m.changes.length} change${m.changes.length === 1 ? "" : "s"}</button>` : ""}${reverted ? `<span style="padding:4px 8px">Changes reverted</span>` : ""}${canRestore ? `<button data-restore="${m.id}" title="Put every file back the way it was right after this reply">Restore to here</button>` : ""}${last && !m.error ? `<button data-regen>Regenerate</button>` : ""}${m.changes?.length ? `<button data-act="preview">Open preview</button><button data-push="${m.id}" class="${m.pushAsked ? "primary" : ""}">Push to GitHub</button>` : ""}${m.loopStopped && last ? `<button data-continue="${m.id}" class="primary">Keep going</button>` : ""}<span style="padding:4px 8px">${t} · ${esc(m.model || "")}${m.step > 1 ? ` · step ${m.step}` : ""}</span></div>`;
@@ -422,7 +423,7 @@
         ? `<div class="verify-note run"><span class="st run"></span><span>Running 5 checks on the project…</span>${checkList}</div>`
         : m.verified && !m.verified.fixing
         ? `<div class="verify-note ${m.verified.ok ? "ok" : "warn"}">${F.icon(m.verified.ok ? "check" : "alert")}${checkList}<span>${m.verified.ok ? `5 checks passed on ${m.verified.files} changed file${m.verified.files === 1 ? "" : "s"}` : m.verified.count ? `${m.verified.count} problem${m.verified.count === 1 ? "" : "s"} still open` : "Verification incomplete — not all checks passed"}</span>${m.verified.list?.length ? `<ul>${m.verified.list.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}${m.verified.warnings?.length ? `<ul class="verify-warnings">${m.verified.warnings.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}${m.verified.skipped?.length ? `<p class="verify-skipped">Skipped checks: ${esc(m.verified.skipped.join(", "))}</p>` : ""}</div>` : "";
-      return `<div class="a-msg">${body}${html}${thinking}${cards}${askHtml}${check}${actions}</div>`;
+      return `<div class="a-msg">${body}${html}${thinking}${cloudNote}${cards}${askHtml}${check}${actions}</div>`;
     }).join("");
     for (const [key, value, focused] of drafts) {
       const el = key && th.querySelector(`[data-approve="${CSS.escape(key)}"]`)?.closest(".stage-bar")?.querySelector("[data-collect]");
@@ -720,7 +721,7 @@
     return true;
   }
 
-  async function generate({ step = 1, retried = false } = {}) {
+  async function generate({ step = 1, retried = false, local = false } = {}) {
     const p = project();
     const c = chat();
     if (step === 1 && F.mcp && !F.mcp.loaded()) await Promise.race([F.mcp.refresh().catch(() => {}), new Promise((r) => setTimeout(r, 4000))]);
@@ -728,6 +729,8 @@
     if (contextUse().pct >= 70) await compactChat({ quiet: true, auto: true });
     const lastUser = [...c.messages].reverse().find((m) => m.role === "user" && !m.auto) || {};
     const skills = F.skills.forMessage(data, p.skills || [], lastUser.content || "");
+    // A new task runs in the cloud when it can, so it keeps going if the page is closed or the phone locks.
+    if (step === 1 && !retried && !local && cloudRunOk()) return cloudGenerate(skills, lastUser);
     const reply = { id: F.uid(), role: "assistant", content: "", pending: true, mode: state.mode, step, model: F.providerLabel(data.settings, "dev"), at: Date.now(), readCount: step === 1 ? Object.keys(p.files).length : 0, skills: step === 1 ? skills.map(({ id, name, icon, auto }) => ({ id, name, icon, auto })) : [] };
     c.messages.push(reply);
     state.controller = new AbortController();
@@ -863,6 +866,141 @@
     save();
     return generate({ step: reply.step + 1 });
   }
+
+  // ---------- the cloud runner ----------
+  // A task runs in the user's cloud sandbox (netlify/lib/runner/agent-runner.mjs) and this page follows it. When the
+  // runner meets something it can't do on its own (a connected app, the browser, a question, an OK the user has to
+  // give), it stops and this page carries on from exactly there with the normal loop.
+  const cloudPolling = new Set();
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  function cloudRunOk() {
+    const p = project();
+    return data.settings.cloudRun !== false && Boolean(F.serverStatusCached?.()?.tools?.sandbox) && F.perm.mode() === "auto" && !data.settings.reviewChanges
+      && !p.remote && state.mode !== "plan" && !F.aiTarget(data.settings)?.missing;
+  }
+  const cloudFiles = (files) => Object.fromEntries(Object.entries(files).filter(([k, v]) => typeof v === "string" && !isBinary(v) && !/^(node_modules|\.fizz-build|\.fizz-out)\//.test(k)));
+  async function cloudGenerate(skills, lastUser) {
+    const p = project(), c = chat();
+    const ai = F.aiTarget(data.settings);
+    const system = systemPrompt(skills, { mentions: lastUser.mentions || [], mcpMentions: lastUser.mcpMentions || [], selection: lastUser.selection || null, text: lastUser.content || "" });
+    const history = c.messages.filter((m) => !m.error && (m.role === "user" || m.content)).map((m) => (m.summary ? { ...m, role: "user" } : m));
+    const conv = ai?.kind === "anthropic" ? F.toApiContent : F.toOpenAI;
+    const holder = { id: F.uid(), role: "assistant", content: "", pending: true, mode: state.mode, step: 1, model: F.providerLabel(data.settings, "dev"), at: Date.now(), cloudPlaceholder: true };
+    c.messages.push(holder);
+    state.controller = new AbortController();
+    renderAll();
+    let r;
+    try {
+      r = await F.conn.sandbox({
+        action: "agent-start", projectId: p.id, files: cloudFiles(p.files), ai,
+        run: { system, messages: history.map(conv), mode: state.mode, step: 1, maxSteps: MAX_STEPS(), modelLabel: holder.model, perm: { mode: F.perm.mode(), rules: F.perm.rules(), project: F.perm.projectRules(p), projectTrusted: F.perm.projectTrusted(p) } },
+      });
+      if (!r?.runId) throw new Error("the sandbox didn't start the run");
+    } catch (e) {
+      c.messages.splice(c.messages.indexOf(holder), 1);
+      state.controller = null;
+      F.toast(`Couldn't start in the cloud (${e.message}) — working here instead.`);
+      return generate({ step: 1, local: true });
+    }
+    c.cloud = { runId: r.runId, projectId: p.id, from: 0, at: Date.now() };
+    save();
+    return pollCloud(c);
+  }
+  async function pollCloud(c) {
+    const run = c.cloud;
+    if (!run || cloudPolling.has(run.runId)) return;
+    cloudPolling.add(run.runId);
+    if (!state.controller) state.controller = new AbortController();
+    const ctrl = state.controller;
+    ctrl.signal.addEventListener("abort", () => { run.stopping = true; F.conn.sandbox({ action: "agent-stop", projectId: run.projectId, runId: run.runId }).catch(() => {}); }, { once: true });
+    renderComposer();
+    let fails = 0;
+    try {
+      for (;;) {
+        if (c.cloud !== run) return;
+        // Files go into the open project, so the run is followed while its chat is the open one.
+        if (project()?.id !== run.projectId || chat()?.id !== c.id) { await sleep(2000); continue; }
+        let r;
+        try { r = await F.conn.sandbox({ action: "agent-poll", projectId: run.projectId, runId: run.runId, from: run.from }); fails = 0; }
+        catch (e) {
+          if (++fails <= 20) { await sleep(Math.min(15000, 1500 * fails)); continue; }
+          r = { status: "error", error: `Lost touch with the cloud run: ${e.message}`, steps: [], from: run.from };
+        }
+        await importCloud(c, run, r);
+        if (r.status === "running" || r.status === "starting") { await sleep(document.hidden ? 5000 : 1200); continue; }
+        return await finishCloud(c, run, r);
+      }
+    } finally { cloudPolling.delete(run.runId); }
+  }
+  async function importCloud(c, run, r) {
+    const steps = r.steps || [];
+    if (steps.length) c.messages = c.messages.filter((m) => !m.cloudPlaceholder);
+    let changed = false;
+    for (const st of steps) {
+      if (st.auto && !c.messages.some((x) => x.id === st.auto.id)) c.messages.push({ ...st.auto });
+      if (!st.reply) continue;
+      const src = st.reply;
+      let m = c.messages.find((x) => x.id === src.id);
+      if (!m) { m = { ...src, tools: undefined }; c.messages.push(m); }
+      Object.assign(m, { content: src.content, pending: src.pending, error: src.error, soft: src.soft, cutOff: src.cutOff });
+      if (src.pending) continue;
+      if (!m.cloudApplied) {
+        m.cloudApplied = true;
+        try { if (m.content && !m.error) applyReply(m); } catch (e) { m.error = `Fizz Code's reply could not be fully applied: ${String(e?.message || e).slice(0, 200)}`; }
+        m.doneAt = Date.now() + 1;
+        if (m.changes?.length) changed = true;
+      }
+      const done = new Set(m.cloudFiles || []);
+      m.tools = (src.tools || []).map((t, k) => {
+        const res = t.result ? { ...t.result } : undefined;
+        if (res?.files && !done.has(k)) {
+          done.add(k);
+          for (const [path, v] of Object.entries(res.files)) {
+            if (!validPath(path)) continue;
+            if (typeof v === "string") { if (writeFile(path, v, { source: "agent", msgId: m.id })) changed = true; }
+            else if (v?.base64) { const bin = atob(v.base64); const bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i); F.blobs.put(bytes, F.blobs.mimeFor(path)).then((ref) => { writeFile(path, ref, { source: "agent", msgId: m.id }); save(); }); }
+          }
+        }
+        if (res?.files) res.files = Object.keys(res.files);
+        return { ...t, result: res };
+      });
+      m.cloudFiles = [...done];
+    }
+    // Only the last step can still change: read from there next time.
+    if (typeof r.total === "number") run.from = Math.max(0, r.total - 1);
+    if (c.title === "New chat") { const first = c.messages.find((m) => m.role === "user" && !m.auto)?.content || "New chat"; c.title = first.length > 44 ? first.slice(0, 42) + "…" : first; }
+    save();
+    renderAll();
+    if (changed) refreshPreview();
+  }
+  async function finishCloud(c, run, r) {
+    c.messages = c.messages.filter((m) => !m.cloudPlaceholder);
+    delete c.cloud;
+    state.controller = null;
+    let last = [...c.messages].reverse().find((m) => m.role === "assistant");
+    if (last) last.pending = false;
+    if (r.status === "stopped" || run.stopping) {
+      if (last) last.content += last.content ? "\n\n*Stopped.*" : "";
+      stopLoop = true; save(); renderAll();
+      return last ? finishLoop(last, "stopped") : undefined;
+    }
+    if (r.status !== "done" && r.status !== "handoff") {
+      if (!last || last.role !== "assistant" || c.messages.at(-1) !== last) { last = { id: F.uid(), role: "assistant", content: "", mode: state.mode, step: 1, at: Date.now() }; c.messages.push(last); }
+      if (!last.error) last.error = r.error || "The cloud run stopped.";
+      save(); renderAll();
+      return finishLoop(last);
+    }
+    // Done, or handed back: carry on here exactly where the cloud stopped (its own checks, tools it couldn't run, OKs).
+    stopLoop = false;
+    turn = { continues: 0, verifies: 0, emptyBuildRetries: 0 };
+    save(); renderAll();
+    if (!last) return;
+    if (last.error) return finishLoop(last);
+    await runTools(last);
+    return continueIfNeeded(last);
+  }
+  // A run started before the page was closed or reloaded: follow it again.
+  setInterval(() => { const c = chat(); if (c?.cloud && !cloudPolling.has(c.cloud.runId)) pollCloud(c); }, 2500);
 
   /** Paths Fizz Code wrote since the user's last message. */
   function turnChanges() {
@@ -2249,6 +2387,7 @@
     if (plusView === "permission") return back("Permissions") + `<div class="ps-list">
       ${F.perm.MODES.map(([k, name, desc]) => `<button type="button" class="ps-row" data-ps-perm="${k}"><span class="ps-txt"><b>${name}</b><small>${desc}</small></span>${tick(F.perm.mode() === k)}</button>`).join("")}
       <button type="button" class="ps-row" data-ps-opt="reviewChanges"><span class="ps-txt"><b>Review file changes first</b><small>See each change and accept or reject it.</small></span>${toggle(Boolean(data.settings.reviewChanges))}</button>
+      <button type="button" class="ps-row" data-ps-opt="cloudRun" data-default-on><span class="ps-txt"><b>Keep working when I leave</b><small>Tasks run in your cloud sandbox, so they go on when you close the page or lock the phone.</small></span>${toggle(data.settings.cloudRun !== false)}</button>
       <button type="button" class="ps-row" data-ps-opt="autoVerify" data-default-on><span class="ps-txt"><b>Check work automatically</b><small>5 checks after every change, fixed automatically.</small></span>${toggle(data.settings.autoVerify !== false)}</button>
       <button type="button" class="ps-row" data-ps="perm-rules"><span class="ps-ic">${F.icon("shield")}</span><span class="ps-txt"><b>Rules…</b><small>${(() => { const r = F.perm.rules(); const n = r.allow.length + r.ask.length + r.deny.length; return n ? `${n} rule${n === 1 ? "" : "s"}: always allow, always ask, never allow` : "Always allow, always ask or never allow specific commands, files and apps"; })()}</small></span>${chev}</button></div>`;
     return `<div class="ps-head"><strong>Add to chat</strong><button type="button" class="icon-btn" data-ps="close" aria-label="Close">${F.icon("x")}</button></div>
@@ -2319,7 +2458,7 @@
     if (d.ps === "perm-rules") { closePlus(); return openSettings("tools"); }
     if (d.psOpt) {
       const o = d.psOpt;
-      data.settings[o] = o === "autoVerify" ? data.settings[o] === false : !data.settings[o];
+      data.settings[o] = o === "autoVerify" || o === "cloudRun" ? data.settings[o] === false : !data.settings[o];
       save();
       return drawPlus();
     }
@@ -2930,7 +3069,7 @@
     for (const c of p.chats || []) {
       for (const m of c.messages || []) {
         // Only replies whose last checkpoint is old: a reply still streaming in another tab keeps going.
-        if (m.role === "assistant" && m.pending && Date.now() - (m.savedAt || m.at || 0) > 30_000) {
+        if (m.role === "assistant" && m.pending && !c.cloud && Date.now() - (m.savedAt || m.at || 0) > 30_000) {
           m.pending = false;
           m.interrupted = true;
           m.error = "";

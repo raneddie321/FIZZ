@@ -329,6 +329,43 @@
     return { role: "user", content: parts };
   }
 
+  /** OpenAI-compatible providers from Settings → AI. */
+  function compatibleProviders(settings) {
+    const compatible = {
+      groq: { key: settings.groqKey, model: settings.groqModel || "llama-3.3-70b-versatile", url: "https://api.groq.com/openai/v1/chat/completions" },
+      zai: { key: settings.zaiKey, model: settings.zaiModel || "glm-4.6", url: settings.zaiBaseUrl || "https://api.z.ai/api/paas/v4" },
+      requesty: { key: settings.requestyKey, model: settings.requestyModel || "openai/gpt-4o-mini", url: "https://router.requesty.ai/v1/chat/completions", headers: { "HTTP-Referer": location.origin, "X-Title": "FIZZ" } },
+      deepseek: { key: settings.deepseekKey, model: settings.deepseekModel || "deepseek-chat", url: "https://api.deepseek.com/v1/chat/completions" },
+      cerebras: { key: settings.cerebrasKey, model: settings.cerebrasModel || "llama-3.3-70b", url: "https://api.cerebras.ai/v1/chat/completions" },
+      together: { key: settings.togetherKey, model: settings.togetherModel || "meta-llama/Llama-3.3-70B-Instruct-Turbo", url: "https://api.together.xyz/v1/chat/completions" },
+    };
+    if (settings.provider === "custom-openai") {
+      compatible["custom-openai"] = {
+        key: settings.customOpenAIKey,
+        model: settings.customOpenAIModel,
+        url: settings.customOpenAIBaseUrl,
+      };
+    }
+    return compatible;
+  }
+  /**
+   * Where a cloud run sends model calls for these settings: the user's own provider ({ kind, url, key, model, headers }),
+   * null for FIZZ AI, or { missing: true } when a key is missing. Used only for runs in the user's sandbox; the key is
+   * sealed by the server and never reaches the sandbox.
+   */
+  function aiTarget(settings) {
+    if (settings.provider === "anthropic") return settings.apiKey ? { kind: "anthropic", url: "https://api.anthropic.com/v1/messages", key: settings.apiKey, model: settings.model || MODELS[0].id } : { missing: true };
+    if (settings.provider === "gemini") return settings.geminiKey ? { kind: "openai", url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", key: settings.geminiKey, model: settings.geminiModel || "gemini-3.8-flash" } : { missing: true };
+    if (settings.provider === "openrouter") return settings.openrouterKey ? { kind: "openai", url: "https://openrouter.ai/api/v1/chat/completions", key: settings.openrouterKey, model: settings.openrouterModel || "z-ai/glm-4.6", headers: { "X-Title": "FIZZ" } } : { missing: true };
+    const p = compatibleProviders(settings)[settings.provider];
+    if (p) {
+      let url = String(p.url || "").trim().replace(/\/+$/, "");
+      if (!p.key || !p.model || !/^https:\/\//i.test(url)) return { missing: true };
+      if (!url.endsWith("/chat/completions")) url += "/chat/completions";
+      return { kind: "openai", url, key: p.key, model: p.model, headers: Object.fromEntries(Object.entries(p.headers || {}).filter(([k]) => k !== "HTTP-Referer")) };
+    }
+    return null;
+  }
   /** Streams a reply using the provider chosen in Settings → AI. */
   async function aiStream(settings, { system, messages, signal, onText, model }) {
     const history = messages.filter((m) => !m.error && (m.role === "user" || m.content));
@@ -359,21 +396,7 @@
 
     // OpenAI-compatible providers share the same streaming protocol. Keys stay in local
     // settings and are sent only to the endpoint selected below; none are uploaded to FIZZ.
-    const compatible = {
-      groq: { key: settings.groqKey, model: settings.groqModel || "llama-3.3-70b-versatile", url: "https://api.groq.com/openai/v1/chat/completions" },
-      zai: { key: settings.zaiKey, model: settings.zaiModel || "glm-4.6", url: settings.zaiBaseUrl || "https://api.z.ai/api/paas/v4" },
-      requesty: { key: settings.requestyKey, model: settings.requestyModel || "openai/gpt-4o-mini", url: "https://router.requesty.ai/v1/chat/completions", headers: { "HTTP-Referer": location.origin, "X-Title": "FIZZ" } },
-      deepseek: { key: settings.deepseekKey, model: settings.deepseekModel || "deepseek-chat", url: "https://api.deepseek.com/v1/chat/completions" },
-      cerebras: { key: settings.cerebrasKey, model: settings.cerebrasModel || "llama-3.3-70b", url: "https://api.cerebras.ai/v1/chat/completions" },
-      together: { key: settings.togetherKey, model: settings.togetherModel || "meta-llama/Llama-3.3-70B-Instruct-Turbo", url: "https://api.together.xyz/v1/chat/completions" },
-    };
-    if (settings.provider === "custom-openai") {
-      compatible["custom-openai"] = {
-        key: settings.customOpenAIKey,
-        model: settings.customOpenAIModel,
-        url: settings.customOpenAIBaseUrl,
-      };
-    }
+    const compatible = compatibleProviders(settings);
     const provider = compatible[settings.provider];
     if (provider) {
       if (!provider.key) throw new Error("NO_KEY");
@@ -534,6 +557,6 @@
     });
   }
 
-  window.FIZZ = { pendingHtml, logoImg, logoNext, faviconUrls, app, serverStatus, serverStatusCached, aiStream, providerLabel, openrouterConnect, openrouterFinish, toOpenAI, store, esc, uid, theme, auth, loadData, saveData, MODELS, streamChat, readAttachment, toApiContent, markdown, toast, download, validEmail };
+  window.FIZZ = { aiTarget, pendingHtml, logoImg, logoNext, faviconUrls, app, serverStatus, serverStatusCached, aiStream, providerLabel, openrouterConnect, openrouterFinish, toOpenAI, store, esc, uid, theme, auth, loadData, saveData, MODELS, streamChat, readAttachment, toApiContent, markdown, toast, download, validEmail };
   theme.init();
 })();

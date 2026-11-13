@@ -1,8 +1,9 @@
-import { env, error, getBigCookie, getCookie, json, readJson, sameOrigin, unseal } from "../netlify/lib/util.mjs";
+import { env, error, getBigCookie, getCookie, json, readJson, sameOrigin, seal, unseal } from "../netlify/lib/util.mjs";
 import { requireUser } from "../netlify/lib/auth.mjs";
 import { quotaCounter, today } from "../netlify/lib/kv.mjs";
 import { Sandbox } from "@vercel/sandbox";
-import { clone, look, run, sandboxEnabled, setSandboxModule, stop, wait } from "../netlify/lib/sandbox.mjs";
+import { agentPoll, agentStart, agentStop, clone, look, run, sandboxEnabled, setSandboxModule, stop, wait } from "../netlify/lib/sandbox.mjs";
+import { randomBytes } from "node:crypto";
 
 // Imported statically so Vercel bundles the SDK with this function.
 setSandboxModule({ Sandbox });
@@ -36,9 +37,42 @@ export async function POST(req) {
       return json(await look({ ...args, kind: String(body.kind || ""), pattern: String(body.pattern || ""), path: String(body.path || ""), glob: String(body.glob || "").slice(0, 200), ignoreCase: Boolean(body.ignoreCase), max: body.max, paths: Array.isArray(body.paths) ? body.paths.map(String) : [] }));
     }
     if (body.action === "stop") return json(await stop(args));
+    // Fizz Code's cloud runner: the task keeps going in the sandbox when the page is closed.
+    if (body.action === "agent-start") {
+      if (!(await quotaCounter()(`${today()}/sandbox/${who.userId}`, Number(env("FIZZ_SANDBOX_LIMIT") || 60)))) return error(429, "You've reached today's sandbox limit. Try again tomorrow.", "quota");
+      const runId = randomBytes(10).toString("hex");
+      const input = runInput(body.run || {});
+      // The runner gets a token that only allows model calls and web searches for this user, for 2 hours.
+      // A key the user brought (Settings → AI) travels sealed inside it: the sandbox never sees it.
+      const token = seal({ kind: "run", u: who.userId, p: projectId, r: runId, ai: aiTarget(body.ai), exp: Date.now() + 2 * 3600_000 });
+      return json(await agentStart({ ...args, files: body.files || {}, input, runId, token, origin: new URL(req.url).origin }));
+    }
+    if (body.action === "agent-poll") return json(await agentPoll({ ...args, runId: String(body.runId || ""), from: Number(body.from) || 0 }));
+    if (body.action === "agent-stop") return json(await agentStop({ ...args, runId: String(body.runId || "") }));
     return error(400, "Unknown action.");
   } catch (e) {
     console.error("[sandbox]", e);
     return error(e.status || 502, e.message || "The sandbox failed.");
   }
+}
+
+/** What the runner needs from the page, trimmed to sane sizes. */
+function runInput(r) {
+  const str = (v, n) => String(v ?? "").slice(0, n);
+  const messages = (Array.isArray(r.messages) ? r.messages : []).slice(-200).map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: typeof m.content === "string" ? m.content.slice(0, 400_000) : Array.isArray(m.content) ? m.content.slice(0, 20) : "" }));
+  const perm = r.perm && typeof r.perm === "object" ? r.perm : {};
+  return {
+    kind: r.kind === "chat" ? "chat" : "dev", web: Boolean(r.web), replyId: str(r.replyId, 60).replace(/[^\w-]/g, ""),
+    system: str(r.system, 400_000), messages, mode: ["build", "plan", "ask", "do"].includes(r.mode) ? r.mode : "build",
+    step: Math.max(1, Math.min(40, Number(r.step) || 1)), maxSteps: Math.max(1, Math.min(40, Number(r.maxSteps) || 20)),
+    model: str(r.model, 200), modelLabel: str(r.modelLabel, 120),
+    perm: { mode: ["auto", "ask", "plan", "read-only"].includes(perm.mode) ? perm.mode : "auto", rules: perm.rules || null, project: perm.project || null, projectTrusted: Boolean(perm.projectTrusted) },
+  };
+}
+/** The user's own AI provider (Settings → AI), if they use one: an OpenAI-compatible endpoint or Anthropic. */
+function aiTarget(a) {
+  if (!a || typeof a !== "object" || !a.key) return null;
+  const url = String(a.url || "");
+  if (!/^https:\/\/[^/\s]+\//.test(url)) return null;
+  return { kind: a.kind === "anthropic" ? "anthropic" : "openai", url: url.slice(0, 300), key: String(a.key).slice(0, 400), model: String(a.model || "").slice(0, 200), headers: a.headers && typeof a.headers === "object" ? Object.fromEntries(Object.entries(a.headers).slice(0, 5).map(([k, v]) => [String(k).slice(0, 60), String(v).slice(0, 300)])) : {} };
 }

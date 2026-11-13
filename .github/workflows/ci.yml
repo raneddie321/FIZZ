@@ -48,3 +48,5 @@ jobs:
         run: node tests/netlify/canva.test.mjs
       - name: Test Shopify
         run: node tests/netlify/shopify.test.mjs
+      - name: Cloud runner tests
+        run: node tests/netlify/cloud-runner.test.mjs

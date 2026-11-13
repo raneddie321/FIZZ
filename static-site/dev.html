@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="assets/site.css?v=20261113-row" />
 <link rel="stylesheet" href="vendor/codemirror/codemirror.css" />
 <link rel="stylesheet" href="vendor/xterm/xterm.css" />
-<link rel="stylesheet" href="assets/dev.css?v=20261112-repo3" />
+<link rel="stylesheet" href="assets/dev.css?v=20261113-cloud" />
 <script>document.documentElement.dataset.app=/\/dev(\.html)?$/.test(location.pathname)?"dev":"chat";try{var t=localStorage.getItem("fizz.theme");t=t?JSON.parse(t):"system";if(t==="dark"||(t!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}</script>
 <script src="vendor/marked.min.js"></script>
 <script src="vendor/purify.min.js"></script>
@@ -29,10 +29,10 @@
 <script src="vendor/codemirror/addon/active-line.js"></script>
 <script src="vendor/xterm/xterm.js"></script>
 <script src="vendor/xterm/addon-fit.js"></script>
-<script src="assets/core.js?v=20261113-ix"></script>
+<script src="assets/core.js?v=20261113-cloud"></script>
 <script src="assets/interactive.js?v=20261113-ix"></script>
 <script src="assets/idb.js?v=20261111-p0"></script>
-<script src="assets/agent-core.js?v=20261112-shop"></script>
+<script src="assets/agent-core.js?v=20261113-cloud"></script>
 <script src="assets/raneddie-id.js?v=20261110-console1"></script>
 <script src="assets/site.js?v=20261112-p4"></script>
 <script src="assets/connections.js?v=20261112-shop"></script>
@@ -229,6 +229,6 @@
   if (S) return S.boot(list);
   // idb.js didn't load: start the apps anyway (data stays in localStorage, as before).
   list.forEach(function (src) { var s = document.createElement("script"); s.src = src; s.async = false; document.body.appendChild(s); });
-})(["assets/chat.js?v=20261113-ix", "assets/dev.js?v=20261113-order"]);</script>
+})(["assets/chat.js?v=20261113-cloud", "assets/dev.js?v=20261113-cloud3"]);</script>
 </body>
 </html>
