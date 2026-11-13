@@ -1,4 +1,4 @@
-import { clearCookie, error, getCookie, json, readJson, sameOrigin, seal, secretConfigured, setCookie, unseal } from "../lib/util.mjs";
+import { YEAR, clearCookie, error, getCookie, json, readJson, sameOrigin, seal, secretConfigured, setCookie, unseal } from "../lib/util.mjs";
 import { CONNECTORS, buildRequest, cookieFor } from "../lib/connectors.mjs";
 import { env, getBigCookie, setBigCookie } from "../lib/util.mjs";
 
@@ -17,7 +17,7 @@ async function canvaToken(req, headers) {
   const d = await res.json().catch(() => ({}));
   if (!res.ok || !d.access_token) throw Object.assign(new Error("The Canva sign-in expired. Connect Canva again."), { status: 401, code: "not_connected" });
   // Canva's refresh tokens are single-use: keep the new one.
-  setBigCookie(headers, "fizz_cv", seal({ ...saved, t: d.access_token, r: d.refresh_token || saved.r, at: Date.now() + (Number(d.expires_in) || 3600) * 1000 }), { maxAge: 60 * 60 * 24 * 30 });
+  setBigCookie(headers, "fizz_cv", seal({ ...saved, t: d.access_token, r: d.refresh_token || saved.r, at: Date.now() + (Number(d.expires_in) || 3600) * 1000 }), { maxAge: YEAR });
   return d.access_token;
 }
 const CANVA_PATH = /^\/(users\/me(\/profile)?|designs(\/[\w-]{1,80}(\/(pages|export-formats))?)?|exports(\/[\w-]{1,80})?|asset-uploads(\/[\w-]{1,80})?|assets\/[\w-]{1,80}|folders\/[\w-]{1,80}(\/items)?)$/;
@@ -113,7 +113,7 @@ export default async (req, context) => {
     }
     if (!res.ok || !j || (c.me.ok && !c.me.ok(j))) return error(401, `${c.name} didn't accept this token. Check that you copied all of it and that it has the right permissions.`, "bad_token");
     const label = c.me.label(j);
-    setCookie(headers, cookieFor(service), seal({ t, label }), { maxAge: 60 * 60 * 24 * 90 });
+    setCookie(headers, cookieFor(service), seal({ t, label }), { maxAge: YEAR });
     return json({ ok: true, account: label }, { headers });
   }
 

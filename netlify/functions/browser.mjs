@@ -1,4 +1,4 @@
-import { env, error, getCookie, json, readJson, sameOrigin, seal, setCookie, unseal } from "../lib/util.mjs";
+import { YEAR, env, error, getCookie, json, readJson, sameOrigin, seal, setCookie, unseal } from "../lib/util.mjs";
 import { requireUser } from "../lib/auth.mjs";
 import { kvConfigured, quotaCounter, redis, today } from "../lib/kv.mjs";
 import { act, browserConfigured, createContext, createSession, liveViews, releaseSession, sessionRunning } from "../lib/browser.mjs";
@@ -27,7 +27,7 @@ async function sandboxEngine(req, uid, body, headers) {
     throw Object.assign(new Error(`The cloud browser couldn't start: ${m.slice(0, 300)}.${hint}`), { status: 502, code: "sandbox_failed" });
   }
   // Remember where the browser answers, so the next request skips the Sandbox API (see ensureBrowser).
-  const remember = () => { if (b.base && st.base !== b.base) { st.base = b.base; setCookie(headers, "fizz_br2", seal(st), { maxAge: 60 * 60 * 24 * 30 }); } };
+  const remember = () => { if (b.base && st.base !== b.base) { st.base = b.base; setCookie(headers, "fizz_br2", seal(st), { maxAge: YEAR }); } };
   if (action === "warm") { remember(); return json({ ready: !b.starting }, { headers }); }
   if (b.starting) return json({ starting: true, text: "The cloud browser is starting (the first time takes about a minute)." });
   remember();
@@ -39,13 +39,13 @@ async function sandboxEngine(req, uid, body, headers) {
     const nav = await r.json().catch(() => ({}));
     if (!r.ok) throw Object.assign(new Error(nav.error || "The cloud browser couldn't open that address."), { status: r.status === 400 ? 400 : 502 });
     st.active = nav.id || st.active;
-    setCookie(headers, "fizz_br2", seal(st), { maxAge: 60 * 60 * 24 * 30 });
+    setCookie(headers, "fizz_br2", seal(st), { maxAge: YEAR });
     const views = await sandboxTabs(b.base, b.token).catch(() => []);
     return json({ text: "", page: { url: body.url, title: "" }, elements: [], tabs: views.map((v) => ({ ...v, active: v.id === st.active })), engine: "sandbox" }, { headers });
   }
   const out = await act({ connectUrl: cdpUrl(b.base, b.token), active: st.active }, body);
   st.active = out.state.active;
-  setCookie(headers, "fizz_br2", seal(st), { maxAge: 60 * 60 * 24 * 30 });
+  setCookie(headers, "fizz_br2", seal(st), { maxAge: YEAR });
   const views = await sandboxTabs(b.base, b.token).catch(() => []);
   const tabs = out.tabs.map((t) => { const v = views.find((x) => x.id === t.id); return { ...t, stream: v?.stream || null, input: v?.input || null }; });
   return json({ ...pageJson(out), tabs, engine: "sandbox" }, { headers });

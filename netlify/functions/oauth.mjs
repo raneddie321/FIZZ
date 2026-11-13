@@ -1,4 +1,4 @@
-import { clearBigCookie, clearCookie, error, getCookie, setBigCookie, json, pkceChallenge, randomId, readJson, safeEqual, sameOrigin, seal, secretConfigured, setCookie, unseal } from "../lib/util.mjs";
+import { YEAR, clearBigCookie, clearCookie, error, getCookie, setBigCookie, json, pkceChallenge, randomId, readJson, safeEqual, sameOrigin, seal, secretConfigured, setCookie, unseal } from "../lib/util.mjs";
 import { PROVIDERS } from "../lib/providers.mjs";
 
 const STATE_COOKIE = "fizz_oauth";
@@ -27,7 +27,7 @@ export default async (req, context) => {
     const scopes = (res.headers.get("x-oauth-scopes") || "").split(",").map((x) => x.trim()).filter(Boolean);
     if (t.startsWith("ghp_") && !(scopes.includes("repo") && scopes.includes("workflow"))) return error(400, `This token needs the "repo" and "workflow" scopes (it has: ${scopes.join(", ") || "none"}). Make a new one with both ticked.`, "bad_token");
     const headers = new Headers();
-    setCookie(headers, p.cookie, seal({ t, label: `@${me.login}`, kind: "token", scopes }), { maxAge: 60 * 60 * 24 * 90 });
+    setCookie(headers, p.cookie, seal({ t, label: `@${me.login}`, kind: "token", scopes }), { maxAge: YEAR });
     return json({ ok: true, account: `@${me.login}` }, { headers });
   }
   if (action === "token" && provider === "vercel") {
@@ -40,7 +40,7 @@ export default async (req, context) => {
     const me = res ? await res.json().catch(() => null) : null;
     if (!res?.ok || !me?.user) return error(res?.status === 403 || res?.status === 401 ? 401 : 502, res && (res.status === 401 || res.status === 403) ? "Vercel didn't accept this token. Check that you copied all of it and that it hasn't expired." : "Couldn't reach Vercel. Try again.", "bad_token");
     const headers = new Headers();
-    setCookie(headers, p.cookie, seal({ t, label: me.user.email || me.user.username || "Vercel account", kind: "token", scopes: [] }), { maxAge: 60 * 60 * 24 * 90 });
+    setCookie(headers, p.cookie, seal({ t, label: me.user.email || me.user.username || "Vercel account", kind: "token", scopes: [] }), { maxAge: YEAR });
     return json({ ok: true, account: me.user.email || me.user.username }, { headers });
   }
   if (!secretConfigured() || !p.configured()) return error(503, `${provider} isn't configured on this server yet.`, "not_configured");
@@ -73,7 +73,7 @@ export default async (req, context) => {
     }
     try {
       const session = await p.exchange(origin, url.searchParams.get("code"), saved.verifier, saved.extra || {}, url);
-      setBigCookie(headers, p.cookie, seal(session), { maxAge: 60 * 60 * 24 * 30 });
+      setBigCookie(headers, p.cookie, seal(session), { maxAge: YEAR });
       headers.set("Location", back(origin, { connected: provider }));
     } catch (e) {
       console.error(`[oauth:${provider}]`, e);

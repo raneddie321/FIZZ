@@ -1,4 +1,4 @@
-import { error, getBigCookie, getCookie, setBigCookie, json, normalizePath, readJson, sameOrigin, seal, setCookie, unseal } from "../lib/util.mjs";
+import { YEAR, error, getBigCookie, getCookie, setBigCookie, json, normalizePath, readJson, sameOrigin, seal, setCookie, unseal } from "../lib/util.mjs";
 import { vercelToken } from "../lib/providers.mjs";
 
 const API = "https://api.vercel.com";
@@ -19,7 +19,7 @@ export default async (req, context) => {
   if (session.at && session.at < Date.now() + 60_000 && session.r) {
     try {
       session = { ...(await vercelToken({ grant_type: "refresh_token", refresh_token: session.r })), label: session.label };
-      setBigCookie(headers, "fizz_vc", seal(session), { maxAge: 60 * 60 * 24 * 30 });
+      setBigCookie(headers, "fizz_vc", seal(session), { maxAge: YEAR });
     } catch {
       return error(401, "Your Vercel connection expired. Connect Vercel again.", "not_connected");
     }

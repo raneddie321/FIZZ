@@ -413,7 +413,7 @@
       }).join("");
       const next = c.messages[i + 1];
       const turnEnd = !next || (next.role === "user" && !next.auto);
-      if (!turnEnd && !m.pending) return `<div class="a-msg mid">${html}${thinking}${body}${cards}${askHtml}</div>`;
+      if (!turnEnd && !m.pending) return `<div class="a-msg mid">${body}${html}${thinking}${cards}${askHtml}</div>`;
       const reverted = m.changes?.length && m.reverted;
       const canRestore = !last && !m.pending && project().history.some((h) => !h.reverted && h.at > (m.doneAt || m.at));
       const actions = m.pending ? "" : `<div class="a-actions">${m.content ? `<button data-copy="${i}">Copy</button>` : ""}${m.mode === "plan" && last && !m.error ? `<button data-approve-plan="${m.id}" class="primary">Approve plan &amp; build</button>` : ""}${m.changes?.length && !m.reverted ? `<button data-revert="${m.id}">Revert ${m.changes.length} change${m.changes.length === 1 ? "" : "s"}</button>` : ""}${reverted ? `<span style="padding:4px 8px">Changes reverted</span>` : ""}${canRestore ? `<button data-restore="${m.id}" title="Put every file back the way it was right after this reply">Restore to here</button>` : ""}${last && !m.error ? `<button data-regen>Regenerate</button>` : ""}${m.changes?.length ? `<button data-act="preview">Open preview</button><button data-push="${m.id}" class="${m.pushAsked ? "primary" : ""}">Push to GitHub</button>` : ""}${m.loopStopped && last ? `<button data-continue="${m.id}" class="primary">Keep going</button>` : ""}<span style="padding:4px 8px">${t} · ${esc(m.model || "")}${m.step > 1 ? ` · step ${m.step}` : ""}</span></div>`;
@@ -422,7 +422,7 @@
         ? `<div class="verify-note run"><span class="st run"></span><span>Running 5 checks on the project…</span>${checkList}</div>`
         : m.verified && !m.verified.fixing
         ? `<div class="verify-note ${m.verified.ok ? "ok" : "warn"}">${F.icon(m.verified.ok ? "check" : "alert")}${checkList}<span>${m.verified.ok ? `5 checks passed on ${m.verified.files} changed file${m.verified.files === 1 ? "" : "s"}` : m.verified.count ? `${m.verified.count} problem${m.verified.count === 1 ? "" : "s"} still open` : "Verification incomplete — not all checks passed"}</span>${m.verified.list?.length ? `<ul>${m.verified.list.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}${m.verified.warnings?.length ? `<ul class="verify-warnings">${m.verified.warnings.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}${m.verified.skipped?.length ? `<p class="verify-skipped">Skipped checks: ${esc(m.verified.skipped.join(", "))}</p>` : ""}</div>` : "";
-      return `<div class="a-msg">${html}${thinking}${body}${cards}${askHtml}${check}${actions}</div>`;
+      return `<div class="a-msg">${body}${html}${thinking}${cards}${askHtml}${check}${actions}</div>`;
     }).join("");
     for (const [key, value, focused] of drafts) {
       const el = key && th.querySelector(`[data-approve="${CSS.escape(key)}"]`)?.closest(".stage-bar")?.querySelector("[data-collect]");

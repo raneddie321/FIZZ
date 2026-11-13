@@ -1,6 +1,8 @@
 // Shared helpers for FIZZ Netlify Functions. No secrets are ever sent to the browser.
 import { createCipheriv, createDecipheriv, createHash, randomBytes, timingSafeEqual } from "node:crypto";
 
+/** How long sign-ins and connected apps are remembered in this browser (the most browsers allow). */
+export const YEAR = 60 * 60 * 24 * 400;
 export const env = (name) => {
   const v = (globalThis.Netlify?.env?.get?.(name) ?? process.env[name] ?? "").trim();
   return v || undefined;
@@ -63,7 +65,7 @@ export function getCookie(req, name) {
   return null;
 }
 
-export function setCookie(headers, name, value, { maxAge = 60 * 60 * 24 * 30, path = "/api" } = {}) {
+export function setCookie(headers, name, value, { maxAge = YEAR, path = "/api" } = {}) {
   headers.append(
     "Set-Cookie",
     `${name}=${encodeURIComponent(value)}; Path=${path}; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Lax`,
