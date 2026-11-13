@@ -755,3 +755,31 @@ dialog.settings-dlg#fizz-settings > .dlg-body { height: 100%; max-height: none; 
   #fizz-settings .dlg-tabs button { flex: none; }
 }
 @media (max-width: 819px) { #fizz-settings .dlg-tabs button svg { display: none; } #fizz-settings [data-pane]::before { font-size: 16px; } }
+/* Interactive blocks in chat replies (assets/interactive.js) */
+.ix-card { margin: 12px 0; padding: 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--card); display: grid; gap: 12px; max-width: 680px; }
+.ix-wait { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
+.ix-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.ix-head b { font-size: 15px; }
+.ix-count { font-size: 12px; font-weight: 600; color: var(--muted); padding: 2px 9px; border-radius: 99px; background: var(--surface-2); }
+.ix-bar { display: flex; gap: 4px; }
+.ix-bar i { flex: 1; height: 4px; border-radius: 4px; background: var(--surface-2); }
+.ix-bar i.on { background: #3b82f6; } .ix-bar i.cur { background: color-mix(in srgb, #3b82f6 45%, var(--surface-2)); }
+.ix-q { font-size: 16px; font-weight: 600; line-height: 1.5; }
+.ix-opts { display: grid; gap: 8px; }
+.ix-opt { display: flex; align-items: center; gap: 12px; width: 100%; padding: 11px 12px; text-align: start; border: 1px solid var(--border); border-radius: 11px; background: transparent; color: var(--fg); font: inherit; cursor: pointer; transition: background .12s, border-color .12s; }
+.ix-opt:hover:not([disabled]) { background: var(--surface); }
+.ix-opt[disabled] { cursor: default; }
+.ix-key { flex: none; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--border); font-size: 12px; font-weight: 700; color: var(--muted); }
+.ix-opt.right { border-color: #16a34a; background: color-mix(in srgb, #16a34a 12%, transparent); }
+.ix-opt.right .ix-key { background: #16a34a; border-color: #16a34a; color: #fff; }
+.ix-opt.wrong { border-color: #dc2626; background: color-mix(in srgb, #dc2626 12%, transparent); }
+.ix-opt.wrong .ix-key { background: #dc2626; border-color: #dc2626; color: #fff; }
+.ix-opt.dim { opacity: .55; }
+.ix-fb { font-size: 14px; line-height: 1.55; padding: 10px 12px; border-radius: 10px; background: var(--surface); }
+.ix-fb.right b { color: #16a34a; } .ix-fb.wrong b { color: #dc2626; }
+.ix-wide { width: 100%; justify-content: center; }
+.ix-result { display: grid; gap: 8px; text-align: center; padding: 6px 0; }
+.ix-score { font-size: 40px; font-weight: 800; letter-spacing: -.03em; }
+.ix-result p { margin: 0; color: var(--muted); }
+.ix-widget { padding: 12px; max-width: 760px; }
+.ix-frame { width: 100%; border: 0; border-radius: 10px; background: transparent; display: block; }

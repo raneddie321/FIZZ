@@ -466,6 +466,7 @@
   // ---------- markdown ----------
   function markdown(text) {
     if (!window.marked || !window.DOMPurify) return esc(text).replace(/\n/g, "<br>");
+    if (window.FIZZ?.interactive && /<fizz-(quiz|widget)\b/.test(text)) { const r = window.FIZZ.interactive.render(text, markdown); if (r !== null) return r; }
     const html = marked.parse(text, { gfm: true });
     const clean = DOMPurify.sanitize(html, { FORBID_TAGS: ["style", "iframe", "form", "img"], FORBID_ATTR: ["style"] });
     return clean.replace(/<a /g, '<a target="_blank" rel="noopener noreferrer nofollow" ');
