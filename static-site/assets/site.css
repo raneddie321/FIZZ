@@ -783,3 +783,7 @@ dialog.settings-dlg#fizz-settings > .dlg-body { height: 100%; max-height: none; 
 .ix-result p { margin: 0; color: var(--muted); }
 .ix-widget { padding: 12px; max-width: 760px; }
 .ix-frame { width: 100%; border: 0; border-radius: 10px; background: transparent; display: block; }
+/* Composer: "+" on the left; model, mic and send grouped on the right, send always last at the far right. */
+.composer .row .model-btn, .dev-app .composer .row .model-btn { margin-left: auto !important; margin-right: 0; min-width: 0; max-width: 55%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.composer .row .ctx-ring { margin-left: 0 !important; }
+.composer .row .send { margin-left: 2px; order: 99; flex: none; }
