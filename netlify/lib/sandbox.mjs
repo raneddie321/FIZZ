@@ -132,21 +132,46 @@ function treeOf(out) {
 }
 const TREE_CMD = `cd ${APP} && find . -type f -not -path './.git/*' -not -path '*/node_modules/*' -printf '%s\\t%P\\n' | sort -k2 | head -n ${TREE_MAX}`;
 
-/** git clone (shallow) into the sandbox. → { tree: [{ path, size }], files: count, branch, sha } */
-export async function clone({ userId, projectId, url, branch = "", token = "" }) {
+/**
+ * git clone (shallow) into the sandbox. A big repository can take minutes: the clone keeps going in the background and
+ * cloneStatus() picks it up. → { tree: [{ path, size }], files: count, truncated, branch, sha } or { running: true, progress }
+ */
+export async function clone({ userId, projectId, url, branch = "", token = "", waitMs = 50_000 }) {
   if (!validRepoUrl(url)) throw Object.assign(new Error("Only https://github.com/owner/repo repositories can be cloned."), { status: 400 });
   if (branch && !validBranch(branch)) throw Object.assign(new Error("Invalid branch."), { status: 400 });
   const sbx = await open(userId, projectId);
+  try { await sbx.extendTimeout?.(30 * 60 * 1000); } catch {}
   const cred = "/tmp/fizz-git-cred";
   if (token) await sbx.writeFiles([{ path: cred, content: Buffer.from(String(token)) }]);
   const auth = token ? `-c credential.helper='!f() { echo username=x-access-token; echo "password=$(cat ${cred})"; }; f'` : "";
-  const script = `rm -rf ${APP} && mkdir -p ${APP} && git ${auth} clone --depth 1 --single-branch ${branch ? `--branch ${q(branch)} ` : ""}${q(url)} ${APP} 2>&1; code=$?; rm -f ${cred}; exit $code`;
-  const r = await sh(sbx, script, 55_000);
-  if (r.code !== 0) throw Object.assign(new Error(`git clone failed: ${String(r.out || r.err || "").replace(/x-access-token:[^@\s]+@/g, "").slice(-600)}`), { status: 400 });
-  const info = await sh(sbx, `cd ${APP} && git rev-parse --abbrev-ref HEAD && git rev-parse HEAD`);
-  const [head, sha] = String(info.out || "").trim().split("\n");
+  // The exit code lands in a file, so a clone that outlives this request is still read correctly later.
+  const script = `rm -f ${CLONE_EXIT} ${CLONE_LOG}; rm -rf ${APP} && mkdir -p ${APP} && git ${auth} clone --progress --depth 1 --single-branch ${branch ? `--branch ${q(branch)} ` : ""}${q(url)} ${APP} > ${CLONE_LOG} 2>&1; code=$?; rm -f ${cred}; echo $code > ${CLONE_EXIT}; exit $code`;
+  const r = await sh(sbx, script, waitMs);
+  if (r.code === 124) return { running: true, progress: await cloneProgress(sbx) };
+  return cloneResult(sbx, r.code, branch);
+}
+const CLONE_EXIT = "/tmp/fizz-clone-exit", CLONE_LOG = "/tmp/fizz-clone.log";
+async function cloneProgress(sbx) {
+  const log = String((await sbx.readFileToBuffer({ path: CLONE_LOG }).catch(() => null)) || "");
+  return log.split(/[\r\n]+/).filter(Boolean).pop()?.replace(/x-access-token:[^@\s]+@/g, "").slice(-160) || "Cloning…";
+}
+async function cloneResult(sbx, code, branch) {
+  if (code !== 0) {
+    const log = String((await sbx.readFileToBuffer({ path: CLONE_LOG }).catch(() => null)) || "");
+    throw Object.assign(new Error(`git clone failed: ${log.replace(/x-access-token:[^@\s]+@/g, "").slice(-600)}`), { status: 400 });
+  }
+  const info = await sh(sbx, `cd ${APP} && git rev-parse --abbrev-ref HEAD && git rev-parse HEAD && git ls-files | wc -l`);
+  const [head, sha, count] = String(info.out || "").trim().split("\n");
   const tree = treeOf((await sh(sbx, TREE_CMD)).out);
-  return { tree, files: tree.length, branch: head || branch, sha: sha || "" };
+  const files = Math.max(tree.length, Number(count) || 0);
+  return { tree, files, truncated: files > tree.length, branch: head || branch, sha: sha || "" };
+}
+/** A clone that was still running: → the same result as clone(), or { running: true, progress }. */
+export async function cloneStatus({ userId, projectId }) {
+  const sbx = await open(userId, projectId);
+  const exit = await sbx.readFileToBuffer({ path: CLONE_EXIT }).catch(() => null);
+  if (!exit) return { running: true, progress: await cloneProgress(sbx) };
+  return cloneResult(sbx, Number(String(exit).trim()), "");
 }
 
 /**
@@ -157,7 +182,19 @@ export async function look({ userId, projectId, kind, pattern = "", path = "", g
   const sbx = await open(userId, projectId);
   const there = await sh(sbx, `test -d ${APP}/.git && echo yes`);
   if (!String(there.out).includes("yes")) throw Object.assign(new Error("The repository isn't in the cloud sandbox any more (it was reset). Clone it again from the project's menu."), { status: 410, code: "gone" });
-  if (kind === "tree") return { tree: treeOf((await sh(sbx, TREE_CMD)).out) };
+  if (kind === "tree") {
+    // A huge repository: the folder asked for, not the whole tree.
+    const base = safeProjectPath(String(path || "").replace(/\/+$/, "")) || "";
+    if (!base) return { tree: treeOf((await sh(sbx, TREE_CMD)).out) };
+    return { tree: treeOf((await sh(sbx, `cd ${APP} && find ${q(base)} -type f -not -path '*/node_modules/*' -printf '%s\\t%p\\n' 2>/dev/null | sort -k2 | head -n ${TREE_MAX}`)).out) };
+  }
+  if (kind === "find") {
+    // Files whose name contains the words (for a repository too big to list whole in the page).
+    const name = String(pattern || "").trim();
+    if (!name || name.length > 200) throw Object.assign(new Error("Give a file name."), { status: 400 });
+    const r = await sh(sbx, `cd ${APP} && git ls-files | grep -i -F -e ${q(name)} | head -n 40`);
+    return { paths: String(r.out || "").split("\n").filter(Boolean) };
+  }
   if (kind === "grep") {
     if (!String(pattern).trim() || String(pattern).length > 300) throw Object.assign(new Error("Give a pattern (up to 300 characters)."), { status: 400 });
     const base = safeProjectPath(String(path || "").replace(/\/+$/, "")) || "";
@@ -193,7 +230,7 @@ const RUNS = "/vercel/sandbox/fizz-run";
 const validRunId = (s) => /^[a-z0-9]{8,40}$/.test(String(s || ""));
 
 /** Copies the project in, writes the runner and its input, and starts it in the background. → { runId } */
-export async function agentStart({ userId, projectId, files = {}, input, runId, token, origin }) {
+export async function agentStart({ userId, projectId, files = {}, input, runId, token, origin, remote = false }) {
   const { AGENT_CORE_SOURCE, RUNNER_SOURCE } = await import("./runner/bundle.mjs");
   if (!validRunId(runId)) throw Object.assign(new Error("Bad run id."), { status: 400 });
   const list = [];
@@ -206,9 +243,11 @@ export async function agentStart({ userId, projectId, files = {}, input, runId, 
   if (list.reduce((n, [, v]) => n + Buffer.byteLength(v, "utf8"), 0) > TEXT_LIMIT) throw Object.assign(new Error("The project is too large to run in the cloud (over 3 MB of text)."), { status: 413 });
   const sbx = await open(userId, projectId);
   try { await sbx.extendTimeout?.(30 * 60 * 1000); } catch {}
+  // A repository that lives in the sandbox: it has to still be there (a reset sandbox loses it).
+  if (remote && !String((await sh(sbx, `test -d ${APP}/.git && echo yes`)).out).includes("yes")) throw Object.assign(new Error("The repository isn't in the cloud sandbox any more (it was reset). Clone it again from the project's menu."), { status: 410, code: "gone" });
   const dir = `${RUNS}/${runId}`;
   await sbx.runCommand({ cmd: "mkdir", args: ["-p", APP, dir] });
-  const body = { ...input, files: Object.fromEntries(list), appDir: APP, origin, token, sandboxUrl: sbx.domain(PORT) };
+  const body = { ...input, remote: Boolean(remote), files: Object.fromEntries(list), appDir: APP, origin, token, sandboxUrl: sbx.domain(PORT) };
   await sbx.writeFiles([
     ...list.map(([p, v]) => ({ path: `${APP}/${p}`, content: Buffer.from(v) })),
     { path: `${RUNS}/agent-core.mjs`, content: Buffer.from(AGENT_CORE_SOURCE) },

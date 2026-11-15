@@ -2,7 +2,7 @@ import { env, error, getBigCookie, getCookie, json, readJson, sameOrigin, seal, 
 import { requireUser } from "../netlify/lib/auth.mjs";
 import { quotaCounter, today } from "../netlify/lib/kv.mjs";
 import { Sandbox } from "@vercel/sandbox";
-import { agentPoll, agentStart, agentStop, clone, look, run, sandboxEnabled, setSandboxModule, stop, wait } from "../netlify/lib/sandbox.mjs";
+import { agentPoll, agentStart, agentStop, clone, cloneStatus, look, run, sandboxEnabled, setSandboxModule, stop, wait } from "../netlify/lib/sandbox.mjs";
 import { randomBytes } from "node:crypto";
 
 // Imported statically so Vercel bundles the SDK with this function.
@@ -32,6 +32,7 @@ export async function POST(req) {
       const gh = unseal(getBigCookie(req, "fizz_gh")); // the user's own GitHub connection, for private repositories
       return json(await clone({ ...args, url: String(body.url || ""), branch: String(body.branch || ""), token: gh?.t || "" }));
     }
+    if (body.action === "clone-status") return json(await cloneStatus(args));
     if (body.action === "look") {
       if (!(await quotaCounter()(`${today()}/sandbox-look/${who.userId}`, Number(env("FIZZ_SANDBOX_LOOK_LIMIT") || 2000)))) return error(429, "You've reached today's limit for looking at repositories in the sandbox.", "quota");
       return json(await look({ ...args, kind: String(body.kind || ""), pattern: String(body.pattern || ""), path: String(body.path || ""), glob: String(body.glob || "").slice(0, 200), ignoreCase: Boolean(body.ignoreCase), max: body.max, paths: Array.isArray(body.paths) ? body.paths.map(String) : [] }));
@@ -45,7 +46,7 @@ export async function POST(req) {
       // The runner gets a token that only allows model calls and web searches for this user, for 2 hours.
       // A key the user brought (Settings → AI) travels sealed inside it: the sandbox never sees it.
       const token = seal({ kind: "run", u: who.userId, p: projectId, r: runId, ai: aiTarget(body.ai), exp: Date.now() + 2 * 3600_000 });
-      return json(await agentStart({ ...args, files: body.files || {}, input, runId, token, origin: new URL(req.url).origin }));
+      return json(await agentStart({ ...args, files: body.files || {}, input, runId, token, origin: new URL(req.url).origin, remote: Boolean(body.remote) }));
     }
     if (body.action === "agent-poll") return json(await agentPoll({ ...args, runId: String(body.runId || ""), from: Number(body.from) || 0 }));
     if (body.action === "agent-stop") return json(await agentStop({ ...args, runId: String(body.runId || "") }));

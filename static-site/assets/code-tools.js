@@ -37,12 +37,18 @@
   }
   const remoteEntries = (p) => (p.remote.tree || []).map((e) => ({ path: e.path, size: p.files[e.path] !== undefined ? sizeOf(p.files[e.path]) : e.size }));
   /** The path the agent means in a remote project: exact, or a unique file name. */
-  function findRemote(p, raw) {
+  async function findRemote(p, raw) {
     const path = clean(raw);
     const all = (p.remote.tree || []).map((e) => e.path);
     if (p.files[path] !== undefined || all.includes(path)) return { path };
     const name = path.split("/").pop().toLowerCase(), stem = name.replace(/\.[^.]+$/, "");
-    const near = all.filter((f) => { const b = f.toLowerCase().split("/").pop(); return b === name || b.replace(/\.[^.]+$/, "") === stem; }).slice(0, 5);
+    let near = all.filter((f) => { const b = f.toLowerCase().split("/").pop(); return b === name || b.replace(/\.[^.]+$/, "") === stem; }).slice(0, 5);
+    // Too big to list whole: the file may well exist outside the part the page has.
+    if (p.remote.truncated && path) {
+      const got = await look(p, { kind: "read", paths: [path] }).catch(() => ({ files: {} }));
+      if (got.files?.[path] !== null && got.files?.[path] !== undefined) return { path };
+      near = ((await look(p, { kind: "find", pattern: name }).catch(() => ({ paths: [] }))).paths || []).slice(0, 5);
+    }
     return { miss: `There is no file ${path || "(no path given)"} in the repository.${near.length ? ` Did you mean: ${near.join(", ")}?` : " Use <fizz-tree/> or <fizz-grep/> to find it."}` };
   }
   /** The file a path means, or a helpful miss: the closest names. */
@@ -66,6 +72,8 @@
       const p = ctx.project();
       if (remote(p)) {
         if (t.attrs.refresh === "true") { const r = await look(p, { kind: "tree" }); p.remote.tree = r.tree; ctx.save?.(); }
+        // A repository too big to list whole: the folder asked for comes from the sandbox.
+        if (p.remote.truncated && clean(t.attrs.path)) { const r = await look(p, { kind: "tree", path: clean(t.attrs.path) }); return { ok: true, text: C.treeText(r.tree || [], { path: clean(t.attrs.path), depth, max: 400 }) }; }
         return { ok: true, text: C.treeText(remoteEntries(p), { path: clean(t.attrs.path), depth, max: 400 }) };
       }
       return { ok: true, text: C.treeText(entries(p.files), { path: clean(t.attrs.path), depth, max: 400 }) };
@@ -107,7 +115,7 @@
     async run(t, ctx) {
       const p = ctx.project();
       const files = p.files;
-      const f = remote(p) ? findRemote(p, t.attrs.path || t.body) : find(files, t.attrs.path || t.body);
+      const f = remote(p) ? await findRemote(p, t.attrs.path || t.body) : find(files, t.attrs.path || t.body);
       if (f.miss) return { ok: false, text: f.miss };
       if (remote(p) && files[f.path] === undefined) {
         const got = (await pull(ctx, [f.path]))[f.path];
@@ -129,7 +137,7 @@
     async run(t, ctx) {
       const p = ctx.project();
       const files = p.files;
-      const f = remote(p) ? findRemote(p, t.attrs.path || t.body) : find(files, t.attrs.path || t.body);
+      const f = remote(p) ? await findRemote(p, t.attrs.path || t.body) : find(files, t.attrs.path || t.body);
       if (f.miss) return { ok: false, text: f.miss };
       if (remote(p) && files[f.path] === undefined) await pull(ctx, [f.path]);
       const v = files[f.path];
@@ -141,9 +149,17 @@
   });
 
   /** Clones a GitHub repository into the project's cloud sandbox. → the project's remote info. */
-  async function cloneInto(project, { owner, repo, branch }) {
-    const r = await F.conn.sandbox({ action: "clone", projectId: project.id, url: `https://github.com/${owner}/${repo}`, branch });
-    project.remote = { owner, repo, branch: r.branch, sha: r.sha, tree: r.tree, at: Date.now() };
+  /** Clones a repository into the project's sandbox. A big one keeps cloning in the background; onProgress(line) follows it. */
+  async function cloneInto(project, { owner, repo, branch }, onProgress = null) {
+    let r = await F.conn.sandbox({ action: "clone", projectId: project.id, url: `https://github.com/${owner}/${repo}`, branch });
+    const started = Date.now();
+    while (r.running && Date.now() - started < 30 * 60_000) {
+      onProgress?.(r.progress || "Cloning…");
+      await new Promise((ok) => setTimeout(ok, 4000));
+      r = await F.conn.sandbox({ action: "clone-status", projectId: project.id });
+    }
+    if (r.running) throw new Error("The clone is taking more than 30 minutes. Try again later, or a smaller branch.");
+    project.remote = { owner, repo, branch: r.branch || branch, sha: r.sha, tree: r.tree, total: r.files || r.tree.length, truncated: Boolean(r.truncated), at: Date.now() };
     // The files that tell what the project is come along; the rest is fetched when Fizz Code reads it.
     const first = ["FIZZ.md", "README.md", "package.json", "AGENTS.md", "CLAUDE.md"].filter((x) => r.tree.some((e) => e.path === x));
     if (first.length) { const got = await look(project, { kind: "read", paths: first }); for (const [k, v] of Object.entries(got.files || {})) if (typeof v === "string") project.files[k] = v; }

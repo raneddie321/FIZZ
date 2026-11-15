@@ -118,6 +118,39 @@ function sh(cmd, { timeoutMs = 10 * 60_000, background = false } = {}) {
     child.on("close", (code) => { clearTimeout(timer); resolve({ code: code ?? 124, out: out.slice(-20_000) }); });
   });
 }
+/** A short read-only command in the project folder (git grep, ls-files): → its output. */
+function capture(cmd, timeoutMs = 60_000) {
+  return new Promise((resolve) => {
+    const child = spawn("bash", ["-c", `cd ${APP} && ${cmd}`], { stdio: ["ignore", "pipe", "pipe"] });
+    let out = "";
+    child.stdout.on("data", (b) => { if (out.length < 2_000_000) out += b.toString(); });
+    const timer = setTimeout(() => child.kill("SIGKILL"), timeoutMs);
+    child.on("close", (code) => { clearTimeout(timer); resolve({ code, out }); });
+  });
+}
+const sq = (s) => `'${String(s).replace(/'/g, "'\\''")}'`;
+// A repository that lives in the sandbox (input.remote): the page holds only the files it has looked at, the rest is
+// read from disk here; what this run reads is sent back (reply.pulled) so the page's copy matches before edits apply.
+const pulled = {};
+async function fromDisk(path) {
+  if (typeof files[path] === "string") return files[path];
+  if (!input.remote || !C.validPath(path)) return undefined;
+  const b = await readFile(join(APP, path)).catch(() => null);
+  if (!b || b.length > 2_000_000) return undefined;
+  const text = b.toString("utf8");
+  if (/[\u0000]/.test(text.slice(0, 8000))) return undefined;
+  files[path] = text;
+  pulled[path] = text;
+  return text;
+}
+/** Files read from disk since the last call ride on this reply (the page fills them in before applying it). */
+function attachPulled(reply) {
+  const got = Object.keys(pulled);
+  if (!got.length) return false;
+  reply.pulled = { ...(reply.pulled || {}), ...pulled };
+  for (const k of got) delete pulled[k];
+  return true;
+}
 async function changedFiles() {
   const list = (await readFile("/tmp/fizz-run-changed", "utf8").catch(() => "")).split("\n").map((l) => l.replace(/^\.\//, "").trim()).filter(Boolean).slice(0, 100);
   const out = {};
@@ -130,11 +163,13 @@ async function changedFiles() {
   }
   return out;
 }
-function find(raw) {
+async function find(raw) {
   const path = clean(raw);
-  if (typeof files[path] === "string") return { path };
+  if (typeof (await fromDisk(path)) === "string") return { path };
   const name = path.split("/").pop().toLowerCase(), stem = name.replace(/\.[^.]+$/, "");
-  const near = Object.keys(files).filter((f) => { const b = f.toLowerCase().split("/").pop(); return b === name || b.replace(/\.[^.]+$/, "") === stem; }).slice(0, 5);
+  let near = Object.keys(files).filter((f) => { const b = f.toLowerCase().split("/").pop(); return b === name || b.replace(/\.[^.]+$/, "") === stem; }).slice(0, 5);
+  if (input.remote && name) near = (await capture(`git ls-files | grep -i -F -e ${sq(name)} | head -n 5`)).out.split("\n").filter(Boolean);
+  if (near.length === 1 && near[0].toLowerCase().endsWith(path.toLowerCase()) && typeof (await fromDisk(near[0])) === "string") return { path: near[0] };
   return { miss: `There is no file ${path || "(no path given)"}.${near.length ? ` Did you mean: ${near.join(", ")}?` : " Use <fizz-tree/> to see what exists."}` };
 }
 const mask = (text) => String(text).split("\n").map((l) => (/^\s*(export\s+)?[A-Za-z_][\w.]*\s*=/.test(l) ? l.replace(/=.*$/, "=•••• (set — the value is hidden from you)") : l)).join("\n");
@@ -166,24 +201,38 @@ async function runTool(t) {
     }
     case "tree": {
       const depth = Math.min(8, Math.max(1, Number(t.attrs.depth) || 3));
+      if (input.remote) {
+        const base = clean(t.attrs.path);
+        const r = await capture(`find ${base ? sq(base) : "."} -type f -not -path '*/.git/*' -not -path '*/node_modules/*' -printf '%s\\t%P\\n' 2>/dev/null | head -n 200000`);
+        const list = r.out.split("\n").filter(Boolean).map((l) => { const i = l.indexOf("\t"); return { size: Number(l.slice(0, i)) || 0, path: (base ? `${base}/` : "") + l.slice(i + 1) }; });
+        return { ok: true, text: C.treeText(list, { path: base, depth, max: 400 }) };
+      }
       return { ok: true, text: C.treeText(Object.entries(files).map(([path, v]) => ({ path, size: typeof v === "string" ? v.length : 0 })), { path: clean(t.attrs.path), depth, max: 400 }) };
     }
     case "grep": {
       const pattern = String(t.attrs.pattern || t.body || "");
       if (!pattern.trim()) return { ok: false, text: 'Give a pattern to search for: <fizz-grep pattern="…"/>.' };
       const max = Math.min(200, Math.max(1, Number(t.attrs.max) || 80));
+      if (input.remote) {
+        const base = clean(t.attrs.path), glob = String(t.attrs.glob || "");
+        const spec = glob ? `:(glob)${base ? `${base}/` : ""}${glob.includes("/") ? glob : `**/${glob}`}` : base || ".";
+        const g = await capture(`git grep -n -I --no-color ${t.attrs["ignore-case"] === "true" ? "-i " : ""}-E -e ${sq(pattern)} -- ${sq(spec)} | head -n ${max + 1}`);
+        const lines = g.out.split("\n").filter((l) => l && !SECRET.test(l.split(":")[0]));
+        if (!lines.length) return { ok: true, text: `No matches for ${pattern}${base ? ` under ${base}` : ""}.` };
+        return { ok: true, text: `${Math.min(lines.length, max)}${lines.length > max ? "+" : ""} match${lines.length === 1 ? "" : "es"}${lines.length > max ? " (more exist: narrow the pattern, path or glob)" : ""}:\n${lines.slice(0, max).map((l) => l.slice(0, 300)).join("\n")}` };
+      }
       const r = C.grepFiles(files, { pattern, path: clean(t.attrs.path), glob: t.attrs.glob || "", ignoreCase: t.attrs["ignore-case"] === "true", max, skip: (p, text) => typeof text !== "string" || SECRET.test(p) || text.length > 1_500_000 });
       if (!r.matches.length) return { ok: true, text: `No matches for ${pattern}.` };
       return { ok: true, text: `${r.matches.length}${r.truncated ? "+" : ""} match${r.matches.length === 1 ? "" : "es"} in ${r.files} file${r.files === 1 ? "" : "s"}:\n${r.matches.map((m) => `${m.path}:${m.line}: ${m.text}`).join("\n")}` };
     }
     case "read": {
-      const f = find(t.attrs.path || t.body);
+      const f = await find(t.attrs.path || t.body);
       if (f.miss) return { ok: false, text: f.miss };
       const r = C.readLines(SECRET.test(f.path) ? mask(files[f.path]) : files[f.path], t.attrs.lines || "");
       return { ok: true, text: `${f.path} — lines ${r.from}–${r.to} of ${r.total}:\n${r.text}${r.more ? `\n… ${r.total - r.to} more lines: ask for lines="${r.to + 1}-${Math.min(r.total, r.to + 400)}".` : ""}` };
     }
     case "symbols": {
-      const f = find(t.attrs.path || t.body);
+      const f = await find(t.attrs.path || t.body);
       if (f.miss) return { ok: false, text: f.miss };
       if (SECRET.test(f.path)) return { ok: true, text: `${f.path} has no outline (secret).` };
       const list = C.symbolsOf(files[f.path], f.path);
@@ -207,7 +256,7 @@ async function applyReply(reply, parsed) {
   for (const f of parsed.files) if (f.closed && C.validPath(f.path)) proposals.push({ path: f.path, after: f.content });
   for (const e of parsed.edits) {
     if (!e.closed || !C.validPath(e.path)) continue;
-    const current = proposals.findLast((x) => x.path === e.path)?.after ?? files[e.path];
+    const current = proposals.findLast((x) => x.path === e.path)?.after ?? (await fromDisk(e.path));
     if (typeof current !== "string") { errors[e.path] = `${e.path} doesn't exist yet (or isn't a text file): write it whole with <fizz-file>.`; continue; }
     const r = C.applyHunks(current, e.hunks);
     if (r.error) errors[e.path] = r.error;
@@ -301,6 +350,7 @@ try {
     if (r.stop === "max_tokens") reply.cutOff = true;
     const parsed = C.parseReply(reply.content, { fences: reply.mode === "build", known: C.TOOL_TYPES });
     const editErrors = await applyReply(reply, parsed);
+    attachPulled(reply);
     reply.tools = parsed.tools.map((t) => ({ ...t, status: "queued" }));
     await save();
 
@@ -321,6 +371,7 @@ try {
       }
       await save();
     }
+    if (attachPulled(reply)) await save();
     messages.push({ role: "assistant", content: reply.content });
     if (handoff) await finish("handoff");
 

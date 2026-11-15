@@ -49,6 +49,10 @@ page is closed or the phone locks. No database is needed: the run's state lives 
 - Anything it can't do there (connected apps, the cloud browser, push/deploy, a question, anything the permission rules
   want to ask about) stops the run as a handoff; the page continues from exactly that point with its normal loop,
   permission gate and checks when it's open again. Tasks only go to the cloud in Auto permission mode without
-  "Review file changes first", and not for repositories that live in the sandbox.
+  "Review file changes first".
+- Repositories that live in the sandbox run there too: the runner reads files from disk, searches with `git grep` and
+  lists folders with `find`, and sends back the files it read (`reply.pulled`) so the page applies the same edits.
+- Very big repositories: a clone that takes longer than the request keeps going (`clone` → `clone-status`); past 20,000
+  files the page keeps part of the tree (`remote.truncated`), and folders and file names are looked up in the sandbox.
 - Limits: the sandbox lives about 30 minutes past the start of a run; very long tasks finish on the page.
   "+" → Permissions → "Keep working when I leave" turns it off.

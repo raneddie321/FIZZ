@@ -13,7 +13,7 @@ const { handleChat } = await import("../../netlify/lib/ai-chat-core.mjs");
 
 const sse = (text) => text.match(/[\s\S]{1,25}/g).map((c) => `data: ${JSON.stringify({ choices: [{ delta: { content: c } }] })}\n\n`).join("") + `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: "stop" }] })}\n\ndata: [DONE]\n\n`;
 
-async function runWith(script, { files = {}, perm = { mode: "auto" }, extra = {} } = {}) {
+async function runWith(script, { files = {}, perm = { mode: "auto" }, extra = {}, disk = {}, git = false } = {}) {
   const seen = { ai: [], web: [] };
   const server = createServer(async (req, res) => {
     let body = "";
@@ -31,7 +31,8 @@ async function runWith(script, { files = {}, perm = { mode: "auto" }, extra = {}
   const root = await mkdtemp(join(tmpdir(), "fizz-run-"));
   const app = join(root, "app"), dir = join(root, "run");
   await mkdir(app, { recursive: true }); await mkdir(dir, { recursive: true });
-  for (const [p, v] of Object.entries(files)) { await mkdir(join(app, p, ".."), { recursive: true }); await writeFile(join(app, p), v); }
+  for (const [p, v] of Object.entries({ ...disk, ...files })) { await mkdir(join(app, p, ".."), { recursive: true }); await writeFile(join(app, p), v); }
+  if (git) await new Promise((ok) => spawn("bash", ["-c", "git init -q && git add -A && git -c user.email=t@t -c user.name=t commit -qm init"], { cwd: app }).on("close", ok));
   await cp(new URL("../../netlify/lib/agent-core.mjs", import.meta.url), join(root, "agent-core.mjs"));
   await cp(new URL("../../netlify/lib/runner/agent-runner.mjs", import.meta.url), join(root, "agent-runner.mjs"));
   await writeFile(join(dir, "input.json"), JSON.stringify({ origin, token: "TOKEN", system: "sys", messages: [{ role: "user", content: "build it" }], mode: "build", step: 1, maxSteps: 8, perm, files, appDir: app, ...extra }));
@@ -86,6 +87,24 @@ async function runWith(script, { files = {}, perm = { mode: "auto" }, extra = {}
   assert.deepEqual([state.steps[0].reply.id, state.steps[0].reply.content, state.steps[0].reply.pending], ["reply1", "It's sunny in Tel Aviv.", false]);
   assert.equal(seen.web.length, 1);
   assert.match(seen.ai[1].messages.at(-1).content, /<search-results query="weather tel aviv">/);
+}
+
+// 6. A repository that lives in the sandbox: the page sent no files; the runner searches with git, edits from disk,
+//    and sends back what it read so the page's copy matches.
+{
+  const disk = { "src/auth/login.js": "export function login() {\n  redirect('/home');\n}\n", "README.md": "# Huge\n" };
+  for (let i = 0; i < 30; i++) disk[`pkg/m${i}/f${i}.js`] = `export const v${i} = ${i};\n`;
+  const { state, app } = await runWith([
+    `<fizz-grep pattern="redirect"/>\n<fizz-tree path="pkg" depth="1"/>\n<fizz-read path="login.js"/>`,
+    "<fizz-edit path=\"src/auth/login.js\">\n<<<<<<< SEARCH\n  redirect('/home');\n=======\n  redirect('/dashboard');\n>>>>>>> REPLACE\n</fizz-edit>",
+  ], { extra: { remote: true }, disk, git: true });
+  assert.equal(state.status, "done", state.error);
+  const r1 = state.steps[0].reply;
+  assert.match(r1.tools[0].result.text, /src\/auth\/login\.js:2:/, "git grep finds it on disk");
+  assert.match(r1.tools[1].result.text, /m0|30 files|pkg/, "the tree of a folder comes from disk");
+  assert.match(r1.tools[2].result.text, /src\/auth\/login\.js — lines 1/, "a bare file name is found in the repository");
+  assert.equal(r1.pulled["src/auth/login.js"], disk["src/auth/login.js"], "what it read goes back to the page");
+  assert.equal(await readFile(join(app, "src/auth/login.js"), "utf8"), "export function login() {\n  redirect('/dashboard');\n}\n");
 }
 
 // ---------- the run token on the AI endpoint ----------
@@ -155,5 +174,32 @@ console.log("Cloud runner tests passed");
   assert.equal(r.status, "lost");
   await lib.agentStop({ ...A, runId: "abcdef1234" });
   assert.equal(written[`${dir}/stop`], "1");
+}
+// A clone that outlives the request keeps going; its status is read later.
+{
+  const lib = await import("../../netlify/lib/sandbox.mjs");
+  const files = {};
+  let finish = null;
+  const sbx = {
+    async writeFiles(list) { for (const f of list) files[f.path] = String(f.content); },
+    async runCommand(p) {
+      const script = p.args?.[1] || "";
+      if (/git .*clone/.test(script)) return { cmdId: "c", wait: () => new Promise((ok) => { finish = () => { files["/tmp/fizz-clone-exit"] = "0\n"; ok({ exitCode: 0, stdout: async () => "", stderr: async () => "", output: async () => "" }); }; }), output: async () => "" };
+      const out = /rev-parse/.test(script) ? "main\nabc\n250000\n" : /find \. -type f/.test(script) ? "10\ta.js\n" : "";
+      const done = { exitCode: 0, stdout: async () => out, stderr: async () => "", output: async () => out };
+      return { cmdId: "c", wait: async () => done, output: async () => out };
+    },
+    async readFileToBuffer({ path }) { return files[path] !== undefined ? Buffer.from(files[path]) : null; },
+    domain: () => "",
+  };
+  lib.setSandboxModule({ Sandbox: { getOrCreate: async () => sbx } });
+  files["/tmp/fizz-clone.log"] = "Receiving objects:  42% (4200/10000)\r";
+  let r = await lib.clone({ userId: "u", projectId: "p", url: "https://github.com/big/mono", waitMs: 50 });
+  assert.deepEqual([r.running, r.progress], [true, "Receiving objects:  42% (4200/10000)"]);
+  r = await lib.cloneStatus({ userId: "u", projectId: "p" });
+  assert.equal(r.running, true);
+  finish();
+  r = await lib.cloneStatus({ userId: "u", projectId: "p" });
+  assert.deepEqual([r.files, r.truncated, r.branch, r.tree.length], [250000, true, "main", 1], "a huge repository says so");
 }
 console.log("Cloud runner sandbox tests passed");

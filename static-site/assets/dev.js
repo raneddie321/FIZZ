@@ -578,7 +578,7 @@
     const stats = { files: 0, chars: 0 };
     for (const v of Object.values(p.files)) { stats.files++; if (typeof v === "string" && !isBinary(v)) stats.chars += v.length; }
     let ctx;
-    if (p.remote) { stats.files = Math.max(stats.files, (p.remote.tree || []).length); stats.chars = Math.max(stats.chars, (p.remote.tree || []).reduce((n, e) => n + e.size, 0)); }
+    if (p.remote) { stats.files = Math.max(stats.files, p.remote.total || 0, (p.remote.tree || []).length); stats.chars = Math.max(stats.chars, (p.remote.tree || []).reduce((n, e) => n + e.size, 0)); }
     if (!p.remote && !F.agentCore.isBigProject(stats)) ctx = order.map((path) => fileTag(path, budget)).join("\n");
     else {
       // A large project: the tree, and in full only what matters now. The rest is one tool call away.
@@ -589,7 +589,7 @@
       ctx = [
         `THIS IS A LARGE PROJECT: ${stats.files} files, about ${Math.round(stats.chars / 1000)}k characters of text. Only its file tree and a few files are shown here; everything else is one tool call away.`,
         "Before you change a file you haven't seen, look at it: <fizz-grep> finds where something is, <fizz-read path lines> shows that part, <fizz-symbols> gives a file's outline, <fizz-tree path> lists a folder. Change existing files with <fizz-edit>, copying the SEARCH text from what you read; don't rewrite a long file with <fizz-file>. Don't guess what a file contains.",
-        ...(p.remote ? [`This repository (${p.remote.owner}/${p.remote.repo}@${p.remote.branch}) lives in your cloud sandbox: <fizz-read> brings a file into the project so you can edit it, and <fizz-sandbox> commands run on the whole repository there (your edits are copied in first).`] : []),
+        ...(p.remote ? [`This repository (${p.remote.owner}/${p.remote.repo}@${p.remote.branch}) lives in your cloud sandbox: <fizz-read> brings a file into the project so you can edit it, and <fizz-sandbox> commands run on the whole repository there (your edits are copied in first).${p.remote.truncated ? ` It is very large (${p.remote.total} files): the tree below is only part of it. Find your way with <fizz-tree path="…"/> on a folder and <fizz-grep>, never by listing everything.` : ""}`] : []),
         `FILE TREE:\n${F.agentCore.treeText(p.remote ? F.codeTools.remoteEntries(p) : F.codeTools.entries(p.files), { depth: 2, max: 220 })}`,
         `SHOWN IN FULL (${shown.length}: project memory, files you were pointed at, files changed in this chat, entry points):\n${full}`,
       ].join("\n\n");
@@ -876,7 +876,7 @@
   function cloudRunOk() {
     const p = project();
     return data.settings.cloudRun !== false && Boolean(F.serverStatusCached?.()?.tools?.sandbox) && F.perm.mode() === "auto" && !data.settings.reviewChanges
-      && !p.remote && state.mode !== "plan" && !F.aiTarget(data.settings)?.missing;
+      && state.mode !== "plan" && !F.aiTarget(data.settings)?.missing;
   }
   const cloudFiles = (files) => Object.fromEntries(Object.entries(files).filter(([k, v]) => typeof v === "string" && !isBinary(v) && !/^(node_modules|\.fizz-build|\.fizz-out)\//.test(k)));
   async function cloudGenerate(skills, lastUser) {
@@ -892,7 +892,7 @@
     let r;
     try {
       r = await F.conn.sandbox({
-        action: "agent-start", projectId: p.id, files: cloudFiles(p.files), ai,
+        action: "agent-start", projectId: p.id, files: cloudFiles(p.files), ai, remote: Boolean(p.remote),
         run: { system, messages: history.map(conv), mode: state.mode, step: 1, maxSteps: MAX_STEPS(), modelLabel: holder.model, perm: { mode: F.perm.mode(), rules: F.perm.rules(), project: F.perm.projectRules(p), projectTrusted: F.perm.projectTrusted(p) } },
       });
       if (!r?.runId) throw new Error("the sandbox didn't start the run");
@@ -934,6 +934,7 @@
   }
   async function importCloud(c, run, r) {
     const steps = r.steps || [];
+    const p0 = project();
     if (steps.length) c.messages = c.messages.filter((m) => !m.cloudPlaceholder);
     let changed = false;
     for (const st of steps) {
@@ -943,6 +944,8 @@
       let m = c.messages.find((x) => x.id === src.id);
       if (!m) { m = { ...src, tools: undefined }; c.messages.push(m); }
       Object.assign(m, { content: src.content, pending: src.pending, error: src.error, soft: src.soft, cutOff: src.cutOff });
+      // A repository in the sandbox: files the run read from disk come first, so edits apply to the same text here.
+      for (const [path, text] of Object.entries(src.pulled || {})) if (typeof text === "string" && validPath(path) && p0.files[path] === undefined) p0.files[path] = text;
       if (src.pending) continue;
       if (!m.cloudApplied) {
         m.cloudApplied = true;
@@ -2111,12 +2114,13 @@
       if (r.truncated && cloud) {
         // Too big for the browser: it lives in the sandbox instead.
         F.toast(`${repo.fullName} has ${r.total} files — cloning it into your cloud sandbox…`);
-        await F.codeTools.cloneInto(p, { owner: repo.owner, repo: repo.name, branch: v.branch });
+        let shown = 0;
+        await F.codeTools.cloneInto(p, { owner: repo.owner, repo: repo.name, branch: v.branch }, (line) => { if (Date.now() - shown > 12000) { shown = Date.now(); F.toast(`Still cloning ${repo.fullName}: ${line}`); } });
         p.git.pushed = [];
         data.projects.unshift(p);
         selectProject(p.id);
         save();
-        F.toast(`${repo.fullName} is in your cloud sandbox (${p.remote.tree.length} files). Fizz Code reads what it needs from there.`);
+        F.toast(`${repo.fullName} is in your cloud sandbox (${(p.remote.total || p.remote.tree.length).toLocaleString()} files). Fizz Code reads what it needs from there.`);
       } else {
         p.files = r.files;
         p.git.pushed = Object.keys(r.files);
