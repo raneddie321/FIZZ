@@ -329,6 +329,40 @@
     return { role: "user", content: parts };
   }
 
+  // ---------- "fizz" on OpenRouter: Kimi plans, GLM writes the code ----------
+  // The newest matching models are picked from OpenRouter's public model list (cached for a day), so the names keep up.
+  const FIZZ_FALLBACK = { planner: "moonshotai/kimi-k2", coder: "z-ai/glm-4.6" };
+  let fizzIds = null;
+  function pickModel(ids, prefs) {
+    for (const re of prefs) { const hit = ids.filter((id) => re.test(id) && !/:free$|flash|air|mini|lite/i.test(id)).sort().reverse()[0]; if (hit) return hit; }
+    return "";
+  }
+  async function fizzModels(settings = {}) {
+    if (settings.fizzPlanner && settings.fizzCoder) return { planner: settings.fizzPlanner, coder: settings.fizzCoder };
+    if (!fizzIds) {
+      try { const c = JSON.parse(localStorage.getItem("fizz.or.fizzmodels") || "null"); if (c && Date.now() - c.at < 864e5) fizzIds = c.ids; } catch {}
+    }
+    if (!fizzIds) {
+      try {
+        const r = await fetch("https://openrouter.ai/api/v1/models");
+        const ids = ((await r.json()).data || []).map((m) => String(m.id || ""));
+        fizzIds = {
+          planner: pickModel(ids, [/^moonshotai\/kimi-k3\.\d/, /^moonshotai\/kimi-k3/, /^moonshotai\/kimi-k2/]) || FIZZ_FALLBACK.planner,
+          coder: pickModel(ids, [/^z-ai\/glm-5\.3/, /^z-ai\/glm-5/, /^z-ai\/glm-4/]) || FIZZ_FALLBACK.coder,
+        };
+        try { localStorage.setItem("fizz.or.fizzmodels", JSON.stringify({ at: Date.now(), ids: fizzIds })); } catch {}
+      } catch { return { ...FIZZ_FALLBACK, ...pickSet(settings) }; }
+    }
+    return { ...fizzIds, ...pickSet(settings) };
+  }
+  const pickSet = (s) => Object.fromEntries([["planner", s.fizzPlanner], ["coder", s.fizzCoder]].filter(([, v]) => v));
+  const isFizzModel = (settings) => settings.provider === "openrouter" && String(settings.openrouterModel || "").trim().toLowerCase() === "fizz";
+  /** These settings with "fizz" replaced by the model that writes the code. */
+  async function withCoder(settings) {
+    if (!isFizzModel(settings)) return settings;
+    return { ...settings, openrouterModel: (await fizzModels(settings)).coder };
+  }
+
   /** OpenAI-compatible providers from Settings → AI. */
   function compatibleProviders(settings) {
     const compatible = {
@@ -391,6 +425,7 @@
     }
     if (settings.provider === "openrouter") {
       if (!settings.openrouterKey) throw new Error("NO_KEY");
+      if (isFizzModel(settings)) settings = await withCoder(settings);
       return streamOpenAI("https://openrouter.ai/api/v1/chat/completions", { Authorization: `Bearer ${settings.openrouterKey}`, "X-Title": "FIZZ" }, { model: settings.openrouterModel || "z-ai/glm-4.6", stream: true, messages: [{ role: "system", content: system }, ...history.map(toOpenAI)] }, signal, onText);
     }
 
@@ -411,6 +446,7 @@
 
   function providerLabel(settings, product = "chat") {
     const names = { groq: settings.groqModel, zai: settings.zaiModel, requesty: settings.requestyModel, deepseek: settings.deepseekModel, cerebras: settings.cerebrasModel, together: settings.togetherModel, "custom-openai": settings.customOpenAIModel };
+    if (isFizzModel(settings)) return product === "dev" ? "FIZZ · Kimi plans, GLM codes" : "FIZZ";
     if (settings.provider === "openrouter") return settings.openrouterModel || "OpenRouter";
     if (settings.provider === "gemini") return settings.geminiModel || "Gemini";
     if (settings.provider === "anthropic") return (MODELS.find((m) => m.id === settings.model) || MODELS[0])[product];
@@ -557,6 +593,6 @@
     });
   }
 
-  window.FIZZ = { aiTarget, pendingHtml, logoImg, logoNext, faviconUrls, app, serverStatus, serverStatusCached, aiStream, providerLabel, openrouterConnect, openrouterFinish, toOpenAI, store, esc, uid, theme, auth, loadData, saveData, MODELS, streamChat, readAttachment, toApiContent, markdown, toast, download, validEmail };
+  window.FIZZ = { aiTarget, fizzModels, isFizzModel, withCoder, pendingHtml, logoImg, logoNext, faviconUrls, app, serverStatus, serverStatusCached, aiStream, providerLabel, openrouterConnect, openrouterFinish, toOpenAI, store, esc, uid, theme, auth, loadData, saveData, MODELS, streamChat, readAttachment, toApiContent, markdown, toast, download, validEmail };
   theme.init();
 })();

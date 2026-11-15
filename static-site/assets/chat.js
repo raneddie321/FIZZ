@@ -301,7 +301,7 @@
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   async function cloudChat(c, reply) {
     if (data.settings.cloudRun === false || !F.serverStatusCached?.()?.tools?.sandbox) return false;
-    const ai = F.aiTarget(data.settings);
+    const ai = F.aiTarget(await F.withCoder(data.settings));
     if (ai?.missing) return false;
     const conv1 = ai?.kind === "anthropic" ? F.toApiContent : F.toOpenAI;
     const history = c.messages.slice(0, -1).filter((m) => !m.error && (m.role === "user" || m.content));

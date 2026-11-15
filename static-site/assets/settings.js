@@ -49,7 +49,7 @@
           <div class="row-inline"><button type="button" class="btn btn-sm" data-or-connect>Connect OpenRouter</button><span class="muted-sm" data-or-state></span></div>
           <label class="field"><span>Or paste an OpenRouter key</span><input class="input" name="openrouterKey" type="password" autocomplete="off" placeholder="sk-or-…" /></label>
           <label class="field"><span>Model</span><input class="input mono" name="openrouterModel" list="or-models" placeholder="z-ai/glm-4.6" /><datalist id="or-models"></datalist>
-            <small>Any model ID from openrouter.ai/models. <button type="button" class="link" data-or-models>Load model list</button></small></label>
+            <small>Any model ID from openrouter.ai/models. <button type="button" class="link" data-or-models>Load model list</button> · <button type="button" class="link" data-or-fizz>Use FIZZ</button> — <code>fizz</code>: Kimi plans each task, GLM writes the code.</small></label>
         </div>
         <div data-sub="gemini" class="form">
           <label class="field"><span>Google AI Studio API key</span><input class="input" name="geminiKey" type="password" autocomplete="off" placeholder="AIza…" /><small>Get one at aistudio.google.com → Get API key. Stored only in this browser and sent only to Google.</small></label>
@@ -326,6 +326,13 @@
         return;
       }
       if (t.hasAttribute("data-or-connect")) { ctx.data.settings.provider = "openrouter"; ctx.save(); F.openrouterConnect(); }
+      if (t.hasAttribute("data-or-fizz")) {
+        const f = d.querySelector("form");
+        f.openrouterModel.value = "fizz";
+        const pr = f.querySelector('[name=provider][value=openrouter]');
+        if (pr) { pr.checked = true; pr.dispatchEvent(new Event("change", { bubbles: true })); }
+        F.fizzModels({}).then((ids) => F.toast(`FIZZ: ${ids.planner} plans, ${ids.coder} writes the code. Save to use it.`)).catch(() => {});
+      }
       if (t.hasAttribute("data-or-models")) {
         t.textContent = "Loading…";
         try {

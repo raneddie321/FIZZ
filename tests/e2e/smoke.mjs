@@ -724,6 +724,28 @@ for (const app of ["chat", "dev"]) {
   await ctx.close();
 }
 
+// ---------- "fizz" on OpenRouter: Kimi plans, GLM writes the code ----------
+{
+  const { ctx, p, errs } = await open({ width: 1280, height: 800 });
+  const calls = [];
+  await ctx.route("https://openrouter.ai/api/v1/models", (r) => r.fulfill({ json: { data: [{ id: "moonshotai/kimi-k2" }, { id: "moonshotai/kimi-k3" }, { id: "moonshotai/kimi-k3.1" }, { id: "z-ai/glm-5.3-flash" }, { id: "z-ai/glm-5.3" }, { id: "z-ai/glm-4.6" }] } }));
+  await ctx.route("https://openrouter.ai/api/v1/chat/completions", async (r) => {
+    const b = r.request().postDataJSON(); calls.push(b);
+    const text = b.model.startsWith("moonshotai") ? "Build a one-page site.\n1. index.html with a heading\n2. Done" : '<fizz-file path="index.html">\n<h1>Planned</h1>\n</fizz-file>\nBuilt from the plan.';
+    await r.fulfill({ status: 200, headers: { "content-type": "text/event-stream" }, body: sse(text) });
+  });
+  await p.goto(B + "dev.html"); await p.waitForTimeout(900);
+  await p.evaluate(() => { localStorage.removeItem("fizz.or.fizzmodels"); const st = FIZZ.loadData(FIZZ.auth.current()).settings; Object.assign(st, { provider: "openrouter", openrouterKey: "sk-or-test", openrouterModel: "fizz", autoVerify: false, cloudRun: false }); });
+  await p.fill("#dev-app #input", "build a page"); await p.keyboard.press("Enter");
+  await lastReply(p, "#dev-app", "Built from the plan.");
+  const models = calls.map((c) => c.model);
+  check("fizz: Kimi plans first, then GLM writes the code (newest of each, never Flash)", models[0] === "moonshotai/kimi-k3.1" && models[1] === "z-ai/glm-5.3", models.join(", "));
+  check("fizz: the plan goes to the coder", (calls[1]?.messages?.[0]?.content || "").includes("PLAN FOR THIS TASK") && calls[1].messages[0].content.includes("index.html with a heading"));
+  check("fizz: the plan shows in the chat, and the coder's files land", await p.evaluate(() => { const pr = FIZZ.loadData(FIZZ.auth.current()).projects[0]; const c = pr.chats.find((x) => x.messages.length); return c.messages.some((m) => m.plannerNote && m.content.includes("one-page site")) && pr.files["index.html"] === "<h1>Planned</h1>"; }));
+  check("fizz: no script errors", !errs.length, errs.join(" | "));
+  await ctx.close();
+}
+
 // ---------- A big repository that lives in the cloud sandbox (phase 2, part 2) ----------
 {
   const { ctx, p, errs, bodies, script } = await open({ width: 1280, height: 800 });
