@@ -1,7 +1,7 @@
 import { YEAR, env, error, getCookie, json, readJson, sameOrigin, seal, setCookie, unseal } from "../lib/util.mjs";
 import { requireUser } from "../lib/auth.mjs";
 import { kvConfigured, quotaCounter, redis, today } from "../lib/kv.mjs";
-import { act, browserConfigured, createContext, createSession, liveViews, releaseSession, sessionRunning } from "../lib/browser.mjs";
+import { act, browserConfigured, createContext, createSession, liveViews, loginHost, releaseSession, sessionRunning } from "../lib/browser.mjs";
 import { cdpUrl, ensureBrowser, sandboxBrowserEnabled, sandboxTabs } from "../lib/sandbox-browser.mjs";
 
 /** Which cloud browser this site uses: Browserbase when its key is set, else FIZZ's own (Vercel Sandbox). */
@@ -79,6 +79,24 @@ export default async (req) => {
   try {
     const body = await readJson(req, 20_000);
     const action = String(body.action || "");
+    // Settings → Accounts: a password is sealed here (for this user and site) and only the sealed text is kept on the device.
+    if (action === "seal-login") {
+      const host = loginHost(String(body.url || ""));
+      const pass = String(body.password || "");
+      if (!host) return error(400, "Give the site's address, like https://example.com.");
+      if (!pass || pass.length > 500) return error(400, "The password is empty or too long.");
+      return json({ host, secret: seal({ kind: "login", u: uid, host, p: pass }) });
+    }
+    delete body.fill; // only set here, from a sealed login
+    if (action === "autofill" && !body.secret) {
+      // A saved account without a password: only the email / username is filled.
+      body.fill = { host: loginHost(String(body.host || "")), pass: "", email: String(body.email || "").slice(0, 200), username: String(body.username || "").slice(0, 200) };
+    } else if (action === "autofill") {
+      const c = unseal(String(body.secret || ""));
+      if (!c || c.kind !== "login" || c.u !== uid) return error(400, "This saved login can't be used on this account. Save it again in Settings → Accounts.", "bad_login");
+      body.fill = { host: c.host, pass: c.p, email: String(body.email || "").slice(0, 200), username: String(body.username || "").slice(0, 200) };
+      delete body.secret;
+    }
     if (engine === "sandbox") {
       if (!["live", "release", "warm"].includes(action) && !(await quotaCounter()(`${today()}/browser/${uid}`, Number(env("FIZZ_BROWSER_LIMIT") || 600)))) return error(429, "You've reached today's limit for the cloud browser. Try again tomorrow.", "quota");
       return await sandboxEngine(req, uid, body, headers);

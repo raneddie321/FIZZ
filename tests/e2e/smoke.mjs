@@ -739,6 +739,44 @@ for (const app of ["chat", "dev"]) {
   await ctx.close();
 }
 
+// ---------- Saved website logins: Settings, then Fizz Code signs in with one ----------
+{
+  const { ctx, p, errs, script, bodies } = await open({ width: 1280, height: 800 });
+  await ctx.route("**/api/status", (r) => r.fulfill({ json: { server: true, apps: [], ai: { configured: true, model: "test-model", dailyLimit: 50 }, connections: {}, google: {}, tools: { search: "wikipedia", browser: true } } }));
+  const sent = [];
+  await ctx.route("**/api/browser", (r) => {
+    const b = r.request().postDataJSON(); sent.push(b);
+    if (b.action === "seal-login") return r.fulfill({ json: { host: "example.com", secret: "SEALED-BLOB" } });
+    if (b.action === "warm" || b.action === "live") return r.fulfill({ json: { ready: true, pages: [] } });
+    r.fulfill({ json: { text: "Filled the saved login for example.com: the email and the password. Now press the page's sign-in button.\nPage: Log in — https://example.com/login", page: { url: "https://example.com/login", title: "Log in" }, elements: [], tabs: [{ id: "t1", title: "Log in", url: "https://example.com/login", active: true }] } });
+  });
+  await p.goto(B + "dev.html"); await p.waitForTimeout(900);
+  await p.evaluate(() => { const st = FIZZ.loadData(FIZZ.auth.current()).settings; st.autoVerify = false; st.cloudRun = false; });
+  await p.locator("#dev-app #model-btn").first().click();
+  await p.locator("dialog[open] [data-tab=connections]").click();
+  await p.waitForSelector("dialog[open] [data-login=url]");
+  await p.fill("dialog[open] [data-login=url]", "https://www.example.com/login");
+  const icon = await p.locator("dialog[open] [data-login-preview] img").count();
+  await p.fill("dialog[open] [data-login=email]", "me@example.com");
+  await p.fill("dialog[open] [data-login=password]", "hunter2-secret");
+  await p.click("dialog[open] [data-login-add]");
+  await p.waitForSelector("dialog[open] .login-row");
+  const saved = await p.evaluate(() => FIZZ.loadData(FIZZ.auth.current()).settings.logins);
+  check("logins: the site's icon shows while typing the address", icon === 1);
+  check("logins: saved with the sealed password only (no password on the device)", saved.length === 1 && saved[0].host === "example.com" && saved[0].secret === "SEALED-BLOB" && !JSON.stringify(saved).includes("hunter2-secret") && sent[0].password === "hunter2-secret", JSON.stringify(saved));
+  await p.keyboard.press("Escape");
+  script.push('<fizz-browser action="open" url="https://example.com/login"/>\n<fizz-browser action="login" account="example.com"/>');
+  script.push("Signed in.");
+  await p.fill("#dev-app #input", "log in to example.com"); await p.keyboard.press("Enter");
+  await lastReply(p, "#dev-app", "Signed in.");
+  const fillReq = sent.find((b) => b.action === "autofill");
+  check("logins: Fizz Code signs in with the saved login (sealed blob + email; no password)", fillReq?.secret === "SEALED-BLOB" && fillReq.email === "me@example.com" && fillReq.host === "example.com" && !JSON.stringify(sent.slice(1)).includes("hunter2-secret"), JSON.stringify(fillReq));
+  const sys = bodies.at(-1)?.system || bodies[0]?.system || "";
+  check("logins: Fizz Code knows the saved logins, without the password", sys.includes("SAVED WEBSITE LOGINS") && sys.includes("example.com") && sys.includes("password saved") && !sys.includes("hunter2-secret"));
+  check("logins: no script errors", !errs.length, errs.join(" | "));
+  await ctx.close();
+}
+
 // ---------- A big repository that lives in the cloud sandbox (phase 2, part 2) ----------
 {
   const { ctx, p, errs, bodies, script } = await open({ width: 1280, height: 800 });

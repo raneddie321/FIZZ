@@ -50,3 +50,5 @@ jobs:
         run: node tests/netlify/shopify.test.mjs
       - name: Cloud runner tests
         run: node tests/netlify/cloud-runner.test.mjs
+      - name: Saved logins tests
+        run: node tests/netlify/logins.test.mjs
