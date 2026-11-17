@@ -42,7 +42,7 @@ function scrubPage(){
       id:i+1,tag:el.tagName.toLowerCase(),type:el.type||'',label:(el.getAttribute('aria-label')||el.labels?.[0]?.innerText||el.innerText||el.placeholder||'').trim().slice(0,80),
       value:secret(el)?'':('value' in el?String(el.value||'').slice(0,50):'')
     }));
-    const text=(document.body?.innerText||'').replace(/\\s+/g,' ').slice(0,10000);
+    const text=(document.body?.innerText||'').replace(/\\s+/g,' ').replace(/(?:\\b\\d[ -]*?){13,19}\\b/g,'[redacted payment-like number]').slice(0,10000);
     return {url:location.href,title:document.title,text,elements:els};
   })()`,true);
 }
