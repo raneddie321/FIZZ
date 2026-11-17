@@ -64,6 +64,7 @@
   const BROWSER_LOOKS = new Set(["open", "newtab", "read", "screenshot", "scroll", "tabs", "switch", "back", "forward", "reload"]);
   const MCP_LOOKS = /(^|[_\-.\s])(get|list|search|read|find|fetch|query|describe|lookup|show|view)(?=$|[_\-.\s])/i;
   const MAP = {
+    pay: (t) => ({ kind: "outbound", target: "payment " + (t.attrs.merchant || "merchant") + " " + (t.attrs.currency || "") + " " + (t.attrs.amount || ""), outbound: true }),
     run: (t) => ({ kind: "run", target: first(t.body) }),
     sandbox: (t) => ({ kind: "run", target: first(t.body) }),
     search: (t) => ({ kind: "network", target: `search ${first(t.body)}`, readOnly: true }),
