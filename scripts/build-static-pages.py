@@ -11,8 +11,11 @@ HEAD = """<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>{title}</title>
 <meta name="description" content="{desc}" />
-<link rel="icon" href="icon.svg" />
-<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="icon" href="/favicon.ico" sizes="any" />
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+<link rel="icon" type="image/svg+xml" href="/icon.svg" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+{extra}<link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" />
 <link rel="stylesheet" href="assets/site.css?v=20261112-att" />
@@ -24,8 +27,18 @@ HEAD = """<!doctype html>
 <body>
 """
 
+# What Google shows for the site: its name ("Fizz") and the home page's title, with the icon.
+HOME_META = """<link rel="canonical" href="https://fizz.raneddie.com/" />
+<meta property="og:site_name" content="Fizz" />
+<meta property="og:title" content="Fizz - AI by RanEddie" />
+<meta property="og:description" content="FIZZ is RANEDDIE's AI assistant. FIZZ DEV is the AI workspace for building software, websites and games." />
+<meta property="og:url" content="https://fizz.raneddie.com/" />
+<meta property="og:image" content="https://fizz.raneddie.com/icon-512.png" />
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"Fizz","alternateName":["Fizz - AI by RanEddie","FIZZ"],"url":"https://fizz.raneddie.com/"}</script>
+"""
+
 def page(name, title, desc, body, chrome=True):
-    html = HEAD.format(title=title, desc=desc)
+    html = HEAD.format(title=title, desc=desc, extra=HOME_META if name == "index.html" else "")
     if chrome:
         html += '<header data-site></header>\n<main id="main">\n' + body + '\n</main>\n<footer data-site></footer>\n'
     else:
@@ -39,7 +52,7 @@ def features(items):
         for i, t, d, tag in items) + "</div>"
 
 # ---------------- home ----------------
-page("index.html", "FIZZ — AI by RANEDDIE", "FIZZ is RANEDDIE's AI assistant. FIZZ DEV is the AI workspace for building software, websites and games.", f"""
+page("index.html", "Fizz - AI by RanEddie", "FIZZ is RANEDDIE's AI assistant. FIZZ DEV is the AI workspace for building software, websites and games.", f"""
 
 <section class="landing-hero">
   <div class="hero-glow hero-glow-a" aria-hidden="true"></div><div class="hero-glow hero-glow-b" aria-hidden="true"></div>
@@ -235,7 +248,10 @@ RID_HEAD = """<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Sign in · RanEddie ID</title>
 <meta name="description" content="Sign in to FIZZ with your RanEddie ID — one account for every RanEddie product." />
-<link rel="icon" href="icon.svg" />
+<link rel="icon" href="/favicon.ico" sizes="any" />
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+<link rel="icon" type="image/svg+xml" href="/icon.svg" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" /><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&family=Sora:wght@600..800&display=swap" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
