@@ -292,3 +292,28 @@ that step once more. The latest summary stays with the project, so a new chat kn
 After Fizz Code changes a project, FIZZ DEV runs five checks and sends what they find back to fix (up to 3 rounds,
 stopping early if the same problems come back): code (syntax, imports, links, JSON, CSS), every page loads, phone
 layout at 390px, pressing every button and control, and an AI code review of the changed files (Settings → Tools).
+
+## FIZZ Local Browser (early desktop companion)
+
+A separate Electron/Chromium companion scaffold lives in `local-browser/`. It binds only to
+`127.0.0.1`, uses Electron context isolation and sandboxing, and exposes a deliberately narrow
+browser command API. The current bridge does not yet connect to the hosted FIZZ DEV agent.
+Run locally after installing dependencies with:
+
+```bash
+cd local-browser
+npm install
+npm start
+```
+
+This is an early developer scaffold, not yet a supported user release. Pairing from the hosted
+FIZZ DEV app, installers/signing, automated tests and platform-specific security review remain
+required. See `docs/local-browser-architecture.md`.
+
+## Payment Vault status
+
+The account UI is available at `/payments`. It is intentionally a status and security-boundary
+page only until the hosted Stripe setup/customer/payment-method API and webhook are implemented
+and configured with `STRIPE_SECRET_KEY` and `STRIPE_PUBLISHABLE_KEY`. No raw card fields or
+card/CVC data are accepted or stored by FIZZ. The local browser currently blocks payment autofill
+and automatic order submission. The user must review and submit all payments directly.
