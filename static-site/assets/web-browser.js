@@ -528,7 +528,7 @@
     label: (t) => {
       if (t.desc) return t.desc; // fixed when the action ran, so it names the element on that page
       const a = t.attrs;
-      const what = { login: `Signed in to ${a.account || a.site || a.host || "the site"} with the saved login`, open: `Opened ${hostName(a.url) || a.url}`, newtab: `Opened ${hostName(a.url) || a.url} in a new tab`, click: `Clicked ${lastLabel(a.id) ? `“${lastLabel(a.id)}”` : `[${a.id}]`}`, type: `Typed into ${lastLabel(a.id) ? `“${lastLabel(a.id)}”` : `[${a.id}]`}`, select: `Chose “${a.value}”`, key: `Pressed ${a.key}`, scroll: `Scrolled ${a.direction || "down"}`, back: "Went back", forward: "Went forward", reload: "Reloaded the page", read: "Read the page", screenshot: "Looked at the page", tabs: "Listed the tabs", switch: `Switched to tab ${a.tab}`, close: `Closed tab ${a.tab || ""}`, handoff: "Your turn in the browser" }[a.action] || `Browser: ${a.action}`;
+      const what = { script: "Ran code in the page", login: `Signed in to ${a.account || a.site || a.host || "the site"} with the saved login`, open: `Opened ${hostName(a.url) || a.url}`, newtab: `Opened ${hostName(a.url) || a.url} in a new tab`, click: `Clicked ${lastLabel(a.id) ? `“${lastLabel(a.id)}”` : `[${a.id}]`}`, type: `Typed into ${lastLabel(a.id) ? `“${lastLabel(a.id)}”` : `[${a.id}]`}`, select: `Chose “${a.value}”`, key: `Pressed ${a.key}`, scroll: `Scrolled ${a.direction || "down"}`, back: "Went back", forward: "Went forward", reload: "Reloaded the page", read: "Read the page", screenshot: "Looked at the page", tabs: "Listed the tabs", switch: `Switched to tab ${a.tab}`, close: `Closed tab ${a.tab || ""}`, handoff: "Your turn in the browser" }[a.action] || `Browser: ${a.action}`;
       return what;
     },
     summary: (k) => `took ${k} browser action${k === 1 ? "" : "s"}`,
@@ -541,6 +541,7 @@
       "  The browser usually runs in the background: the user isn't watching it. Work through the whole task yourself, quickly, without stopping to report each step. Only when a step needs the user — a CAPTCHA or bot check, a code you can't get (no Gmail), a password with no saved login, a field you can't fill after two tries — use action=\"handoff\" reason=\"what they need to do\": FIZZ opens the browser for them just for that step, then you continue.",
       "  Rules — always follow them:",
       "  • Never ask for passwords, card numbers or security codes in the chat and never type them. A site with a saved login (listed under SAVED WEBSITE LOGINS): open its login page and use action=\"login\" account=\"its host\" — FIZZ fills the email/username and password itself. Otherwise use handoff: the user types them straight into the browser, then presses Continue.",
+      '  script code="return [...document.querySelectorAll(\'h2 a\')].map(a => ({ title: a.innerText, url: a.href }))"/> (or the code inside the tag) — runs your JavaScript in the page and gives you its result as text: the fastest way to pull lists, prices, tables or links out of a page, or to do many steps at once. It can\'t run on pages with a password field.',
       '  login account="example.com" — fills a saved login (Settings → Website logins) into the login form on the open page; then click the sign-in button.',
       "  • Signing in / signing up on a site: if it has a saved login, sign in with it right away (don't ask). Otherwise first ask with <fizz-ask> whether the user already has an account there. Yes → open the login page, then handoff so they log in. No → open the sign-up page, fill in the details the user gives you (ask for them), handoff for the password, and if the site emails a code, ask the user for it with <fizz-ask> and type it in. After that you can work inside their account.",
       "  • Before anything that spends money, posts or sends something in the user's name, deletes data or changes account or security settings: ask the user with <fizz-ask> first.",
@@ -581,6 +582,7 @@
       if (a.tab && /^\d+$/.test(a.tab)) a.tab = lastTabs[Number(a.tab) - 1]?.id || a.tab;
       for (const k of ["enter", "clear"]) if (k in a) a[k] = a[k] !== "false";
       if (a.action === "type" && !("text" in a)) a.text = t.body;
+      if (a.action === "script" && !a.code) a.code = t.body;
       const ct = tabs.find((x) => x.kind === "cloud" && x.id === active);
       if (ct?.target && !a.tab) a.tab = ct.target;
       if (a.action === "screenshot") a.shot = true;

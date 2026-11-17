@@ -308,6 +308,21 @@ export async function act(state, a) {
           : `The saved login for ${f.host} has nothing for the fields on this page.`;
         break;
       }
+      case "script": {
+        // Fizz Code's own code in the page (a fast way to pull data out as text). Never on a page with a password
+        // field or a filled saved login, so code can't read a password.
+        const src = String(a.code || a.text || "").trim();
+        if (!src || src.length > 6000) throw Object.assign(new Error("Give the JavaScript to run (up to 6,000 characters)."), { status: 400 });
+        const guarded = await tab.evaluate(() => Boolean(document.querySelector('input[type=password],[data-fizz-fill]')));
+        if (guarded) throw Object.assign(new Error("This page has a password field, so code can't run on it. Use click / type / read here, and run code after signing in."), { status: 400, code: "script_blocked" });
+        const res = await tab.send("Runtime.evaluate", { expression: `(async () => { ${src.includes("return") ? src : `return (${src});`} })()`, returnByValue: true, awaitPromise: true, userGesture: true, timeout: 15000 });
+        if (res.exceptionDetails) throw Object.assign(new Error(`The code threw: ${String(res.exceptionDetails.exception?.description || res.exceptionDetails.text || "error").slice(0, 600)}`), { status: 400 });
+        let v = res.result?.value;
+        try { v = typeof v === "string" ? v : JSON.stringify(v, null, 1); } catch { v = String(v); }
+        note = `Result of your code:\n${String(v ?? "undefined").slice(0, 12000)}\n`;
+        await settle(tab, 1500);
+        break;
+      }
       case "read": case "screenshot": case "tabs": case "viewport": break;
       case "switch": await cdp.send("Target.activateTarget", { targetId: state.active }); break;
       default: throw Object.assign(new Error(`Unknown browser action "${a.action}".`), { status: 400 });

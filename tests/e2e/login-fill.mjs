@@ -11,6 +11,7 @@ const exe = readdirSync(base).sort().reverse().map((d) => join(base, d, "chrome-
 const pages = {
   "/login": `<form><label>Email <input id=e type=email name=email></label><label>Password <input id=p type=password name=password></label><button>Sign in</button></form>`,
   "/two-step": `<form><label>Username <input id=u type=text name=username autocomplete=username></label><button>Next</button></form>`,
+  "/list": `<meta http-equiv="Content-Security-Policy" content="script-src 'none'"><h2><a href="/a">Alpha</a></h2><h2><a href="/b">Beta</a></h2>`,
   "/show": `<form><input id=e type=email name=email><input id=p type=password><button type=button onclick="p.type='text'">show</button></form>`,
 };
 const srv = createServer((q, r) => { r.writeHead(200, { "content-type": "text/html" }); r.end(`<!doctype html><title>t</title>${pages[q.url] || "<p>nothing</p>"}`); }).listen(0);
@@ -46,6 +47,16 @@ assert.equal(await page.inputValue("#p"), "");
 // No login form: says so.
 await page.goto(`http://127.0.0.1:${port}/nothing`);
 await assert.rejects(act({ connectUrl: ws, active: null }, { action: "autofill", fill }), (e) => e.code === "no_login_form");
+
+// Code in the page: data comes back as text, even under a strict CSP; never on a page with a password field.
+await page.goto(`http://127.0.0.1:${port}/list`);
+out = await act({ connectUrl: ws, active: null }, { action: "script", code: "return [...document.querySelectorAll('h2 a')].map(a => a.innerText)" });
+assert.match(out.text, /Result of your code:\n\[\n "Alpha",\n "Beta"\n\]/);
+out = await act({ connectUrl: ws, active: null }, { action: "script", code: "document.title" });
+assert.match(out.text, /Result of your code:\nt\n/);
+await assert.rejects(act({ connectUrl: ws, active: null }, { action: "script", code: "nope(" }), /The code threw/);
+await page.goto(`http://127.0.0.1:${port}/login`);
+await assert.rejects(act({ connectUrl: ws, active: null }, { action: "script", code: "return document.querySelector('#p').value" }), (e) => e.code === "script_blocked");
 
 await browser.close(); srv.close();
 console.log("Login fill tests passed");
