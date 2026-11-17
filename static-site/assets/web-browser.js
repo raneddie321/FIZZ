@@ -535,7 +535,7 @@
       const amount = String(t.attrs.amount || "");
       const currency = String(t.attrs.currency || "").toUpperCase();
       const url = safeUrl(t.attrs.url || "");
-      const valid = Boolean(merchant && /^\\d{1,8}(?:\\.\\d{1,2})?$/.test(amount) && /^[A-Z]{3}$/.test(currency) && url && new URL(url).protocol === "https:");
+      const valid = Boolean(merchant && /^\d{1,8}(?:\.\d{1,2})?$/.test(amount) && /^[A-Z]{3}$/.test(currency) && url && new URL(url).protocol === "https:");
       return {
         text: valid ? "Fizz Code requests permission to open checkout for " + merchant + ": " + currency + " " + amount + "." : "Payment request details are incomplete or invalid.",
         ok: valid ? "Approve checkout" : "Dismiss", cancel: valid ? "Decline" : "Dismiss",
@@ -547,7 +547,7 @@
       const amount = String(t.attrs.amount || "");
       const currency = String(t.attrs.currency || "").toUpperCase();
       const url = safeUrl(t.attrs.url || "");
-      if (!merchant || !/^\\d{1,8}(?:\\.\\d{1,2})?$/.test(amount) || !/^[A-Z]{3}$/.test(currency) || !url || new URL(url).protocol !== "https:") return { ok: false, text: "Payment request rejected: valid merchant, amount, currency and HTTPS checkout URL are required." };
+      if (!merchant || !/^\d{1,8}(?:\.\d{1,2})?$/.test(amount) || !/^[A-Z]{3}$/.test(currency) || !url || new URL(url).protocol !== "https:") return { ok: false, text: "Payment request rejected: valid merchant, amount, currency and HTTPS checkout URL are required." };
       window.open(url, "_blank", "noopener,noreferrer");
       return { ok: true, text: "The user approved opening checkout for " + merchant + ", " + currency + " " + amount + ". The user must enter payment details and confirm the charge directly with the payment provider. Fizz Code received no card data and did not submit payment." };
     }
