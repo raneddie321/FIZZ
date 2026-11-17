@@ -1,7 +1,7 @@
 import { YEAR, env, error, getCookie, json, readJson, sameOrigin, seal, setCookie, unseal } from "../lib/util.mjs";
 import { requireUser } from "../lib/auth.mjs";
 import { kvConfigured, quotaCounter, redis, today } from "../lib/kv.mjs";
-import { act, browserConfigured, createContext, createSession, liveViews, loginHost, releaseSession, sessionRunning } from "../lib/browser.mjs";
+import { act, browserConfigured, cardBrand, createContext, createSession, liveViews, loginHost, luhn, releaseSession, sessionRunning } from "../lib/browser.mjs";
 import { cdpUrl, ensureBrowser, sandboxBrowserEnabled, sandboxTabs } from "../lib/sandbox-browser.mjs";
 
 /** Which cloud browser this site uses: Browserbase when its key is set, else FIZZ's own (Vercel Sandbox). */
@@ -87,7 +87,23 @@ export default async (req) => {
       if (!pass || pass.length > 500) return error(400, "The password is empty or too long.");
       return json({ host, secret: seal({ kind: "login", u: uid, host, p: pass }) });
     }
+    // Settings → Payment cards: sealed here for this user; the device keeps the sealed text and the last 4 digits.
+    if (action === "seal-card") {
+      const number = String(body.number || "").replace(/[\s-]/g, "");
+      const month = String(body.month || "").padStart(2, "0"), year = String(body.year || "").length === 2 ? `20${body.year}` : String(body.year || "");
+      if (!luhn(number)) return error(400, "That card number isn't valid.");
+      if (!/^(0[1-9]|1[0-2])$/.test(month) || !/^20\d\d$/.test(year)) return error(400, "Give the expiry as month and year.");
+      const cvc = String(body.cvc || "").replace(/\D/g, "").slice(0, 4);
+      return json({ brand: cardBrand(number), last4: number.slice(-4), exp: `${month}/${year.slice(-2)}`, secret: seal({ kind: "card", u: uid, number, month, year, cvc, name: String(body.name || "").slice(0, 80), zip: String(body.zip || "").slice(0, 12) }) });
+    }
     delete body.fill; // only set here, from a sealed login
+    delete body.card;
+    if (action === "autofill-card") {
+      const c = unseal(String(body.secret || ""));
+      if (!c || c.kind !== "card" || c.u !== uid) return error(400, "This saved card can't be used on this account. Save it again in Settings.", "bad_card");
+      body.card = { number: c.number, month: c.month, year: c.year, cvc: c.cvc, name: c.name, zip: c.zip };
+      delete body.secret;
+    }
     if (action === "autofill" && !body.secret) {
       // A saved account without a password: only the email / username is filled.
       body.fill = { host: loginHost(String(body.host || "")), pass: "", email: String(body.email || "").slice(0, 200), username: String(body.username || "").slice(0, 200) };

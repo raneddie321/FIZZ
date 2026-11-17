@@ -794,3 +794,4 @@ dialog.settings-dlg#fizz-settings > .dlg-body { height: 100%; max-height: none; 
 .login-preview { display: flex; align-items: center; gap: 10px; min-height: 0; color: var(--muted); font-size: 13px; }
 .login-preview:empty { display: none; }
 .login-add .btn { justify-self: start; }
+.card-ic { font-size: 11px !important; font-weight: 700; letter-spacing: .02em; }

@@ -61,7 +61,7 @@ function readPage(max) {
     const id = ++n;
     el.setAttribute("data-fizz-id", String(id));
     const lab = el.labels && el.labels[0] ? el.labels[0].innerText : "";
-    const secret = el.type === "password" || el.getAttribute("data-fizz-fill") === "pass";
+    const secret = el.type === "password" || el.getAttribute("data-fizz-fill") === "pass" || el.hasAttribute("data-fizz-card") || /^cc-(number|csc|exp)/.test(el.getAttribute("autocomplete") || "");
     const label = (el.getAttribute("aria-label") || lab || (el.tagName === "INPUT" || el.tagName === "TEXTAREA" ? el.placeholder || el.name : el.innerText) || (secret ? "" : el.value) || el.title || el.getAttribute("alt") || "").trim().replace(/\s+/g, " ").slice(0, 80);
     out.push({ id, tag: el.tagName.toLowerCase(), type: (el.getAttribute("type") || "").toLowerCase(), role: el.getAttribute("role") || "", label, href: el.tagName === "A" ? String(el.href).slice(0, 140) : "", value: secret ? "" : String(el.value ?? "").slice(0, 40), checked: el.checked === true, inView: r.top >= 0 && r.bottom <= innerHeight });
     if (out.length >= 160) break;
@@ -176,6 +176,75 @@ function findLoginFields() {
   return { user: at(user, "user"), pass: at(pass, "pass") };
 }
 function clearFill(mark) { const el = document.querySelector(`[data-fizz-fill="${mark}"]`); if (!el) return false; el.focus(); el.select?.(); return true; }
+
+// ---------- saved payment cards ----------
+// Filled by the server only after the user approved this payment on this site in the chat. The fields are often
+// inside a payment provider's iframe (another site): every frame of the page is searched, in its own context.
+function findCardFields() {
+  const visible = (el) => { const r = el.getBoundingClientRect(); const st = getComputedStyle(el); return r.width > 1 && r.height > 1 && st.visibility !== "hidden" && st.display !== "none" && !el.disabled; };
+  const words = (el) => `${el.name} ${el.id} ${el.getAttribute("autocomplete") || ""} ${el.placeholder || ""} ${el.getAttribute("aria-label") || ""} ${el.getAttribute("data-elements-stable-field-name") || ""} ${el.labels?.[0]?.innerText || ""}`.toLowerCase();
+  const tests = [
+    ["number", (w, el) => /cc-number|card.?number|cardnumber|ccnumber|credit.?card|מספר כרטיס/.test(w) || /^(\d{4} ?){4}$/.test((el.placeholder || "").trim())],
+    ["expMonth", (w) => /cc-exp-month|exp.?month|expirymonth|month/.test(w) && !/year/.test(w)],
+    ["expYear", (w) => /cc-exp-year|exp.?year|expiryyear|year/.test(w)],
+    ["exp", (w) => /cc-exp|expir|exp.?date|mm ?\/ ?yy|תוקף/.test(w)],
+    ["cvc", (w) => /cc-csc|cvc|cvv|csc|security.?code|קוד אבטחה/.test(w)],
+    ["name", (w) => /cc-name|name.?on.?card|card.?holder|cardholder|שם בעל/.test(w)],
+    ["zip", (w) => /postal|zip|מיקוד/.test(w)],
+  ];
+  const out = {};
+  for (const el of document.querySelectorAll("input, select")) {
+    if (!visible(el) || el.type === "hidden" || el.type === "checkbox" || el.type === "radio") continue;
+    const w = words(el);
+    for (const [k, t] of tests) {
+      if (out[k] || !t(w, el)) continue;
+      if (k === "exp" && (out.expMonth || out.expYear || /month|year/.test(w))) continue;
+      el.setAttribute("data-fizz-card", k);
+      out[k] = { select: el.tagName === "SELECT", placeholder: el.placeholder || "" };
+      break;
+    }
+  }
+  return out;
+}
+function focusCard(k) { const el = document.querySelector(`[data-fizz-card="${k}"]`); if (!el) return false; el.scrollIntoView({ block: "center" }); el.focus(); el.select?.(); return true; }
+function setSelect([k, v]) {
+  const el = document.querySelector(`[data-fizz-card="${k}"]`);
+  if (!el) return false;
+  const want = String(v).toLowerCase(), n = Number(v);
+  const opt = [...el.options].find((o) => o.value.toLowerCase() === want || o.text.trim().toLowerCase() === want || (n && (Number(o.value) === n || Number(o.text) === n || Number(o.value) === n % 100 || Number(o.text) === n % 100)));
+  if (!opt) return false;
+  el.value = opt.value;
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+  el.dispatchEvent(new Event("change", { bubbles: true }));
+  return true;
+}
+export const luhn = (num) => { const d = String(num).replace(/\D/g, ""); if (d.length < 12 || d.length > 19) return false; let sum = 0; for (let i = 0; i < d.length; i++) { let x = Number(d[d.length - 1 - i]); if (i % 2) { x *= 2; if (x > 9) x -= 9; } sum += x; } return sum % 10 === 0; };
+export const cardBrand = (num) => { const d = String(num).replace(/\D/g, ""); return /^4/.test(d) ? "Visa" : /^(5[1-5]|2[2-7])/.test(d) ? "Mastercard" : /^3[47]/.test(d) ? "Amex" : /^6(011|5)/.test(d) ? "Discover" : /^35/.test(d) ? "JCB" : /^3(0[0-5]|[68])/.test(d) ? "Diners" : "Card"; };
+
+/** Every frame of the tab, each as { send, contextId } (same-process frames and other-site iframes alike). */
+async function frameContexts(cdp, tab) {
+  const ctxs = [];
+  const add = async (send) => {
+    const { frameTree } = await send("Page.getFrameTree");
+    const walk = (n, list = []) => { list.push(n.frame); for (const c of n.childFrames || []) walk(c, list); return list; };
+    for (const f of walk(frameTree)) {
+      try { const { executionContextId } = await send("Page.createIsolatedWorld", { frameId: f.id, worldName: "fizz-card", grantUniveralAccess: false }); ctxs.push({ send, contextId: executionContextId }); } catch {}
+    }
+  };
+  await add(tab.send);
+  // Iframes from other sites run in their own process: attach to each one under this tab.
+  const kids = [];
+  const off = cdp.on((m) => { if (m.method === "Target.attachedToTarget" && m.sessionId === tab.sessionId && m.params?.targetInfo?.type === "iframe") kids.push(m.params.sessionId); });
+  try { await tab.send("Target.setAutoAttach", { autoAttach: true, waitForDebuggerOnStart: false, flatten: true }); } catch {}
+  await sleep(400);
+  off();
+  for (const sid of kids) { try { await add((method, params, ms) => cdp.send(method, params, sid, ms)); } catch {} }
+  return ctxs;
+}
+async function inContext(c, fn, arg) {
+  const r = await c.send("Runtime.evaluate", { expression: `(${fn})(${arg === undefined ? "" : JSON.stringify(arg)})`, contextId: c.contextId, returnByValue: true, awaitPromise: true, userGesture: true });
+  return r.result?.value;
+}
 
 // Verification codes the user gave in the chat may be typed; passwords and card details never.
 const SECRET_FIELD = (l) => l.type === "password" || /(^|\s)(current-password|new-password|cc-number|cc-csc|cc-exp)$/.test(l.autocomplete) || /card number|cvv|cvc|security code|סיסמה/i.test(l.label);
@@ -308,13 +377,40 @@ export async function act(state, a) {
           : `The saved login for ${f.host} has nothing for the fields on this page.`;
         break;
       }
+      case "autofill-card": {
+        const c = a.card;
+        if (!c?.number) throw Object.assign(new Error("No saved card to fill."), { status: 400 });
+        const here = loginHost(await tab.evaluate(() => location.href));
+        if (!a.approvedHost || !sameSite(here, a.approvedHost)) throw Object.assign(new Error(`The payment was approved for ${a.approvedHost || "another page"}, but this page is on ${here}. Ask the user to approve it here.`), { status: 400, code: "wrong_site" });
+        const ctxs = await frameContexts(cdp, tab);
+        const values = { number: c.number, cvc: c.cvc, name: c.name, zip: c.zip, expMonth: c.month, expYear: c.year };
+        const filled = new Set();
+        for (const ctx of ctxs) {
+          const found = (await inContext(ctx, findCardFields).catch(() => null)) || {};
+          for (const [k, info] of Object.entries(found)) {
+            if (filled.has(k)) continue;
+            let v = k === "exp" ? (/yyyy/i.test(info.placeholder) ? `${c.month}/${c.year}` : `${c.month}/${String(c.year).slice(-2)}`) : values[k];
+            if (k === "expYear" && !info.select && /^yy$/i.test(info.placeholder.trim())) v = String(c.year).slice(-2);
+            if (!v) continue;
+            if (info.select) { if (await inContext(ctx, setSelect, [k, v])) filled.add(k); continue; }
+            if (!(await inContext(ctx, focusCard, k))) continue;
+            await ctx.send("Input.insertText", { text: String(v) });
+            await sleep(120);
+            filled.add(k);
+          }
+        }
+        if (!filled.has("number")) throw Object.assign(new Error("There's no card form on this page (or it hasn't opened yet). Go to the payment step, then try again."), { status: 400, code: "no_card_form" });
+        const names = { number: "the card number", exp: "the expiry", expMonth: "the expiry month", expYear: "the expiry year", cvc: "the security code", name: "the name on the card", zip: "the postal code" };
+        note = `Filled the saved card on ${here}: ${[...filled].map((k) => names[k]).join(", ")} (you can't see the details). Check the total, then press the page's pay button.`;
+        break;
+      }
       case "script": {
         // Fizz Code's own code in the page (a fast way to pull data out as text). Never on a page with a password
         // field or a filled saved login, so code can't read a password.
         const src = String(a.code || a.text || "").trim();
         if (!src || src.length > 6000) throw Object.assign(new Error("Give the JavaScript to run (up to 6,000 characters)."), { status: 400 });
-        const guarded = await tab.evaluate(() => Boolean(document.querySelector('input[type=password],[data-fizz-fill]')));
-        if (guarded) throw Object.assign(new Error("This page has a password field, so code can't run on it. Use click / type / read here, and run code after signing in."), { status: 400, code: "script_blocked" });
+        const guarded = await tab.evaluate(() => Boolean(document.querySelector('input[type=password],[data-fizz-fill],[data-fizz-card],[autocomplete^="cc-"]')));
+        if (guarded) throw Object.assign(new Error("This page has a password or payment field, so code can't run on it. Use click / type / read here, and run code after signing in."), { status: 400, code: "script_blocked" });
         const res = await tab.send("Runtime.evaluate", { expression: `(async () => { ${src.includes("return") ? src : `return (${src});`} })()`, returnByValue: true, awaitPromise: true, userGesture: true, timeout: 15000 });
         if (res.exceptionDetails) throw Object.assign(new Error(`The code threw: ${String(res.exceptionDetails.exception?.description || res.exceptionDetails.text || "error").slice(0, 600)}`), { status: 400 });
         let v = res.result?.value;
@@ -331,6 +427,7 @@ export async function act(state, a) {
     const out = { state, page, text: (note ? note + "\n" : "") + describe(page) };
     // A saved password never comes back in what the AI reads, even from a field that shows it.
     if (a.fill?.pass && a.fill.pass.length >= 3) out.text = out.text.split(a.fill.pass).join("••••");
+    if (a.card?.number) for (const v of [a.card.number, a.card.number.replace(/(\d{4})(?=\d)/g, "$1 "), a.card.cvc].filter((x) => x && x.length >= 3)) out.text = out.text.split(v).join("••••");
     if (a.action === "screenshot" || a.shot) {
       const shot = await tab.send("Page.captureScreenshot", { format: "jpeg", quality: 60 });
       out.screenshot = `data:image/jpeg;base64,${shot.data}`;

@@ -34,4 +34,16 @@ assert.equal((await call({ action: "seal-login", url: "example.com", password: "
 r = await call({ action: "autofill", secret: j.secret }, "b".repeat(32));
 assert.equal(r.status, 400);
 assert.equal((await r.json()).error.code, "bad_login");
+// Cards: validated, sealed for this user; only brand, last 4 and expiry come back in the clear.
+r = await call({ action: "seal-card", number: "4242 4242 4242 4242", month: "7", year: "28", cvc: "123", name: "Dana" });
+assert.equal(r.status, 200);
+const cj = await r.json();
+assert.deepEqual([cj.brand, cj.last4, cj.exp], ["Visa", "4242", "07/28"]);
+assert.ok(!JSON.stringify({ ...cj, secret: "" }).includes("4242424242424242") && !cj.secret.includes("4242"), "the number stays sealed");
+const sc = unseal(cj.secret);
+assert.deepEqual([sc.kind, sc.number, sc.month, sc.year, sc.cvc], ["card", "4242424242424242", "07", "2028", "123"]);
+assert.equal((await call({ action: "seal-card", number: "4242 4242 4242 4241", month: "07", year: "2028" })).status, 400, "a wrong number (Luhn) is refused");
+assert.equal((await call({ action: "seal-card", number: "4242424242424242", month: "13", year: "2028" })).status, 400);
+r = await call({ action: "autofill-card", secret: cj.secret }, "b".repeat(32));
+assert.equal((await r.json()).error.code, "bad_card", "another user can't use the card");
 console.log("Logins tests passed");

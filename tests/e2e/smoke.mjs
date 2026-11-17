@@ -799,6 +799,48 @@ for (const app of ["chat", "dev"]) {
   await ctx.close();
 }
 
+// ---------- Saved cards: one click in the chat approves a payment; FIZZ fills the card ----------
+{
+  const { ctx, p, errs, script } = await open({ width: 1280, height: 800 });
+  await ctx.route("**/api/status", (r) => r.fulfill({ json: { server: true, apps: [], ai: { configured: true, model: "test-model", dailyLimit: 50 }, connections: {}, google: {}, tools: { search: "wikipedia", browser: true } } }));
+  const sent = [];
+  await ctx.route("**/api/browser", (r) => {
+    const b = r.request().postDataJSON(); sent.push(b);
+    if (b.action === "seal-card") return r.fulfill({ json: { brand: "Visa", last4: "4242", exp: "12/28", secret: "SEALED-CARD" } });
+    if (b.action === "warm" || b.action === "live") return r.fulfill({ json: { ready: true, pages: [] } });
+    r.fulfill({ json: { text: "Page: Checkout — https://shop.example/checkout\n[5] button \"Pay now\"", page: { url: "https://shop.example/checkout", title: "Checkout" }, elements: [{ id: 5, label: "Pay now", tag: "button" }], tabs: [{ id: "t1", title: "Checkout", url: "https://shop.example/checkout", active: true }] } });
+  });
+  await p.goto(B + "dev.html"); await p.waitForTimeout(900);
+  await p.evaluate(() => { const st = FIZZ.loadData(FIZZ.auth.current()).settings; st.autoVerify = false; st.cloudRun = false; });
+  await p.locator("#dev-app #model-btn").first().click();
+  await p.locator("dialog[open] [data-tab=connections]").click();
+  await p.waitForSelector("dialog[open] [data-card=number]");
+  await p.fill("dialog[open] [data-card=number]", "4242 4242 4242 4242");
+  await p.fill("dialog[open] [data-card=month]", "12");
+  await p.fill("dialog[open] [data-card=year]", "2028");
+  await p.fill("dialog[open] [data-card=cvc]", "123");
+  await p.click("dialog[open] [data-card-add]");
+  await p.waitForFunction(() => (FIZZ.loadData(FIZZ.auth.current()).settings.cards || []).length === 1, null, { timeout: 8000 });
+  const saved = await p.evaluate(() => FIZZ.loadData(FIZZ.auth.current()).settings.cards);
+  check("cards: saved sealed, with only brand, last 4 and expiry", saved[0].secret === "SEALED-CARD" && saved[0].last4 === "4242" && !JSON.stringify(saved).includes("4242424242424242") && !JSON.stringify(saved).includes('"123"'), JSON.stringify(saved));
+  await p.keyboard.press("Escape");
+  script.push('<fizz-browser action="open" url="https://shop.example/checkout"/>\n<fizz-browser action="pay" card="4242" amount="$24.90"/>');
+  script.push('<fizz-browser action="click" id="5"/>');
+  script.push("Paid.");
+  await p.fill("#dev-app #input", "buy the shirt on shop.example"); await p.keyboard.press("Enter");
+  await p.waitForSelector("#dev-app .stage-bar [data-approve]", { timeout: 20000 });
+  const ask = await p.locator("#dev-app .stage-bar").first().innerText();
+  check("cards: the chat asks to approve the payment with the card, site and amount", /Pay on shop\.example/.test(ask) && /4242/.test(ask) && /\$24\.90/.test(ask), ask);
+  check("cards: nothing is filled before the approval", !sent.some((b) => b.action === "autofill-card"));
+  await p.locator("#dev-app .stage-bar [data-approve]").first().click();
+  await lastReply(p, "#dev-app", "Paid.");
+  const fill = sent.find((b) => b.action === "autofill-card");
+  check("cards: after one click FIZZ fills the sealed card on the approved site", fill?.secret === "SEALED-CARD" && fill.approvedHost === "shop.example", JSON.stringify(fill));
+  check("cards: the page's pay button is pressed without asking again", sent.some((b) => b.action === "click" && b.id === "5"));
+  check("cards: no script errors", !errs.length, errs.join(" | "));
+  await ctx.close();
+}
+
 // ---------- A big repository that lives in the cloud sandbox (phase 2, part 2) ----------
 {
   const { ctx, p, errs, bodies, script } = await open({ width: 1280, height: 800 });

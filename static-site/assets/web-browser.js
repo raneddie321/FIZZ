@@ -523,12 +523,29 @@
   const tabList = (r) => (r.tabs || []).map((t, i) => `[${i + 1}] ${t.title || "(untitled)"} — ${t.url}${t.active ? " (current)" : ""}`).join("\n");
   let lastTabs = [];
 
+  // ---------- paying with a saved card ----------
+  // The user approves each payment in the chat (card, site, amount). After that, pressing the page's pay button on
+  // the same site within 3 minutes doesn't ask again.
+  let paid = null;
+  const activeUrl = () => lastTabs.find((x) => x.active)?.url || "";
+  const justPaid = () => Boolean(paid && Date.now() - paid.at < 180_000 && hostName(activeUrl()).replace(/^www\./, "") === paid.host);
+  function payWaiting(t) {
+    const c = F.logins?.findCard(t.attrs.card);
+    const host = hostName(activeUrl()).replace(/^www\./, "") || "this site";
+    if (!c) return { text: `There's no saved card “${t.attrs.card || ""}”. Add one in Settings → Connections → Payment cards.`, ok: "Continue", cancel: "Cancel" };
+    return {
+      text: `Pay on ${host} with ${F.logins.cardName(c)}${t.attrs.amount ? ` — ${t.attrs.amount}` : ""}? FIZZ fills the card into this site's payment form; check the total in the browser before you allow it.`,
+      html: `<button type="button" class="btn btn-outline btn-sm" data-act="preview">Open the browser</button>`,
+      ok: "Allow payment", cancel: "Don't pay",
+    };
+  }
+
   F.agentTools.register("browser", {
     icon: "cursor", feedback: true,
     label: (t) => {
       if (t.desc) return t.desc; // fixed when the action ran, so it names the element on that page
       const a = t.attrs;
-      const what = { script: "Ran code in the page", login: `Signed in to ${a.account || a.site || a.host || "the site"} with the saved login`, open: `Opened ${hostName(a.url) || a.url}`, newtab: `Opened ${hostName(a.url) || a.url} in a new tab`, click: `Clicked ${lastLabel(a.id) ? `“${lastLabel(a.id)}”` : `[${a.id}]`}`, type: `Typed into ${lastLabel(a.id) ? `“${lastLabel(a.id)}”` : `[${a.id}]`}`, select: `Chose “${a.value}”`, key: `Pressed ${a.key}`, scroll: `Scrolled ${a.direction || "down"}`, back: "Went back", forward: "Went forward", reload: "Reloaded the page", read: "Read the page", screenshot: "Looked at the page", tabs: "Listed the tabs", switch: `Switched to tab ${a.tab}`, close: `Closed tab ${a.tab || ""}`, handoff: "Your turn in the browser" }[a.action] || `Browser: ${a.action}`;
+      const what = { pay: `Filled ${a.card ? `card •••• ${String(a.card).slice(-4)}` : "the saved card"} for payment${a.amount ? ` (${a.amount})` : ""}`, script: "Ran code in the page", login: `Signed in to ${a.account || a.site || a.host || "the site"} with the saved login`, open: `Opened ${hostName(a.url) || a.url}`, newtab: `Opened ${hostName(a.url) || a.url} in a new tab`, click: `Clicked ${lastLabel(a.id) ? `“${lastLabel(a.id)}”` : `[${a.id}]`}`, type: `Typed into ${lastLabel(a.id) ? `“${lastLabel(a.id)}”` : `[${a.id}]`}`, select: `Chose “${a.value}”`, key: `Pressed ${a.key}`, scroll: `Scrolled ${a.direction || "down"}`, back: "Went back", forward: "Went forward", reload: "Reloaded the page", read: "Read the page", screenshot: "Looked at the page", tabs: "Listed the tabs", switch: `Switched to tab ${a.tab}`, close: `Closed tab ${a.tab || ""}`, handoff: "Your turn in the browser" }[a.action] || `Browser: ${a.action}`;
       return what;
     },
     summary: (k) => `took ${k} browser action${k === 1 ? "" : "s"}`,
@@ -541,6 +558,7 @@
       "  The browser usually runs in the background: the user isn't watching it. Work through the whole task yourself, quickly, without stopping to report each step. Only when a step needs the user — a CAPTCHA or bot check, a code you can't get (no Gmail), a password with no saved login, a field you can't fill after two tries — use action=\"handoff\" reason=\"what they need to do\": FIZZ opens the browser for them just for that step, then you continue.",
       "  Rules — always follow them:",
       "  • Never ask for passwords, card numbers or security codes in the chat and never type them. A site with a saved login (listed under SAVED WEBSITE LOGINS): open its login page and use action=\"login\" account=\"its host\" — FIZZ fills the email/username and password itself. Otherwise use handoff: the user types them straight into the browser, then presses Continue.",
+      '  pay card="4242" amount="$24.90" — pay with a saved card (Settings → Payment cards): the user approves it in the chat, then FIZZ fills the card into the payment form; then press the page\'s pay button.',
       '  script code="return [...document.querySelectorAll(\'h2 a\')].map(a => ({ title: a.innerText, url: a.href }))"/> (or the code inside the tag) — runs your JavaScript in the page and gives you its result as text: the fastest way to pull lists, prices, tables or links out of a page, or to do many steps at once. It can\'t run on pages with a password field.',
       '  login account="example.com" — fills a saved login (Settings → Website logins) into the login form on the open page; then click the sign-in button.',
       "  • Signing in / signing up on a site: if it has a saved login, sign in with it right away (don't ask). Otherwise first ask with <fizz-ask> whether the user already has an account there. Yes → open the login page, then handoff so they log in. No → open the sign-up page, fill in the details the user gives you (ask for them), handoff for the password, and if the site emails a code, ask the user for it with <fizz-ask> and type it in. After that you can work inside their account.",
@@ -550,8 +568,8 @@
     ].join("\n"),
     available: () => cloudOn(),
     unavailable: "There's no cloud browser on this site right now, but you can still do web tasks with the user: never say you can't. For anything they must get from a website (sign up somewhere, an API key, a token, a code), use <fizz-collect>: it opens the right page for them, shows your short steps, and saves what they paste straight into the project. Read pages and docs with <fizz-fetch> to find the exact URLs (sign-up page, the API-key settings page).",
-    needsApproval: (t) => t.attrs.action === "handoff" || (t.attrs.action === "click" && SENSITIVE.test(lastLabel(t.attrs.id))) || (t.attrs.action === "type" && t.attrs.enter === "true" && SENSITIVE.test(lastLabel(t.attrs.id))),
-    waiting: (t) => (t.attrs.action === "handoff"
+    needsApproval: (t) => t.attrs.action === "handoff" || t.attrs.action === "pay" || (t.attrs.action === "click" && SENSITIVE.test(lastLabel(t.attrs.id)) && !justPaid()) || (t.attrs.action === "type" && t.attrs.enter === "true" && SENSITIVE.test(lastLabel(t.attrs.id)) && !justPaid()),
+    waiting: (t) => (t.attrs.action === "pay" ? payWaiting(t) : t.attrs.action === "handoff"
       ? { handoff: true, text: `Your turn: ${t.attrs.reason || "do this step yourself in the browser"}. Do it in the browser, then press Continue.`, html: `<button type="button" class="btn btn-outline btn-sm" data-act="preview">Open the browser</button>`, ok: "Continue", cancel: "Cancel" }
       : { text: `Fizz Code wants to click “${lastLabel(t.attrs.id)}”. This may buy, send, post or delete something. Allow it?`, ok: "Allow", cancel: "Don't allow" }),
     onWait(t, ctx, key) {
@@ -570,6 +588,14 @@
       if (a.action === "handoff") { handoff = null; render(); a.action = "read"; }
       if (a.action === "newtab") { a.action = "open"; a.newTab = true; }
       // A saved login (Settings → Website logins): the server types it into the form; the password never comes here.
+      if (a.action === "pay") {
+        const c = F.logins?.findCard(a.card);
+        if (!c) return { ok: false, text: `There's no saved card “${a.card || ""}”.${(F.logins?.cards() || []).length ? ` Saved cards: ${F.logins.cards().map((x) => F.logins.cardName(x)).join(", ")}.` : " None are saved: ask the user to add one in Settings → Connections → Payment cards, or hand over the payment step."}` };
+        const host = hostName(activeUrl()).replace(/^www\./, "");
+        Object.assign(a, { action: "autofill-card", secret: c.secret, approvedHost: host });
+        delete a.card; delete a.amount;
+        paid = { host, at: Date.now() };
+      }
       if (a.action === "login") {
         const l = F.logins?.find(a.account || a.site || a.host || a.url || "");
         if (!l) {
