@@ -69,7 +69,7 @@ async function command(action,args={}){
 }
 function auth(req){
   const origin=req.headers.origin||"";
-  if(origin && origin!=="http://127.0.0.1:"+PORT && origin!=="http://localhost:"+PORT) return false;
+  if(origin && origin!=="https://fizz.raneddie.com" && origin!=="https://fizzbrowser.vercel.app" && origin!=="http://localhost:3000") return false;
   const token=req.headers["x-fizz-local-token"]||"";
   return token.length===sessionKey.length && crypto.timingSafeEqual(Buffer.from(token),Buffer.from(sessionKey));
 }
