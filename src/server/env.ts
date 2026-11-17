@@ -86,6 +86,7 @@ const schema = z.object({
 
   // Payments
   STRIPE_SECRET_KEY: optional,
+  STRIPE_PUBLISHABLE_KEY: optional,
   STRIPE_WEBHOOK_SECRET: optional,
   WALLET_LIVE_MODE_ENABLED: bool(false),
   PURCHASING_LIVE_ENABLED: bool(false),
