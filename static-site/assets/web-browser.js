@@ -538,6 +538,7 @@
       "  After each action you get the page: its numbered elements (links, buttons, fields) and text. Use those numbers; read again if the page changed.",
       "  Do the task, don't describe it: when the user asks for something on a website (sign up or log in somewhere, get an API key, fill in a form, find, compare, book…), open the site and do every step yourself with these actions. Never answer with instructions for the user to follow — the only steps you hand over are the ones only they can do (passwords, CAPTCHAs, codes from their email or phone).",
       "  When a page shows a value the user wants (an API key, a token, an order number…), read it from the page and give it to them in your reply; if it belongs to this project, also save it to .env (and make sure .gitignore lists .env).",
+      "  The browser usually runs in the background: the user isn't watching it. Work through the whole task yourself, quickly, without stopping to report each step. Only when a step needs the user — a CAPTCHA or bot check, a code you can't get (no Gmail), a password with no saved login, a field you can't fill after two tries — use action=\"handoff\" reason=\"what they need to do\": FIZZ opens the browser for them just for that step, then you continue.",
       "  Rules — always follow them:",
       "  • Never ask for passwords, card numbers or security codes in the chat and never type them. A site with a saved login (listed under SAVED WEBSITE LOGINS): open its login page and use action=\"login\" account=\"its host\" — FIZZ fills the email/username and password itself. Otherwise use handoff: the user types them straight into the browser, then presses Continue.",
       '  login account="example.com" — fills a saved login (Settings → Website logins) into the login form on the open page; then click the sign-in button.',
@@ -555,6 +556,7 @@
     onWait(t, ctx, key) {
       if (t.attrs.action !== "handoff") return;
       handoff = { key, reason: t.attrs.reason || "Do this step yourself in the browser." };
+      F.toast(`Fizz Code needs you in the browser: ${handoff.reason}`);
       const ct = tabs.find((x) => x.kind === "cloud" && x.target === lastTabs.find((y) => y.active)?.id) || tabs.find((x) => x.kind === "cloud");
       if (ct) active = ct.id;
       ctx.showTab("browser");
@@ -583,7 +585,9 @@
       if (ct?.target && !a.tab) a.tab = ct.target;
       if (a.action === "screenshot") a.shot = true;
       // Always bring the browser on screen, so the user sees what Fizz is doing.
-      if (!$(".pane-browser.on") || !tabs.some((x) => x.kind === "cloud")) { ctx.showTab("browser"); render(); }
+      // In the background (the default): the browser works out of sight and only opens when the user is needed (handoff).
+      const bg = F.loadData(F.auth.current()).settings.browserBackground !== false;
+      if (!bg && (!$(".pane-browser.on") || !tabs.some((x) => x.kind === "cloud"))) { ctx.showTab("browser"); render(); }
       // Show what's happening while it works (the first start of the cloud browser takes about a minute).
       const t0 = Date.now();
       const tick = setInterval(() => { const sec = Math.round((Date.now() - t0) / 1000); t.progress = starting ? `Starting the cloud browser — the first time takes about a minute… ${sec}s` : `Working… ${sec}s`; ctx.rerender?.(); }, 1000);
@@ -594,7 +598,7 @@
       lastTabs = r.tabs || [];
       const cur = tabs.find((x) => x.kind === "cloud" && x.target === lastTabs.find((y) => y.active)?.id);
       if (cur) active = cur.id;
-      if (!$(".pane-browser.on")) ctx.showTab("browser");
+      if (!bg && !$(".pane-browser.on")) ctx.showTab("browser");
       render();
       const see = ctx.canSeeImages?.();
       const head = t.attrs.action === "handoff" ? `The user finished their turn (“${t.attrs.reason || ""}”). This is the page now:\n` : "";

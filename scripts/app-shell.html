@@ -58,7 +58,7 @@
 <script src="assets/cloud-tools.js?v=20261112-p4"></script>
 <script src="assets/builds.js"></script>
 <script src="assets/sync.js?v=20261111-p2"></script>
-<script src="assets/web-browser.js?v=20261117-login"></script>
+<script src="assets/web-browser.js?v=20261117-bg"></script>
 <script src="assets/google-tools.js"></script>
 <script src="assets/app-tools.js"></script>
 <script src="assets/mcp-tools.js?v=20261111-p0"></script>
@@ -234,6 +234,6 @@
   if (S) return S.boot(list);
   // idb.js didn't load: start the apps anyway (data stays in localStorage, as before).
   list.forEach(function (src) { var s = document.createElement("script"); s.src = src; s.async = false; document.body.appendChild(s); });
-})(["assets/chat.js?v=20261113-cloud", "assets/dev.js?v=20261117-login"]);</script>
+})(["assets/chat.js?v=20261113-cloud", "assets/dev.js?v=20261117-bg"]);</script>
 </body>
 </html>

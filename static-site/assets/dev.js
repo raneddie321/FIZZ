@@ -2392,6 +2392,7 @@
     if (plusView === "permission") return back("Permissions") + `<div class="ps-list">
       ${F.perm.MODES.map(([k, name, desc]) => `<button type="button" class="ps-row" data-ps-perm="${k}"><span class="ps-txt"><b>${name}</b><small>${desc}</small></span>${tick(F.perm.mode() === k)}</button>`).join("")}
       <button type="button" class="ps-row" data-ps-opt="reviewChanges"><span class="ps-txt"><b>Review file changes first</b><small>See each change and accept or reject it.</small></span>${toggle(Boolean(data.settings.reviewChanges))}</button>
+      <button type="button" class="ps-row" data-ps-opt="browserBackground" data-default-on><span class="ps-txt"><b>Browser in the background</b><small>Fizz Code uses the web browser out of sight and opens it for you only when it needs you (a CAPTCHA, a code, a field).</small></span>${toggle(data.settings.browserBackground !== false)}</button>
       <button type="button" class="ps-row" data-ps-opt="cloudRun" data-default-on><span class="ps-txt"><b>Keep working when I leave</b><small>Tasks run in your cloud sandbox, so they go on when you close the page or lock the phone.</small></span>${toggle(data.settings.cloudRun !== false)}</button>
       <button type="button" class="ps-row" data-ps-opt="autoVerify" data-default-on><span class="ps-txt"><b>Check work automatically</b><small>5 checks after every change, fixed automatically.</small></span>${toggle(data.settings.autoVerify !== false)}</button>
       <button type="button" class="ps-row" data-ps="perm-rules"><span class="ps-ic">${F.icon("shield")}</span><span class="ps-txt"><b>Rules…</b><small>${(() => { const r = F.perm.rules(); const n = r.allow.length + r.ask.length + r.deny.length; return n ? `${n} rule${n === 1 ? "" : "s"}: always allow, always ask, never allow` : "Always allow, always ask or never allow specific commands, files and apps"; })()}</small></span>${chev}</button></div>`;
@@ -2463,7 +2464,7 @@
     if (d.ps === "perm-rules") { closePlus(); return openSettings("tools"); }
     if (d.psOpt) {
       const o = d.psOpt;
-      data.settings[o] = o === "autoVerify" || o === "cloudRun" ? data.settings[o] === false : !data.settings[o];
+      data.settings[o] = ["autoVerify", "cloudRun", "browserBackground"].includes(o) ? data.settings[o] === false : !data.settings[o];
       save();
       return drawPlus();
     }

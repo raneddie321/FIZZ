@@ -777,6 +777,28 @@ for (const app of ["chat", "dev"]) {
   await ctx.close();
 }
 
+// ---------- The browser in the background: hidden while it works, shown only when the user is needed ----------
+{
+  const { ctx, p, errs, script } = await open({ width: 1280, height: 800 });
+  await ctx.route("**/api/status", (r) => r.fulfill({ json: { server: true, apps: [], ai: { configured: true, model: "test-model", dailyLimit: 50 }, connections: {}, google: {}, tools: { search: "wikipedia", browser: true } } }));
+  await ctx.route("**/api/browser", (r) => {
+    const b = r.request().postDataJSON();
+    if (b.action === "warm" || b.action === "live") return r.fulfill({ json: { ready: true, pages: [] } });
+    r.fulfill({ json: { text: "Page: Sign up — https://example.com/signup\n[1] button \"I'm not a robot\"", page: { url: "https://example.com/signup", title: "Sign up", captcha: true }, elements: [], tabs: [{ id: "t1", title: "Sign up", url: "https://example.com/signup", active: true }] } });
+  });
+  await p.goto(B + "dev.html"); await p.waitForTimeout(900);
+  await p.evaluate(() => { const st = FIZZ.loadData(FIZZ.auth.current()).settings; st.autoVerify = false; st.cloudRun = false; });
+  await p.evaluate(() => document.querySelector('#dev-app [data-tab="code"]')?.click());
+  script.push('<fizz-browser action="open" url="https://example.com/signup"/>\nOpening.');
+  script.push('<fizz-browser action="handoff" reason="Solve the CAPTCHA"/>');
+  await p.fill("#dev-app #input", "sign me up on example.com"); await p.keyboard.press("Enter");
+  await p.waitForSelector("#dev-app .stage-bar.handoff", { timeout: 20000 }).catch(() => {});
+  const shownOnHandoff = await p.evaluate(() => Boolean(document.querySelector(".pane-browser.on")));
+  check("browser in the background: the handoff opens the browser for the user", shownOnHandoff);
+  check("browser in the background: no script errors", !errs.length, errs.join(" | "));
+  await ctx.close();
+}
+
 // ---------- A big repository that lives in the cloud sandbox (phase 2, part 2) ----------
 {
   const { ctx, p, errs, bodies, script } = await open({ width: 1280, height: 800 });
