@@ -177,8 +177,8 @@ function findLoginFields() {
 }
 function clearFill(mark) { const el = document.querySelector(`[data-fizz-fill="${mark}"]`); if (!el) return false; el.focus(); el.select?.(); return true; }
 
-// Verification codes the user gave in the chat may be typed; passwords and card details never.
-const SECRET_FIELD = (l) => l.type === "password" || /(^|\s)(current-password|new-password|cc-number|cc-csc|cc-exp)$/.test(l.autocomplete) || /card number|cvv|cvc|security code|סיסמה/i.test(l.label);
+// Payment fields are always user-only. Never loosen this guard: card data must not enter the agent context.
+const SECRET_FIELD = (l) => l.type === "password" || /(^|\s)(current-password|new-password|cc-number|cc-csc|cc-exp|cc-name|cc-type)$/.test(l.autocomplete) || /card number|credit card|cardholder|expiry|expiration|cvv|cvc|security code|מספר כרטיס|תוקף כרטיס|קוד אבטחה|סיסמה/i.test(l.label);
 
 /**
  * Runs one action. state = { sessionId, connectUrl, active } (the active tab id); returns { state, page, text, screenshot? }.
