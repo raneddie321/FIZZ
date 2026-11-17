@@ -724,6 +724,21 @@ for (const app of ["chat", "dev"]) {
   await ctx.close();
 }
 
+// ---------- WhatsApp: a message the user sends from their own WhatsApp ----------
+{
+  const { ctx, p, errs, script } = await open({ width: 1280, height: 800 });
+  await p.goto(B + "dev.html"); await p.waitForTimeout(900);
+  await p.evaluate(() => { const st = FIZZ.loadData(FIZZ.auth.current()).settings; st.autoVerify = false; st.cloudRun = false; });
+  script.push('Here is the message.\n<fizz-whatsapp to="050-123-4567" name="Dani Barber">Hi Dani, can I book a haircut tomorrow at 10?</fizz-whatsapp>');
+  script.push("The message is ready: press Send in WhatsApp.");
+  await p.fill("#dev-app #input", "send a whatsapp to dani barber 0501234567 to book a haircut"); await p.keyboard.press("Enter");
+  await lastReply(p, "#dev-app", "press Send in WhatsApp");
+  const href = await p.locator("#dev-app .wa-send").first().getAttribute("href").catch(() => "");
+  check("whatsapp: a Send in WhatsApp button opens the chat with the text (Israeli number with 972)", href === "https://wa.me/972501234567?text=" + encodeURIComponent("Hi Dani, can I book a haircut tomorrow at 10?"), href);
+  check("whatsapp: no script errors", !errs.length, errs.join(" | "));
+  await ctx.close();
+}
+
 // ---------- A big repository that lives in the cloud sandbox (phase 2, part 2) ----------
 {
   const { ctx, p, errs, bodies, script } = await open({ width: 1280, height: 800 });
