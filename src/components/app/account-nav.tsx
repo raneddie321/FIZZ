@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, CreditCard, Database, Gauge, KeyRound, LifeBuoy, Link2, MonitorSmartphone, Palette, Sparkles, User, Wallet, BellRing } from "lucide-react";
+import { Bell, CreditCard, Database, Gauge, KeyRound, LifeBuoy, Link2, MonitorSmartphone, Palette, Sparkles, User, Wallet, BellRing, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const GROUPS = [
@@ -22,6 +22,7 @@ const GROUPS = [
     title: "Plan & payments",
     items: [
       { href: "/billing", label: "Billing & subscription", icon: CreditCard },
+      { href: "/payments", label: "Payment Vault", icon: ShieldCheck },
       { href: "/wallet", label: "FIZZ Wallet", icon: Wallet },
       { href: "/usage", label: "Usage", icon: Gauge },
     ],
