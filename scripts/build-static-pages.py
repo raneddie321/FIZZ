@@ -18,11 +18,11 @@ HEAD = """<!doctype html>
 {extra}<link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" />
-<link rel="stylesheet" href="assets/site.css?v=20261121-app" />
+<link rel="stylesheet" href="assets/site.css?v=20261121-app2" />
 <script>try{{var t=localStorage.getItem("fizz.theme");t=t?JSON.parse(t):"system";if(t==="dark"||(t!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}}catch(e){{}}</script>
 <script src="assets/core.js?v=20261112-att" defer></script>
 <script src="assets/raneddie-id.js?v=20261110-console1" defer></script>
-<script src="assets/site.js?v=20261121-app" defer></script>
+<script src="assets/site.js?v=20261121-app2" defer></script>
 </head>
 <body>
 """
@@ -52,6 +52,17 @@ def features(items):
         for i, t, d, tag in items) + "</div>"
 
 # ---------------- home ----------------
+# ---------------- phones: get the app ----------------
+# FIZZ itself is in the app on phones (and on the website on computers, or in a phone browser in desktop mode).
+# Store links: fill these in when the apps are published; until then the buttons say "Coming soon".
+APP_STORE_URL = ""
+PLAY_STORE_URL = ""
+def store_button(url, top, name, icon):
+    inner = f'<span class="store-ic" aria-hidden="true">{icon}</span><span class="store-txt"><small>{top}</small><b>{name}</b></span>'
+    return f'<a class="store-btn" href="{url}" target="_blank" rel="noopener">{inner}</a>' if url else f'<span class="store-btn soon" aria-disabled="true">{inner}<em>Coming soon</em></span>'
+def store_row(): return f'<div class="store-row">{store_button(APP_STORE_URL, "Download on the", "App Store", APPLE_SVG)}{store_button(PLAY_STORE_URL, "GET IT ON", "Google Play", PLAY_SVG)}</div>'
+APPLE_SVG = '<svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M16.37 12.6c-.02-2.2 1.8-3.26 1.88-3.31-1.03-1.5-2.62-1.7-3.18-1.73-1.35-.14-2.64.8-3.33.8-.69 0-1.74-.78-2.87-.76-1.47.02-2.83.86-3.59 2.18-1.53 2.66-.39 6.6 1.1 8.76.73 1.06 1.6 2.24 2.73 2.2 1.1-.05 1.51-.71 2.84-.71 1.32 0 1.7.71 2.86.69 1.18-.02 1.93-1.07 2.65-2.13.84-1.23 1.18-2.42 1.2-2.48-.03-.01-2.3-.88-2.32-3.5zM14.2 6.13c.6-.73 1.01-1.75.9-2.76-.87.04-1.92.58-2.54 1.3-.56.64-1.05 1.67-.92 2.66.97.08 1.96-.49 2.56-1.2z"/></svg>'
+PLAY_SVG = '<svg viewBox="0 0 24 26" width="24" height="26"><path fill="#00D7FE" d="M.6.5C.2.9 0 1.5 0 2.3v21.4c0 .8.2 1.4.6 1.8l.1.1L12.7 13.6v-.3L.7.4z"/><path fill="#FFCE00" d="M16.7 17.6l-4-4v-.3l4-4 .1.1 4.7 2.7c1.4.8 1.4 2 0 2.8l-4.7 2.7z"/><path fill="#FF3A44" d="M16.8 17.5L12.7 13.4 .6 25.5c.4.5 1.2.5 2 .1l14.2-8.1"/><path fill="#00F076" d="M16.8 9.4L2.6 1.3C1.8.8 1 .9.6 1.3l12.1 12.1z"/></svg>'
 page("index.html", "Fizz - AI by RanEddie", "FIZZ is RANEDDIE's AI assistant. FIZZ DEV is the AI workspace for building software, websites and games.", f"""
 
 <section class="landing-hero">
@@ -64,6 +75,7 @@ page("index.html", "Fizz - AI by RanEddie", "FIZZ is RANEDDIE's AI assistant. FI
       <a class="btn btn-lg hero-primary" href="signin.html?mode=signup&amp;redirect_url=%2Fchat.html">Get started for free <span data-icon="arrow"></span></a>
       <a class="btn btn-lg hero-secondary" href="product.html">Meet FIZZ DEV</a>
     </div>
+    <div class="hero-app"><p class="hero-app-note">On your phone, FIZZ lives in the app.</p>{store_row()}</div>
     <div class="hero-proof"><span><span data-icon="check"></span> One RanEddie ID</span><span><span data-icon="check"></span> Ideas to working projects</span><span><span data-icon="check"></span> Built for every screen</span></div>
   </div>
   <div class="hero-visual" aria-label="Preview of the FIZZ and FIZZ DEV workspace">
@@ -181,23 +193,13 @@ page("pricing.html", "Pricing · FIZZ", "FIZZ plans.", f"""
 <p class="fine">Plan names and features are provisional and may change before general availability.</p></section>
 """)
 
-# ---------------- phones: get the app ----------------
-# FIZZ itself is in the app on phones (and on the website on computers, or in a phone browser in desktop mode).
-# Store links: fill these in when the apps are published; until then the buttons say "Coming soon".
-APP_STORE_URL = ""
-PLAY_STORE_URL = ""
-def store_button(url, top, name, icon):
-    inner = f'<span class="store-ic" aria-hidden="true">{icon}</span><span class="store-txt"><small>{top}</small><b>{name}</b></span>'
-    return f'<a class="store-btn" href="{url}" target="_blank" rel="noopener">{inner}</a>' if url else f'<span class="store-btn soon" aria-disabled="true">{inner}<em>Coming soon</em></span>'
-APPLE_SVG = '<svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M16.37 12.6c-.02-2.2 1.8-3.26 1.88-3.31-1.03-1.5-2.62-1.7-3.18-1.73-1.35-.14-2.64.8-3.33.8-.69 0-1.74-.78-2.87-.76-1.47.02-2.83.86-3.59 2.18-1.53 2.66-.39 6.6 1.1 8.76.73 1.06 1.6 2.24 2.73 2.2 1.1-.05 1.51-.71 2.84-.71 1.32 0 1.7.71 2.86.69 1.18-.02 1.93-1.07 2.65-2.13.84-1.23 1.18-2.42 1.2-2.48-.03-.01-2.3-.88-2.32-3.5zM14.2 6.13c.6-.73 1.01-1.75.9-2.76-.87.04-1.92.58-2.54 1.3-.56.64-1.05 1.67-.92 2.66.97.08 1.96-.49 2.56-1.2z"/></svg>'
-PLAY_SVG = '<svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M3.6 2.3c-.2.2-.3.5-.3.9v17.6c0 .4.1.7.3.9l9.8-9.7L3.6 2.3zm10.6 8.9l2.7-2.7L5.1 1.8l9.1 9.4zm0 1.6l-9.1 9.4 11.8-6.7-2.7-2.7zm3.8-3.6l-3 3 3 3 3.4-1.9c1-.6 1-1.6 0-2.2L18 9.2z"/></svg>'
 page("get-app.html", "Get the FIZZ app", "FIZZ on your phone: the FIZZ app for iPhone and Android.", f"""
 <section class="section center get-app">
   <img class="get-app-icon" src="/icon-192.png" alt="" width="96" height="96" />
   <p class="eyebrow">FIZZ on your phone</p>
   <h1 class="h2">Download the FIZZ app</h1>
   <p class="lead">On a phone, FIZZ and FIZZ DEV live in the FIZZ app — faster, with notifications, and made for a small screen.</p>
-  <div class="store-row">{store_button(APP_STORE_URL, "Download on the", "App Store", APPLE_SVG)}{store_button(PLAY_STORE_URL, "Get it on", "Google Play", PLAY_SVG)}</div>
+  {store_row()}
   <p class="fine">On a computer, use FIZZ at fizz.raneddie.com or in the desktop app. In a phone browser you can also switch to desktop mode (browser menu → “Desktop site”) to open the full FIZZ website.</p>
   <div class="get-app-links"><a class="btn btn-outline" href="/pricing.html">Plans</a><a class="btn btn-outline" href="/product.html">What FIZZ can do</a><a class="btn btn-outline" href="/">Home</a></div>
 </section>

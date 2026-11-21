@@ -186,7 +186,7 @@
   window.FIZZ.icon = icon;
   window.FIZZ.MARK = MARK;
   window.FIZZ.WORDMARK = WORDMARK;
-  const start = () => { mount(); phoneLinks(); };
+  const start = () => { if (isPhone()) document.documentElement.classList.add("is-phone"); mount(); phoneLinks(); };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);
   else start();
 })();
