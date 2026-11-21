@@ -508,7 +508,7 @@ svg.dots3 { stroke-width: 3; }
 .hero-description{font-size:17px;line-height:1.78;max-width:440px}
 .hero-actions{margin-top:29px;gap:10px}
 .hero-primary{padding:0 22px;box-shadow:0 8px 22px color-mix(in srgb,var(--primary) 19%,transparent)}
-.hero-secondary{background:transparent;border-color:var(--input)}
+.hero-secondary{background:transparent;border-color:var(--input);color:var(--fg)}
 .hero-proof{gap:14px 18px;margin-top:25px;font-size:11px}
 .hero-visual{padding:26px 6px 28px 0}
 .workspace-window{border-radius:16px;box-shadow:0 32px 75px -38px rgba(0,0,0,.38),0 0 0 7px color-mix(in srgb,var(--card) 70%,transparent);transform:perspective(1600px) rotateY(-2deg) rotateX(.5deg)}

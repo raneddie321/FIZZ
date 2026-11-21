@@ -117,7 +117,7 @@
     const h = document.querySelector("header[data-site]");
     if (h) {
       h.className = "site-header";
-      const draw = () => { h.innerHTML = header(); };
+      const draw = () => { h.innerHTML = header(); phoneLinks(h); };
       draw();
       h.addEventListener("click", (e) => {
         if (e.target.closest(".mobile-toggle")) {
@@ -172,9 +172,21 @@
     });
   }
 
+  // ---------- phones: FIZZ itself is in the app ----------
+  // On a phone (not desktop mode, not the FIZZ app's own web view) every way into FIZZ leads to get-app.html.
+  const isPhone = () => { try { const ua = navigator.userAgent || ""; return /iPhone|iPod|Windows Phone|Android.*Mobile|BlackBerry|Opera Mini/i.test(ua) && !/iPad|Tablet/i.test(ua) && !(/; wv\)|FIZZApp|RanEddieApp|Capacitor/i.test(ua) || window.Capacitor || window.ReactNativeWebView || window.FIZZ_APP); } catch { return false; } };
+  function phoneLinks(root = document) {
+    if (!isPhone() || /get-app\.html$/.test(location.pathname)) return;
+    for (const a of root.querySelectorAll('a[href*="chat.html"], a[href*="dev.html"], a[href*="signin.html"]')) {
+      a.setAttribute("href", "/get-app.html");
+      for (const n of a.childNodes) if (n.nodeType === 3 && /Get started|Open FIZZ|Try FIZZ|Start building|Start for free/i.test(n.textContent)) n.textContent = n.textContent.replace(/Get started for free|Get started|Open FIZZ DEV|Open FIZZ|Try FIZZ DEV|Try FIZZ|Start building|Start for free/i, "Get the app");
+    }
+  }
+  window.FIZZ.phoneLinks = phoneLinks;
   window.FIZZ.icon = icon;
   window.FIZZ.MARK = MARK;
   window.FIZZ.WORDMARK = WORDMARK;
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", mount);
-  else mount();
+  const start = () => { mount(); phoneLinks(); };
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);
+  else start();
 })();
