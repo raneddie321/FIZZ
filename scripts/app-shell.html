@@ -4,6 +4,11 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>FIZZ</title>
+<script>
+/* Phones get the FIZZ app (get-app.html). Computers, tablets, a phone browser in desktop mode (it sends a desktop
+   user agent) and FIZZ's own app (its web view) open FIZZ here. ?web=1 skips the check. */
+(function(){try{var ua=navigator.userAgent||"";var phone=/iPhone|iPod|Windows Phone|Android.*Mobile|BlackBerry|Opera Mini/i.test(ua)&&!/iPad|Tablet/i.test(ua);var app=/; wv\)|FIZZApp|RanEddieApp|Capacitor/i.test(ua)||!!window.Capacitor||!!window.ReactNativeWebView||!!window.FIZZ_APP;if(phone&&!app&&!/[?&]web=1/.test(location.search))location.replace("/get-app.html")}catch(e){}})();
+</script>
 <link rel="icon" href="/favicon.ico" sizes="any" />
 <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
 <link rel="icon" type="image/svg+xml" href="/icon.svg" />

@@ -799,6 +799,28 @@ for (const app of ["chat", "dev"]) {
   await ctx.close();
 }
 
+// ---------- Phones get the FIZZ app; computers, the app's web view and desktop mode open FIZZ ----------
+{
+  const UA = {
+    iphone: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
+    android: "Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Mobile Safari/537.36",
+    webview: "Mozilla/5.0 (Linux; Android 15; Pixel 9; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/131.0 Mobile Safari/537.36",
+    desktopMode: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36",
+    ipad: "Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
+  };
+  const where = async (ua, path) => { const c = await browser.newContext({ userAgent: ua, viewport: { width: 390, height: 844 } }); const pg = await c.newPage(); await pg.goto(B + path); await pg.waitForTimeout(400); const u = new URL(pg.url()).pathname; await c.close(); return u; };
+  check("phones: an iPhone opening FIZZ gets the app page", (await where(UA.iphone, "chat.html")) === "/get-app.html");
+  check("phones: an Android phone opening FIZZ DEV gets the app page", (await where(UA.android, "dev.html")) === "/get-app.html");
+  check("phones: the FIZZ app's own web view opens FIZZ", (await where(UA.webview, "chat.html")) !== "/get-app.html");
+  check("phones: a phone browser in desktop mode opens FIZZ", (await where(UA.desktopMode, "dev.html")) !== "/get-app.html");
+  check("phones: a tablet opens FIZZ", (await where(UA.ipad, "chat.html")) !== "/get-app.html");
+  check("phones: the info pages stay open on a phone", (await where(UA.iphone, "pricing.html")) === "/pricing.html");
+  const c = await browser.newContext({ userAgent: UA.iphone, viewport: { width: 390, height: 844 } }); const pg = await c.newPage(); await pg.goto(B + "get-app.html");
+  const txt = await pg.locator("main").innerText();
+  check("phones: the app page shows both stores and links to plans", /App Store/.test(txt) && /Google Play/.test(txt) && (await pg.locator('a[href="/pricing.html"]').count()) > 0, txt.slice(0, 120));
+  await c.close();
+}
+
 // ---------- A big repository that lives in the cloud sandbox (phase 2, part 2) ----------
 {
   const { ctx, p, errs, bodies, script } = await open({ width: 1280, height: 800 });

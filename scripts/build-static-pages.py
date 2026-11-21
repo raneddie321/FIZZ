@@ -181,13 +181,35 @@ page("pricing.html", "Pricing · FIZZ", "FIZZ plans.", f"""
 <p class="fine">Plan names and features are provisional and may change before general availability.</p></section>
 """)
 
+# ---------------- phones: get the app ----------------
+# FIZZ itself is in the app on phones (and on the website on computers, or in a phone browser in desktop mode).
+# Store links: fill these in when the apps are published; until then the buttons say "Coming soon".
+APP_STORE_URL = ""
+PLAY_STORE_URL = ""
+def store_button(url, top, name, icon):
+    inner = f'<span class="store-ic" aria-hidden="true">{icon}</span><span class="store-txt"><small>{top}</small><b>{name}</b></span>'
+    return f'<a class="store-btn" href="{url}" target="_blank" rel="noopener">{inner}</a>' if url else f'<span class="store-btn soon" aria-disabled="true">{inner}<em>Coming soon</em></span>'
+APPLE_SVG = '<svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M16.37 12.6c-.02-2.2 1.8-3.26 1.88-3.31-1.03-1.5-2.62-1.7-3.18-1.73-1.35-.14-2.64.8-3.33.8-.69 0-1.74-.78-2.87-.76-1.47.02-2.83.86-3.59 2.18-1.53 2.66-.39 6.6 1.1 8.76.73 1.06 1.6 2.24 2.73 2.2 1.1-.05 1.51-.71 2.84-.71 1.32 0 1.7.71 2.86.69 1.18-.02 1.93-1.07 2.65-2.13.84-1.23 1.18-2.42 1.2-2.48-.03-.01-2.3-.88-2.32-3.5zM14.2 6.13c.6-.73 1.01-1.75.9-2.76-.87.04-1.92.58-2.54 1.3-.56.64-1.05 1.67-.92 2.66.97.08 1.96-.49 2.56-1.2z"/></svg>'
+PLAY_SVG = '<svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M3.6 2.3c-.2.2-.3.5-.3.9v17.6c0 .4.1.7.3.9l9.8-9.7L3.6 2.3zm10.6 8.9l2.7-2.7L5.1 1.8l9.1 9.4zm0 1.6l-9.1 9.4 11.8-6.7-2.7-2.7zm3.8-3.6l-3 3 3 3 3.4-1.9c1-.6 1-1.6 0-2.2L18 9.2z"/></svg>'
+page("get-app.html", "Get the FIZZ app", "FIZZ on your phone: the FIZZ app for iPhone and Android.", f"""
+<section class="section center get-app">
+  <img class="get-app-icon" src="/icon-192.png" alt="" width="96" height="96" />
+  <p class="eyebrow">FIZZ on your phone</p>
+  <h1 class="h2">Download the FIZZ app</h1>
+  <p class="lead">On a phone, FIZZ and FIZZ DEV live in the FIZZ app — faster, with notifications, and made for a small screen.</p>
+  <div class="store-row">{store_button(APP_STORE_URL, "Download on the", "App Store", APPLE_SVG)}{store_button(PLAY_STORE_URL, "Get it on", "Google Play", PLAY_SVG)}</div>
+  <p class="fine">On a computer, use FIZZ at fizz.raneddie.com or in the desktop app. In a phone browser you can also switch to desktop mode (browser menu → “Desktop site”) to open the full FIZZ website.</p>
+  <div class="get-app-links"><a class="btn btn-outline" href="/pricing.html">Plans</a><a class="btn btn-outline" href="/product.html">What FIZZ can do</a><a class="btn btn-outline" href="/">Home</a></div>
+</section>
+""")
+
 # ---------------- FAQ ----------------
 faq = [("What is the difference between FIZZ and FIZZ DEV?", "FIZZ is a general AI assistant for conversation, writing, analysis and research. FIZZ DEV is a workspace where Fizz Code writes, edits and previews software projects with you."),
        ("What is a RanEddie ID?", "RanEddie ID is one account for every RanEddie product, including FIZZ and the RanEddie games. You need one to use FIZZ and FIZZ DEV. Your settings (theme, model, mode) are saved to it and follow you to every device; your chats and projects stay in your browser."),
        ("Do I need an account?", "Yes. FIZZ is a RANEDDIE product, so you sign in with a free RanEddie ID. If you already have one from a RANEDDIE game, use the same account."),
        ("Where are my account and projects stored?", "In this version, your account, chats and projects are stored securely in your browser on this device. Use Settings → Export my data to keep a copy."),
        ("Why do I need to add an API key?", "FIZZ connects to an AI model provider (Anthropic). Add your API key in Settings to start chatting. It's stored only in your browser and sent only to the provider."),
-       ("Can I use FIZZ on my phone or tablet?", "Yes. FIZZ and FIZZ DEV are designed for phones, tablets and desktops."),
+       ("Can I use FIZZ on my phone or tablet?", "On a phone, FIZZ is used through the FIZZ app for iPhone and Android. On a computer, use the website or the desktop app. In a phone browser you can also switch to desktop mode (“Request desktop site”) to open the full website."),
        ("Can files or websites trick FIZZ?", "Content from files and websites is treated as untrusted data. It can't change FIZZ's rules or make it take actions on its own."),
        ("Can I export or delete my data?", "Yes. Settings lets you download an export of your data or permanently delete your account.")]
 page("faq.html", "FAQ · FIZZ", "Frequently asked questions.", f"""
