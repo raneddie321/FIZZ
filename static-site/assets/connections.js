@@ -68,14 +68,23 @@
     return data;
   }
 
-  // ---------- Google (token lives only in this tab, ~1 hour) ----------
+  // ---------- Google (an access token lasts ~1 hour; kept for that hour in this browser, shared by its tabs) ----------
   // Every Google Workspace app Fizz Code can use. Google's consent screen lets the user untick any of them.
   const GSCOPES = ["drive", "gmail.modify", "documents", "spreadsheets", "presentations", "calendar", "tasks", "contacts.readonly", "youtube"].map((s) => `https://www.googleapis.com/auth/${s}`).join(" ");
   let gToken = null;
+  const G_KEY = "fizz.google";
+  const G_ACCOUNT = "fizz.google.account"; // the email last connected, so reconnecting is one click
+  const gSave = (v) => { try { if (v) localStorage.setItem(G_KEY, JSON.stringify(v)); else localStorage.removeItem(G_KEY); sessionStorage.removeItem(G_KEY); } catch {} };
   try {
-    const saved = JSON.parse(sessionStorage.getItem("fizz.google") || "null");
+    const saved = JSON.parse(localStorage.getItem(G_KEY) || sessionStorage.getItem(G_KEY) || "null");
     if (saved && saved.exp > Date.now()) gToken = saved;
+    else gSave(null);
   } catch {}
+  // Another tab connected or disconnected Google: follow it here too.
+  window.addEventListener("storage", (e) => {
+    if (e.key !== G_KEY) return;
+    try { const v = JSON.parse(e.newValue || "null"); gToken = v && v.exp > Date.now() ? v : null; } catch { gToken = null; }
+  });
 
   function loadGis() {
     if (window.google?.accounts?.oauth2) return Promise.resolve();
@@ -94,9 +103,12 @@
     if (!st.google?.clientId) throw new Error("Google isn't configured on this server yet.");
     await loadGis();
     return new Promise((resolve, reject) => {
+      let hint = "";
+      try { hint = localStorage.getItem(G_ACCOUNT) || ""; } catch {}
       const client = google.accounts.oauth2.initTokenClient({
         client_id: st.google.clientId,
         scope: GSCOPES,
+        ...(hint ? { hint } : {}),
         callback: async (resp) => {
           if (resp.error) return reject(new Error(resp.error_description || "Google sign-in was cancelled."));
           gToken = { t: resp.access_token, exp: Date.now() + (Number(resp.expires_in) || 3600) * 1000 - 60_000, label: "Google account", scopes: String(resp.scope || "").split(" ").filter(Boolean) };
@@ -104,12 +116,13 @@
             const about = await gfetch("https://www.googleapis.com/drive/v3/about?fields=user(displayName,emailAddress)");
             gToken.label = about.user?.emailAddress || about.user?.displayName || gToken.label;
           } catch {}
-          sessionStorage.setItem("fizz.google", JSON.stringify(gToken));
+          gSave(gToken);
+          try { if (/@/.test(gToken.label)) localStorage.setItem(G_ACCOUNT, gToken.label); } catch {}
           resolve(gToken);
         },
         error_callback: (e) => reject(new Error(e?.message || "Google sign-in was cancelled.")),
       });
-      client.requestAccessToken({ prompt: "" });
+      client.requestAccessToken(hint ? { prompt: "", login_hint: hint } : { prompt: "" });
     });
   }
 
@@ -119,10 +132,10 @@
     if (res.status === 403) {
       const j = await res.clone().json().catch(() => null);
       const msg = j?.error?.message || "";
-      if (/insufficient|scope/i.test(msg)) { gToken = null; sessionStorage.removeItem("fizz.google"); throw Object.assign(new Error("Google didn't give FIZZ access to this app (it was unticked when connecting). Connect Google again and leave it ticked."), { code: "not_connected" }); }
+      if (/insufficient|scope/i.test(msg)) { gToken = null; gSave(null); throw Object.assign(new Error("Google didn't give FIZZ access to this app (it was unticked when connecting). Connect Google again and leave it ticked."), { code: "not_connected" }); }
       if (/has not been used|is disabled|not enabled/i.test(msg)) throw Object.assign(new Error(`This Google API isn't turned on for the site's Google Cloud project yet. The site owner turns it on in console.cloud.google.com → APIs & Services → Library. (${msg.slice(0, 220)})`), { code: "api_disabled" });
     }
-    if (res.status === 401) { gToken = null; sessionStorage.removeItem("fizz.google"); throw Object.assign(new Error("Your Google connection expired. Connect again."), { code: "not_connected" }); }
+    if (res.status === 401) { gToken = null; gSave(null); throw Object.assign(new Error("Your Google connection expired. Connect again."), { code: "not_connected" }); }
     if (!res.ok) {
       const j = await res.json().catch(() => null);
       throw new Error(j?.error?.message || `Google error ${res.status}`);
@@ -143,7 +156,8 @@
     disconnect() {
       if (gToken && window.google?.accounts?.oauth2) google.accounts.oauth2.revoke(gToken.t, () => {});
       gToken = null;
-      sessionStorage.removeItem("fizz.google");
+      gSave(null);
+      try { localStorage.removeItem(G_ACCOUNT); } catch {}
     },
     async listDocs(query = "") {
       const q = [`mimeType='application/vnd.google-apps.document'`, "trashed=false", query ? `name contains '${query.replace(/'/g, "\\'")}'` : ""].filter(Boolean).join(" and ");

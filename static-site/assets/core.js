@@ -99,8 +99,20 @@
       try { off = sessionStorage.getItem("fizz.rid.off") === "1"; } catch {}
       if (off) return u;
       document.documentElement.style.visibility = "hidden";
-      location.replace(this.url("signin"));
-      throw new Error("redirecting to RanEddie ID");
+      // Coming back from id.raneddie.com the session exists in Clerk before this page has seen it,
+      // so ask Clerk first and only send the person to sign in when there really is no session.
+      const go = () => location.replace(this.url("signin"));
+      const waitForRid = (tries = 0) => {
+        const rid = window.FIZZ && window.FIZZ.rid;
+        if (!rid) return tries < 100 ? setTimeout(() => waitForRid(tries + 1), 50) : go();
+        rid.reconcile().then(() => {
+          // reconcile() stores the signed-in RanEddie ID (and may reload the page itself).
+          if (!this.rid()) return go();
+          setTimeout(() => location.reload(), 50);
+        }, go);
+      };
+      waitForRid();
+      throw new Error("checking RanEddie ID");
     },
     rename(name) {
       const me = legacyUser();
@@ -112,6 +124,7 @@
     async signOut() {
       if (this.rid() && window.FIZZ.rid) return window.FIZZ.rid.signOut();
       store.del("fizz.session");
+      try { window.FIZZ.conn?.google?.disconnect?.(); localStorage.removeItem("fizz.google"); } catch {}
       location.reload();
     },
     /** Link to the RanEddie ID page that returns here afterwards. mode: "signin" | "signup" | "forgot". */
