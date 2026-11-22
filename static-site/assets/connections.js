@@ -98,7 +98,7 @@
     });
   }
 
-  async function googleConnect() {
+  async function googleConnect(extra = []) {
     const st = await F.serverStatus();
     if (!st.google?.clientId) throw new Error("Google isn't configured on this server yet.");
     await loadGis();
@@ -107,7 +107,8 @@
       try { hint = localStorage.getItem(G_ACCOUNT) || ""; } catch {}
       const client = google.accounts.oauth2.initTokenClient({
         client_id: st.google.clientId,
-        scope: GSCOPES,
+        scope: [GSCOPES, ...extra.map((x) => (/^https:/.test(x) ? x : `https://www.googleapis.com/auth/${x}`))].join(" "),
+        include_granted_scopes: true,
         ...(hint ? { hint } : {}),
         callback: async (resp) => {
           if (resp.error) return reject(new Error(resp.error_description || "Google sign-in was cancelled."));
