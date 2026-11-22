@@ -70,7 +70,7 @@
 
   // ---------- Google (an access token lasts ~1 hour; kept for that hour in this browser, shared by its tabs) ----------
   // Every Google Workspace app Fizz Code can use. Google's consent screen lets the user untick any of them.
-  const GSCOPES = ["drive", "gmail.modify", "documents", "spreadsheets", "presentations", "calendar", "tasks", "contacts.readonly", "youtube"].map((s) => `https://www.googleapis.com/auth/${s}`).join(" ");
+  const GSCOPES = ["drive", "gmail.modify", "documents", "spreadsheets", "presentations", "calendar", "tasks", "contacts", "youtube", "forms.body", "forms.responses.readonly"].map((s) => `https://www.googleapis.com/auth/${s}`).join(" ");
   let gToken = null;
   const G_KEY = "fizz.google";
   const G_ACCOUNT = "fizz.google.account"; // the email last connected, so reconnecting is one click
@@ -149,7 +149,8 @@
     /** Authorised fetch to any Google API (JSON in, JSON or text out). */
     fetch: (url, init) => gfetch(url, init),
     token: () => (gToken && gToken.exp > Date.now() ? gToken.t : null),
-    has: (scope) => Boolean(gToken?.scopes?.some((s) => s.endsWith(`/${scope}`))),
+    has: (scope) => Boolean(gToken?.scopes?.some((s) => s.endsWith(`/${scope}`) || (scope === "contacts.readonly" && s.endsWith("/contacts")))),
+    scopes: () => (gToken?.scopes || []).map((s) => s.replace("https://www.googleapis.com/auth/", "")),
     preload: () => loadGis().catch(() => {}),
     account: () => gToken?.label ?? null,
     connect: googleConnect,
