@@ -3,6 +3,24 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<script>
+/* On fizz.raneddie.com, sign-in and sign-up happen on the central RanEddie ID site (id.raneddie.com),
+   which shares its session with every *.raneddie.com product and enforces the same age and password rules.
+   This page stays as the fallback on other hosts (previews, *.vercel.app, local). */
+(function () {
+  try {
+    var host = location.hostname.toLowerCase();
+    if (host !== "raneddie.com" && host.slice(-13) !== ".raneddie.com") return;
+    var q = new URLSearchParams(location.search);
+    var mode = q.get("mode");
+    var path = mode === "signup" ? "/sign-up" : mode === "forgot" ? "/forgot-password" : "/sign-in";
+    var r = q.get("redirect_url") || "/chat.html";
+    if (r.charAt(0) !== "/" || r.charAt(1) === "/" || r.charAt(1) === "\\") r = "/chat.html";
+    document.documentElement.style.visibility = "hidden";
+    location.replace("https://id.raneddie.com" + path + "?redirect_url=" + encodeURIComponent(location.origin + r));
+  } catch (e) {}
+})();
+</script>
 <title>Sign in · RanEddie ID</title>
 <meta name="description" content="Sign in to FIZZ with your RanEddie ID — one account for every RanEddie product." />
 <link rel="icon" href="/favicon.ico" sizes="any" />
