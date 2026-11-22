@@ -15,6 +15,19 @@
   ],
   "routes": [
     {
+      "src": "/(?!api/)(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "fizzbrowser.vercel.app"
+        }
+      ],
+      "status": 308,
+      "headers": {
+        "Location": "https://fizz.raneddie.com/$1"
+      }
+    },
+    {
       "src": "/(.*)",
       "headers": {
         "X-Content-Type-Options": "nosniff",

@@ -66,6 +66,8 @@
     try { await clerk?.signOut(); } catch (e) { console.warn(e); }
     F.auth.setRid(null);
     F.store.set("fizz.rid.signedOut", Date.now());
+    // Google access belongs to the person who connected it: don't leave it behind for the next one.
+    try { window.FIZZ.conn?.google?.disconnect?.(); localStorage.removeItem("fizz.google"); } catch {}
     location.reload();
   }
 
