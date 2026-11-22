@@ -289,7 +289,26 @@ RID_HEAD = """<!doctype html>
 </head>
 <body class="rid-page">
 """
-(OUT / "signin.html").write_text(RID_HEAD + """<div class="rid-backdrop" aria-hidden="true"></div>
+SIGNIN_REDIRECT = r"""<script>
+/* On fizz.raneddie.com, sign-in and sign-up happen on the central RanEddie ID site (id.raneddie.com),
+   which shares its session with every *.raneddie.com product and enforces the same age and password rules.
+   This page stays as the fallback on other hosts (previews, *.vercel.app, local). */
+(function () {
+  try {
+    var host = location.hostname.toLowerCase();
+    if (host !== "raneddie.com" && host.slice(-13) !== ".raneddie.com") return;
+    var q = new URLSearchParams(location.search);
+    var mode = q.get("mode");
+    var path = mode === "signup" ? "/sign-up" : mode === "forgot" ? "/forgot-password" : "/sign-in";
+    var r = q.get("redirect_url") || "/chat.html";
+    if (r.charAt(0) !== "/" || r.charAt(1) === "/" || r.charAt(1) === "\\") r = "/chat.html";
+    document.documentElement.style.visibility = "hidden";
+    location.replace("https://id.raneddie.com" + path + "?redirect_url=" + encodeURIComponent(location.origin + r));
+  } catch (e) {}
+})();
+</script>
+"""
+(OUT / "signin.html").write_text(RID_HEAD.replace('<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />\n', '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />\n' + SIGNIN_REDIRECT, 1) + """<div class="rid-backdrop" aria-hidden="true"></div>
 <main class="rid-main">
   <a class="rid-brand" href="index.html" aria-label="RanEddie ID home"><img src="assets/raneddie-logo.png" alt="" width="56" height="44" /><span>RanEddie <span class="rid-gradient-text">ID</span></span></a>
   <div class="rid-card" id="rid-card"><noscript><p>Turn on JavaScript to sign in with RanEddie ID.</p></noscript></div>
