@@ -642,6 +642,7 @@
       aboutUser(),
       F.logins?.promptText() || "",
       F.interactive?.PROMPT || "",
+      F.LOGO_PROMPT || "",
       sessionNote(),
       data.settings.research ? "RESEARCH IS ON. Before you answer or build, research properly: run several <fizz-search> queries, read the best 3–5 sources with <fizz-fetch>, cross-check facts, and cite the sources as links. Say what's uncertain." : "",
       connectionsSummary(),

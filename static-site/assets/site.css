@@ -814,3 +814,5 @@ html.is-phone .hero-app { display: grid; gap: 12px; justify-items: center; margi
 html.is-phone .hero-app .store-row { justify-content: center; }
 .hero-app-note { margin: 0; font-size: 14px; color: var(--muted, #999); }
 .get-app-links { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.md-logo { display: inline-block; width: 1.15em; height: 1.15em; vertical-align: -0.2em; margin-inline: 0 .3em; border-radius: 4px; object-fit: contain; }
+h1 .md-logo, h2 .md-logo, h3 .md-logo, h4 .md-logo { width: 1em; height: 1em; vertical-align: -0.12em; }

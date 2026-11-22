@@ -18,11 +18,11 @@ HEAD = """<!doctype html>
 {extra}<link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" />
-<link rel="stylesheet" href="assets/site.css?v=20261121-app2" />
+<link rel="stylesheet" href="assets/site.css?v=20261122-logo" />
 <script>try{{var t=localStorage.getItem("fizz.theme");t=t?JSON.parse(t):"system";if(t==="dark"||(t!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}}catch(e){{}}</script>
 <script src="assets/core.js?v=20261112-att" defer></script>
 <script src="assets/raneddie-id.js?v=20261110-console1" defer></script>
-<script src="assets/site.js?v=20261121-app2" defer></script>
+<script src="assets/site.js?v=20261122-logo" defer></script>
 </head>
 <body>
 """

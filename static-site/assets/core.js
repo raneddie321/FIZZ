@@ -487,11 +487,23 @@
   }
 
   // ---------- markdown ----------
+  // Logos in replies: <fizz-logo name="gmail"/> or <fizz-logo domain="stripe.com"/> → the brand's icon, inline.
+  const LOGO_RE = /<fizz-logo\s+(?:name|domain|site)="([^"]{1,80})"\s*\/?>(?:<\/fizz-logo>)?/g;
+  const LOGO_ALIASES = { gmail: "mail.google.com", "google calendar": "calendar.google.com", calendar: "calendar.google.com", "google docs": "docs.google.com", docs: "docs.google.com", "google sheets": "sheets.google.com", sheets: "sheets.google.com", "google slides": "slides.google.com", slides: "slides.google.com", "google drive": "drive.google.com", drive: "drive.google.com", "google meet": "meet.google.com", meet: "meet.google.com", youtube: "youtube.com", google: "google.com", github: "github.com", vercel: "vercel.com", canva: "canva.com", shopify: "shopify.com", whatsapp: "whatsapp.com", stripe: "stripe.com", notion: "notion.so", slack: "slack.com", figma: "figma.com", openai: "openai.com", chatgpt: "chatgpt.com", claude: "claude.ai", anthropic: "anthropic.com", gemini: "gemini.google.com", supabase: "supabase.com", netlify: "netlify.com", instagram: "instagram.com", facebook: "facebook.com", x: "x.com", twitter: "x.com", linkedin: "linkedin.com", tiktok: "tiktok.com", apple: "apple.com", microsoft: "microsoft.com", outlook: "outlook.com", roblox: "roblox.com", discord: "discord.com", spotify: "spotify.com", amazon: "amazon.com", paypal: "paypal.com", clerk: "clerk.com", cloudflare: "cloudflare.com", firebase: "firebase.google.com", wix: "wix.com", wordpress: "wordpress.com", zoom: "zoom.us", trello: "trello.com", jira: "atlassian.com", npm: "npmjs.com", python: "python.org", react: "react.dev", "next.js": "nextjs.org", nextjs: "nextjs.org", tailwind: "tailwindcss.com" };
+  function logoDomain(v) {
+    const k = String(v || "").trim().toLowerCase();
+    const d = LOGO_ALIASES[k] || k.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+    return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(d) ? d : "";
+  }
+  const LOGO_PROMPT = 'LOGOS: when you name an app, service, company or website in a list or heading, put its real logo instead of an emoji: <fizz-logo name="gmail"/> (known names: gmail, calendar, docs, sheets, slides, drive, meet, youtube, github, vercel, canva, shopify, whatsapp, stripe, notion, slack, figma…) or <fizz-logo domain="example.com"/> for anything else, e.g. "### <fizz-logo name="gmail"/> Gmail". Never inside code blocks.';
   function markdown(text) {
     if (!window.marked || !window.DOMPurify) return esc(text).replace(/\n/g, "<br>");
     if (window.FIZZ?.interactive && /<fizz-(quiz|widget)\b/.test(text)) { const r = window.FIZZ.interactive.render(text, markdown); if (r !== null) return r; }
+    const logos = [];
+    if (String(text).includes("<fizz-logo")) text = String(text).split(/(```[\s\S]*?(?:```|$)|`[^`\n]*`)/).map((part, i) => (i % 2 ? part : part.replace(LOGO_RE, (_m, v) => { const d = logoDomain(v); if (!d) return ""; logos.push([v, d]); return `FIZZLOGO${logos.length - 1}X`; }))).join("");
     const html = marked.parse(text, { gfm: true });
-    const clean = DOMPurify.sanitize(html, { FORBID_TAGS: ["style", "iframe", "form", "img"], FORBID_ATTR: ["style"] });
+    let clean = DOMPurify.sanitize(html, { FORBID_TAGS: ["style", "iframe", "form", "img"], FORBID_ATTR: ["style"] });
+    if (logos.length) clean = clean.replace(/FIZZLOGO(\d+)X/g, (_m, i) => { const [n, d] = logos[i] || []; return d ? logoImg(n, faviconUrls(d), "md-logo") : ""; });
     return clean.replace(/<a /g, '<a target="_blank" rel="noopener noreferrer nofollow" ');
   }
 
@@ -557,6 +569,6 @@
     });
   }
 
-  window.FIZZ = { aiTarget, pendingHtml, logoImg, logoNext, faviconUrls, app, serverStatus, serverStatusCached, aiStream, providerLabel, openrouterConnect, openrouterFinish, toOpenAI, store, esc, uid, theme, auth, loadData, saveData, MODELS, streamChat, readAttachment, toApiContent, markdown, toast, download, validEmail };
+  window.FIZZ = { aiTarget, pendingHtml, logoImg, logoNext, LOGO_PROMPT, faviconUrls, app, serverStatus, serverStatusCached, aiStream, providerLabel, openrouterConnect, openrouterFinish, toOpenAI, store, esc, uid, theme, auth, loadData, saveData, MODELS, streamChat, readAttachment, toApiContent, markdown, toast, download, validEmail };
   theme.init();
 })();
