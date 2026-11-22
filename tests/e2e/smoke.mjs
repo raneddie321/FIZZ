@@ -46,10 +46,20 @@ const lastReply = (p, app, text) => p.waitForFunction(([a, t]) => document.query
 // ---------- public pages ----------
 {
   const { ctx, p, errs } = await open({ width: 1280, height: 800 });
-  for (const page of ["index.html", "pricing.html", "privacy.html", "terms.html", "fizz.html", "fizz-dev.html", "signin.html"]) {
+  for (const page of ["index.html", "pricing.html", "privacy.html", "terms.html", "fizz.html", "fizz-dev.html"]) {
     await p.goto(B + page); await p.waitForTimeout(300);
     check(`page ${page} renders`, (await p.locator("body").innerText()).trim().length > 50);
   }
+  // The old sign-in page only forwards to the official RanEddie ID site; FIZZ has no sign-in form of its own.
+  await ctx.route("https://id.raneddie.com/**", (r) => r.fulfill({ status: 200, contentType: "text/html", body: "<p>RanEddie ID</p>" }));
+  for (const [q, path, back] of [["mode=signup&redirect_url=%2Fchat.html", "/sign-up", "/chat.html"], ["redirect_url=%2Fdev.html", "/sign-in", "/dev.html"], ["mode=forgot", "/forgot-password", "/chat.html"], ["redirect_url=https%3A%2F%2Fevil.example", "/sign-in", "/https:"]]) {
+    await p.goto(B + "signin.html?" + q).catch(() => {});
+    await p.waitForURL(/id\.raneddie\.com/, { timeout: 5000 }).catch(() => {});
+    const u = new URL(p.url());
+    const to = u.searchParams.get("redirect_url") || "";
+    check(`signin.html?${q} → id.raneddie.com${path}`, u.host === "id.raneddie.com" && u.pathname === path && to.startsWith(B.replace(/\/$/, "") + back), p.url());
+  }
+  check("signin.html has no password field", !(await (await fetch(B + "signin.html")).text()).includes('type="password"'));
   check("public pages have no script errors", !errs.length, errs.join(" | "));
   await ctx.close();
 }
@@ -234,7 +244,7 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
   await ctx.close();
 }
 
-// ---------- Cloud browser: searches open in real Chrome, the screen reconnects after leaving ----------
+// ---------- Cloud browser: only Fizz Code drives it; typed links open in a real tab; the screen reconnects ----------
 {
   const { ctx, p, errs } = await open({ width: 1280, height: 800 });
   await ctx.route("**/api/status", (r) => r.fulfill({ json: { server: true, apps: [], ai: { configured: true, model: "test-model", dailyLimit: 50 }, connections: {}, google: {}, tools: { search: "wikipedia", browser: true } } }));
@@ -256,20 +266,28 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
     shots.push(r.request().url()); r.fulfill({ status: 200, contentType: "image/jpeg", body: Buffer.from("/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==", "base64") }); });
   await p.goto(B + "dev.html"); await p.waitForTimeout(800);
   await p.click('#dev-app [data-tab="browser"]');
-  await p.click("#br-new");
   await p.waitForTimeout(300);
-  check("browser: opening the Browser tab wakes the cloud browser", calls.some((c) => c.action === "warm"));
+  check("browser: there's no new-tab button for browsing the web inside FIZZ", (await p.locator("#br-new").count()) === 0);
+  // A link or search typed by the user opens in a real browser tab, never inside FIZZ.
+  await p.evaluate(() => { window.__opened = []; window.open = (u) => { window.__opened.push(String(u)); return null; }; });
   await p.fill("#br-url", "snake game"); await p.keyboard.press("Enter");
-  await p.waitForFunction(() => !document.querySelector("#br-screen")?.hidden, null, { timeout: 8000 });
+  await p.waitForTimeout(200);
+  const popupUrl = (await p.evaluate(() => window.__opened[0])) || "";
+  check("browser: a typed search opens in a real browser tab", /duckduckgo\.com\/\?q=snake%20game/.test(popupUrl), popupUrl);
+  check("browser: typing an address doesn't drive the cloud browser", !calls.some((c) => c.action === "open"), JSON.stringify(calls));
+  check("browser: no web-page iframes inside FIZZ", (await p.locator("#br-stage iframe.web-frame:not(#br-live)").count()) === 0);
+  // Fizz Code's own cloud browser keeps working: the agent opens a page and the live screen shows it.
+  await p.evaluate(async () => {
+    const tool = FIZZ.agentTools.registry.browser;
+    const t = { name: "browser", attrs: { action: "open", url: "https://duckduckgo.com/?q=snake" }, body: "" };
+    await tool.run(t, { showTab: () => {}, rerender: () => {}, project: () => ({ files: {} }) });
+  });
   const open1 = calls.find((c) => c.action === "open");
-  check("browser: a search opens a real search engine in Chrome", open1?.url === "https://duckduckgo.com/?q=snake%20game", open1?.url);
-  check("browser: the address bar uses the fast open (no page reading)", open1?.fast === true);
+  check("browser: Fizz Code opens pages in the cloud browser", open1?.url === "https://duckduckgo.com/?q=snake", JSON.stringify(open1));
+  await p.waitForFunction(() => !document.querySelector("#br-screen")?.hidden, null, { timeout: 8000 });
   check("browser: the live picture is sized for the panel", /&w=\d+&h=\d+&q=\d+/.test(shots[0] || ""), shots[0]);
-  // Once it runs, navigation goes straight to the browser — no server round trip.
-  const opens = calls.filter((c) => c.action === "open").length;
-  await p.fill("#br-url", "wikipedia.org"); await p.keyboard.press("Enter");
-  await p.waitForTimeout(500);
-  check("browser: next address goes straight to the cloud browser", direct.includes("navigate https://wikipedia.org") && calls.filter((c) => c.action === "open").length === opens, direct.join(","));
+  const bar = await p.evaluate(() => ({ ro: document.querySelector("#br-url").readOnly, v: document.querySelector("#br-url").value, tab: document.querySelector(".br-tab.on")?.textContent }));
+  check("browser: the address bar only shows where Fizz Code is (read-only)", bar.ro && /duckduckgo/.test(bar.v), JSON.stringify(bar));
   await p.click("#br-back").catch(() => {});
   await p.waitForTimeout(300);
   check("browser: back goes straight to the browser", direct.includes("input back") || !(await p.locator("#br-back").count()), direct.join(","));
@@ -736,44 +754,6 @@ for (const app of ["chat", "dev"]) {
   const href = await p.locator("#dev-app .wa-send").first().getAttribute("href").catch(() => "");
   check("whatsapp: a Send in WhatsApp button opens the chat with the text (Israeli number with 972)", href === "https://wa.me/972501234567?text=" + encodeURIComponent("Hi Dani, can I book a haircut tomorrow at 10?"), href);
   check("whatsapp: no script errors", !errs.length, errs.join(" | "));
-  await ctx.close();
-}
-
-// ---------- Saved website logins: Settings, then Fizz Code signs in with one ----------
-{
-  const { ctx, p, errs, script, bodies } = await open({ width: 1280, height: 800 });
-  await ctx.route("**/api/status", (r) => r.fulfill({ json: { server: true, apps: [], ai: { configured: true, model: "test-model", dailyLimit: 50 }, connections: {}, google: {}, tools: { search: "wikipedia", browser: true } } }));
-  const sent = [];
-  await ctx.route("**/api/browser", (r) => {
-    const b = r.request().postDataJSON(); sent.push(b);
-    if (b.action === "seal-login") return r.fulfill({ json: { host: "example.com", secret: "SEALED-BLOB" } });
-    if (b.action === "warm" || b.action === "live") return r.fulfill({ json: { ready: true, pages: [] } });
-    r.fulfill({ json: { text: "Filled the saved login for example.com: the email and the password. Now press the page's sign-in button.\nPage: Log in — https://example.com/login", page: { url: "https://example.com/login", title: "Log in" }, elements: [], tabs: [{ id: "t1", title: "Log in", url: "https://example.com/login", active: true }] } });
-  });
-  await p.goto(B + "dev.html"); await p.waitForTimeout(900);
-  await p.evaluate(() => { const st = FIZZ.loadData(FIZZ.auth.current()).settings; st.autoVerify = false; st.cloudRun = false; });
-  await p.locator("#dev-app #model-btn").first().click();
-  await p.locator("dialog[open] [data-tab=connections]").click();
-  await p.waitForSelector("dialog[open] [data-login=url]");
-  await p.fill("dialog[open] [data-login=url]", "https://www.example.com/login");
-  const icon = await p.locator("dialog[open] [data-login-preview] img").count();
-  await p.fill("dialog[open] [data-login=email]", "me@example.com");
-  await p.fill("dialog[open] [data-login=password]", "hunter2-secret");
-  await p.click("dialog[open] [data-login-add]");
-  await p.waitForSelector("dialog[open] .login-row");
-  const saved = await p.evaluate(() => FIZZ.loadData(FIZZ.auth.current()).settings.logins);
-  check("logins: the site's icon shows while typing the address", icon === 1);
-  check("logins: saved with the sealed password only (no password on the device)", saved.length === 1 && saved[0].host === "example.com" && saved[0].secret === "SEALED-BLOB" && !JSON.stringify(saved).includes("hunter2-secret") && sent[0].password === "hunter2-secret", JSON.stringify(saved));
-  await p.keyboard.press("Escape");
-  script.push('<fizz-browser action="open" url="https://example.com/login"/>\n<fizz-browser action="login" account="example.com"/>');
-  script.push("Signed in.");
-  await p.fill("#dev-app #input", "log in to example.com"); await p.keyboard.press("Enter");
-  await lastReply(p, "#dev-app", "Signed in.");
-  const fillReq = sent.find((b) => b.action === "autofill");
-  check("logins: Fizz Code signs in with the saved login (sealed blob + email; no password)", fillReq?.secret === "SEALED-BLOB" && fillReq.email === "me@example.com" && fillReq.host === "example.com" && !JSON.stringify(sent.slice(1)).includes("hunter2-secret"), JSON.stringify(fillReq));
-  const sys = bodies.at(-1)?.system || bodies[0]?.system || "";
-  check("logins: Fizz Code knows the saved logins, without the password", sys.includes("SAVED WEBSITE LOGINS") && sys.includes("example.com") && sys.includes("password saved") && !sys.includes("hunter2-secret"));
-  check("logins: no script errors", !errs.length, errs.join(" | "));
   await ctx.close();
 }
 

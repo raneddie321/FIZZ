@@ -61,7 +61,7 @@ function readPage(max) {
     const id = ++n;
     el.setAttribute("data-fizz-id", String(id));
     const lab = el.labels && el.labels[0] ? el.labels[0].innerText : "";
-    const secret = el.type === "password" || el.getAttribute("data-fizz-fill") === "pass";
+    const secret = el.type === "password";
     const label = (el.getAttribute("aria-label") || lab || (el.tagName === "INPUT" || el.tagName === "TEXTAREA" ? el.placeholder || el.name : el.innerText) || (secret ? "" : el.value) || el.title || el.getAttribute("alt") || "").trim().replace(/\s+/g, " ").slice(0, 80);
     out.push({ id, tag: el.tagName.toLowerCase(), type: (el.getAttribute("type") || "").toLowerCase(), role: el.getAttribute("role") || "", label, href: el.tagName === "A" ? String(el.href).slice(0, 140) : "", value: secret ? "" : String(el.value ?? "").slice(0, 40), checked: el.checked === true, inView: r.top >= 0 && r.bottom <= innerHeight });
     if (out.length >= 160) break;
@@ -151,32 +151,6 @@ async function clickAt(tab, x, y) {
   await tab.send("Input.dispatchMouseEvent", { type: "mousePressed", x, y, button: "left", clickCount: 1 });
   await tab.send("Input.dispatchMouseEvent", { type: "mouseReleased", x, y, button: "left", clickCount: 1 });
 }
-// ---------- saved logins (Settings → Accounts) ----------
-// A login the user saved is filled by the server, straight into the page: the AI never sees the password, and it is
-// only filled on the site it was saved for (a look-alike page on another domain gets nothing).
-export const loginHost = (u) => { try { return new URL(/^https?:\/\//i.test(u) ? u : `https://${u}`).hostname.toLowerCase().replace(/^www\./, ""); } catch { return ""; } };
-export function sameSite(pageHost, savedHost) {
-  const a = String(pageHost || "").replace(/^www\./, ""), b = String(savedHost || "").replace(/^www\./, "");
-  if (!a || !b) return false;
-  if (a === b || a.endsWith(`.${b}`) || b.endsWith(`.${a}`)) return true;
-  // Same registrable name (login.example.com and app.example.com).
-  const base = (h) => h.split(".").slice(-2).join(".");
-  return base(a) === base(b) && base(a).includes(".");
-}
-function findLoginFields() {
-  const visible = (el) => { const r = el.getBoundingClientRect(); const st = getComputedStyle(el); return r.width > 2 && r.height > 2 && st.visibility !== "hidden" && st.display !== "none" && !el.disabled && !el.readOnly; };
-  const inputs = [...document.querySelectorAll("input")].filter(visible);
-  const pass = inputs.find((el) => el.type === "password" && !/new-password/.test(el.autocomplete || "")) || inputs.find((el) => el.type === "password");
-  const words = (el) => `${el.name} ${el.id} ${el.placeholder} ${el.autocomplete} ${el.getAttribute("aria-label") || ""} ${el.labels?.[0]?.innerText || ""}`.toLowerCase();
-  const cand = inputs.filter((el) => ["email", "text", "tel", ""].includes(el.type) && /user|email|mail|login|account|phone|identifier|מייל|משתמש|דוא/.test(words(el)));
-  let user = null;
-  if (pass) user = cand.filter((el) => el.compareDocumentPosition(pass) & Node.DOCUMENT_POSITION_FOLLOWING).pop() || null;
-  if (!user) user = cand[0] || null;
-  const at = (el, mark) => { if (!el) return null; el.setAttribute("data-fizz-fill", mark); el.scrollIntoView({ block: "center" }); const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, empty: !el.value, email: el.type === "email" || /mail|דוא|מייל/.test(words(el)) }; };
-  return { user: at(user, "user"), pass: at(pass, "pass") };
-}
-function clearFill(mark) { const el = document.querySelector(`[data-fizz-fill="${mark}"]`); if (!el) return false; el.focus(); el.select?.(); return true; }
-
 // Payment fields are always user-only. Never loosen this guard: card data must not enter the agent context.
 const SECRET_FIELD = (l) => l.type === "password" || /(^|\s)(current-password|new-password|cc-number|cc-csc|cc-exp|cc-name|cc-type)$/.test(l.autocomplete) || /card number|credit card|cardholder|expiry|expiration|cvv|cvc|security code|מספר כרטיס|תוקף כרטיס|קוד אבטחה|סיסמה/i.test(l.label);
 
@@ -290,30 +264,12 @@ export async function act(state, a) {
         }
         break;
       }
-      case "autofill": {
-        const f = a.fill;
-        if (!f?.host) throw Object.assign(new Error("No saved login to fill."), { status: 400 });
-        const here = loginHost(await tab.evaluate(() => location.href));
-        if (!sameSite(here, f.host)) throw Object.assign(new Error(`This page is on ${here || "an unknown site"}, but the saved login is for ${f.host}. It's only filled on its own site: open ${f.host}'s login page first.`), { status: 400, code: "wrong_site" });
-        const at = await tab.evaluate(findLoginFields);
-        if (!at.user && !at.pass) throw Object.assign(new Error("There's no login form on this page. Open the site's sign-in page (or press its \"Log in\" button) and try again."), { status: 400, code: "no_login_form" });
-        const filled = [];
-        // An email field gets the saved email; any other gets the username (each falls back to the other).
-        const who = at.user ? (at.user.email ? f.email || f.username : f.username || f.email) || f.user : "";
-        if (at.user && who) { await clickAt(tab, at.user.x, at.user.y); await tab.evaluate(clearFill, "user"); await tab.send("Input.insertText", { text: who }); filled.push(at.user.email ? "the email" : "the username"); }
-        if (at.pass && f.pass) { await clickAt(tab, at.pass.x, at.pass.y); await tab.evaluate(clearFill, "pass"); await tab.send("Input.insertText", { text: f.pass }); filled.push("the password"); }
-        await sleep(300);
-        note = filled.length
-          ? `Filled the saved login for ${f.host}: ${filled.join(" and ")} (you can't see the password; it's in the field). Now press the page's sign-in / next button.${at.pass ? "" : " This step only asks for the email or username; after you continue, fill again on the password step."}`
-          : `The saved login for ${f.host} has nothing for the fields on this page.`;
-        break;
-      }
       case "script": {
         // Fizz Code's own code in the page (a fast way to pull data out as text). Never on a page with a password
-        // field or a filled saved login, so code can't read a password.
+        // field, so code can't read a password.
         const src = String(a.code || a.text || "").trim();
         if (!src || src.length > 6000) throw Object.assign(new Error("Give the JavaScript to run (up to 6,000 characters)."), { status: 400 });
-        const guarded = await tab.evaluate(() => Boolean(document.querySelector('input[type=password],[data-fizz-fill]')));
+        const guarded = await tab.evaluate(() => Boolean(document.querySelector('input[type=password]')));
         if (guarded) throw Object.assign(new Error("This page has a password field, so code can't run on it. Use click / type / read here, and run code after signing in."), { status: 400, code: "script_blocked" });
         const res = await tab.send("Runtime.evaluate", { expression: `(async () => { ${src.includes("return") ? src : `return (${src});`} })()`, returnByValue: true, awaitPromise: true, userGesture: true, timeout: 15000 });
         if (res.exceptionDetails) throw Object.assign(new Error(`The code threw: ${String(res.exceptionDetails.exception?.description || res.exceptionDetails.text || "error").slice(0, 600)}`), { status: 400 });
@@ -329,8 +285,6 @@ export async function act(state, a) {
     }
     const page = await tab.evaluate(readPage, max);
     const out = { state, page, text: (note ? note + "\n" : "") + describe(page) };
-    // A saved password never comes back in what the AI reads, even from a field that shows it.
-    if (a.fill?.pass && a.fill.pass.length >= 3) out.text = out.text.split(a.fill.pass).join("••••");
     if (a.action === "screenshot" || a.shot) {
       const shot = await tab.send("Page.captureScreenshot", { format: "jpeg", quality: 60 });
       out.screenshot = `data:image/jpeg;base64,${shot.data}`;

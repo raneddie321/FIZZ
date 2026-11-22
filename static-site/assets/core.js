@@ -105,10 +105,17 @@
       const waitForRid = (tries = 0) => {
         const rid = window.FIZZ && window.FIZZ.rid;
         if (!rid) return tries < 100 ? setTimeout(() => waitForRid(tries + 1), 50) : go();
-        rid.reconcile().then(() => {
+        rid.reconcile().then(async () => {
           // reconcile() stores the signed-in RanEddie ID (and may reload the page itself).
-          if (!this.rid()) return go();
-          setTimeout(() => location.reload(), 50);
+          if (this.rid()) return setTimeout(() => location.reload(), 50);
+          // No RanEddie ID on this deployment (previews, local runs): let people in as guests for this browser
+          // session instead of sending them to a sign-in that can't work here.
+          if (!(await rid.load())) {
+            try { sessionStorage.setItem("fizz.rid.off", "1"); } catch {}
+            return location.reload();
+          }
+          try { sessionStorage.removeItem("fizz.rid.off"); } catch {}
+          go();
         }, go);
       };
       waitForRid();
@@ -127,10 +134,11 @@
       try { window.FIZZ.conn?.google?.disconnect?.(); localStorage.removeItem("fizz.google"); } catch {}
       location.reload();
     },
-    /** Link to the RanEddie ID page that returns here afterwards. mode: "signin" | "signup" | "forgot". */
+    /** The official RanEddie ID page (id.raneddie.com), which returns here afterwards. mode: "signin" | "signup" | "forgot". */
     url(mode = "signin") {
-      const back = location.pathname + location.search + location.hash;
-      return `signin.html?mode=${mode}&redirect_url=${encodeURIComponent(back)}`;
+      const path = mode === "signup" ? "/sign-up" : mode === "forgot" ? "/forgot-password" : "/sign-in";
+      const back = location.origin + location.pathname + location.search + location.hash;
+      return `https://id.raneddie.com${path}?redirect_url=${encodeURIComponent(back)}`;
     },
   };
 
@@ -152,6 +160,8 @@
       customOpenAIKey: "", customOpenAIBaseUrl: "", customOpenAIModel: "",
       model: "claude-opus-5-5", style: "balanced"
     }, d.settings || {});
+    // Saved website logins were removed: drop any that an older version stored in this browser.
+    if ("logins" in d.settings) delete d.settings.logins;
     d.conversations ||= [];
     d.projects ||= [];
     return d;

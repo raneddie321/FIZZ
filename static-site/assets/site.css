@@ -787,13 +787,6 @@ dialog.settings-dlg#fizz-settings > .dlg-body { height: 100%; max-height: none; 
 .composer .row .model-btn, .dev-app .composer .row .model-btn { margin-left: auto !important; margin-right: 0; min-width: 0; max-width: 55%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .composer .row .ctx-ring { margin-left: 0 !important; }
 .composer .row .send { margin-left: 2px; order: 99; flex: none; }
-/* Settings → Website logins */
-.login-add { display: grid; gap: 10px; padding: 14px 16px; border: 1px dashed var(--border); border-radius: 12px; margin-top: 8px; }
-.login-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
-.login-grid .field { margin: 0; }
-.login-preview { display: flex; align-items: center; gap: 10px; min-height: 0; color: var(--muted); font-size: 13px; }
-.login-preview:empty { display: none; }
-.login-add .btn { justify-self: start; }
 /* get-app.html: FIZZ on phones */
 .get-app { display: grid; justify-items: center; gap: 14px; max-width: 560px; margin: 0 auto; }
 .get-app-icon { border-radius: 22px; box-shadow: 0 10px 30px rgba(255,122,26,.25); }

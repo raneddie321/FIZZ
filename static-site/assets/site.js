@@ -177,7 +177,7 @@
   const isPhone = () => { try { const ua = navigator.userAgent || ""; return /iPhone|iPod|Windows Phone|Android.*Mobile|BlackBerry|Opera Mini/i.test(ua) && !/iPad|Tablet/i.test(ua) && !(/; wv\)|FIZZApp|RanEddieApp|Capacitor/i.test(ua) || window.Capacitor || window.ReactNativeWebView || window.FIZZ_APP); } catch { return false; } };
   function phoneLinks(root = document) {
     if (!isPhone() || /get-app\.html$/.test(location.pathname)) return;
-    for (const a of root.querySelectorAll('a[href*="chat.html"], a[href*="dev.html"], a[href*="signin.html"]')) {
+    for (const a of root.querySelectorAll('a[href*="chat.html"], a[href*="dev.html"], a[href*="signin.html"], a[href^="https://id.raneddie.com/"]')) {
       a.setAttribute("href", "/get-app.html");
       for (const n of a.childNodes) if (n.nodeType === 3 && /Get started|Open FIZZ|Try FIZZ|Start building|Start for free/i.test(n.textContent)) n.textContent = n.textContent.replace(/Get started for free|Get started|Open FIZZ DEV|Open FIZZ|Try FIZZ DEV|Try FIZZ|Start building|Start for free/i, "Get the app");
     }

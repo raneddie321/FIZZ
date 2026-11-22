@@ -2,48 +2,30 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>Sign in · RanEddie ID</title>
 <script>
-/* On fizz.raneddie.com, sign-in and sign-up happen on the central RanEddie ID site (id.raneddie.com),
-   which shares its session with every *.raneddie.com product and enforces the same age and password rules.
-   This page stays as the fallback on other hosts (previews, *.vercel.app, local). */
+/* Old FIZZ sign-in address. Signing in, signing up and password resets all happen on the official RanEddie ID site,
+   https://id.raneddie.com, which then sends the person back to the FIZZ page they came from. */
 (function () {
-  try {
-    var host = location.hostname.toLowerCase();
-    if (host !== "raneddie.com" && host.slice(-13) !== ".raneddie.com") return;
-    var q = new URLSearchParams(location.search);
-    var mode = q.get("mode");
-    var path = mode === "signup" ? "/sign-up" : mode === "forgot" ? "/forgot-password" : "/sign-in";
-    var r = q.get("redirect_url") || "/chat.html";
-    if (r.charAt(0) !== "/" || r.charAt(1) === "/" || r.charAt(1) === "\\") r = "/chat.html";
-    document.documentElement.style.visibility = "hidden";
-    location.replace("https://id.raneddie.com" + path + "?redirect_url=" + encodeURIComponent(location.origin + r));
-  } catch (e) {}
+  var q = new URLSearchParams(location.search);
+  var mode = q.get("mode");
+  var path = mode === "signup" ? "/sign-up" : mode === "forgot" ? "/forgot-password" : "/sign-in";
+  var r = q.get("redirect_url") || q.get("next") || "/chat.html";
+  if (r.charAt(0) !== "/") r = "/" + r.replace(/^\/*/, "");
+  if (r.charAt(1) === "/" || r.charAt(1) === "\\") r = "/chat.html";
+  var url = "https://id.raneddie.com" + path + "?redirect_url=" + encodeURIComponent(location.origin + r);
+  document.documentElement.setAttribute("data-to", url);
+  location.replace(url);
 })();
 </script>
-<title>Sign in · RanEddie ID</title>
-<meta name="description" content="Sign in to FIZZ with your RanEddie ID — one account for every RanEddie product." />
-<link rel="icon" href="/favicon.ico" sizes="any" />
-<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
-<link rel="icon" type="image/svg+xml" href="/icon.svg" />
-<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-<link rel="preconnect" href="https://fonts.googleapis.com" /><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&family=Sora:wght@600..800&display=swap" />
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" />
-<link rel="stylesheet" href="assets/site.css" />
-<link rel="stylesheet" href="assets/rid.css" />
-<script src="assets/core.js?v=20261112-att" defer></script>
-<script src="assets/raneddie-id.js?v=20261110-console1" defer></script>
-<script src="assets/rid-auth.js" defer></script>
 </head>
-<body class="rid-page">
-<div class="rid-backdrop" aria-hidden="true"></div>
-<main class="rid-main">
-  <a class="rid-brand" href="index.html" aria-label="RanEddie ID home"><img src="assets/raneddie-logo.png" alt="" width="56" height="44" /><span>RanEddie <span class="rid-gradient-text">ID</span></span></a>
-  <div class="rid-card" id="rid-card"><noscript><p>Turn on JavaScript to sign in with RanEddie ID.</p></noscript></div>
-  <footer class="rid-footer"><span>© RanEddie</span><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><span>Secured by Clerk</span></footer>
+<body style="font:16px/1.6 system-ui,sans-serif;margin:0;display:grid;place-items:center;min-height:100vh;background:#0b1220;color:#e6ebf5">
+<main style="max-width:460px;padding:32px 24px;text-align:center">
+  <p>Taking you to <b>RanEddie ID</b>, the official sign-in for every RanEddie product…</p>
+  <p><a id="go" style="color:#7cc4ff" href="https://id.raneddie.com/sign-in">Continue to id.raneddie.com</a></p>
+  <script>try { document.getElementById("go").href = document.documentElement.getAttribute("data-to"); } catch (e) {}</script>
 </main>
 </body>
 </html>

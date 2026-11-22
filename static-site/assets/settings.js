@@ -206,7 +206,6 @@
     box.innerHTML = (st.server ? "" : `<div class="alert alert-info"><div><strong>Connections need the FIZZ server</strong><p>Deploy this site from GitHub to Netlify (with the environment variables from the README) to enable GitHub, Vercel, Canva and Google.</p></div></div>`) + CONN.map((c) => connCard(c, st)).join("") + (F.customConnectors ? `<div data-cc-list><p class="muted-sm">Loading custom connectors…</p></div>` : "") + (apps ? `<h3 class="conn-group">Apps Fizz can use</h3><p class="muted-sm">Connect an app with your own token. FIZZ only uses connected apps when you ask. Actions that send, publish, or delete should be reviewed before they happen.</p>${apps}` : "");
     const cc = box.querySelector("[data-cc-list]");
     if (cc) F.customConnectors.listHtml().then((html) => { cc.innerHTML = html; });
-    if (F.logins) { const lb = document.createElement("div"); lb.setAttribute("data-logins", ""); box.appendChild(lb); F.logins.mount(lb); }
   }
 
   // Custom connectors (MCP servers): assets/custom-connectors.js draws the list and the Add dialog.
