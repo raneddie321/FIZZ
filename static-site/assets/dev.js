@@ -489,8 +489,8 @@
     $$(".mode button").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.mode === state.mode)));
     const modelLabel = typeof F.providerLabel === "function" ? F.providerLabel(data.settings, "dev") : "";
     $("#model-btn").innerHTML = `${esc(modelLabel || "Choose AI model")} <svg class="i" viewBox="0 0 24 24" style="width:14px"><path d="M6 9l6 6 6-6"/></svg>`;
-    $("#model-btn").title = `Selected model: ${modelLabel || "not available"}. Click to open AI settings.`;
-    $("#model-btn").setAttribute("aria-label", `Selected model ${modelLabel || "not available"}; open AI settings`);
+    $("#model-btn").title = `Selected model: ${modelLabel || "not available"}. Click to choose a model.`;
+    $("#model-btn").setAttribute("aria-label", `Selected model ${modelLabel || "not available"}; choose a model`);
     $("#pending").innerHTML = F.pendingHtml(state.pending);
     $("#pending").classList.toggle("hidden", !state.pending.length);
     const busy = Boolean(state.controller);
@@ -2325,16 +2325,9 @@
     F.toast(m ? `${m[0].toUpperCase() + m.slice(1)} mode is on — back to Automatic in the + menu.` : "Automatic: FIZZ DEV works out whether to answer, build, plan or do.");
   }
   if (state.mode === "do") setTimeout(() => F.web?.warmUp?.(), 3000);
-  // Always open the full AI settings panel from the model button. This is more reliable
-  // than a floating provider menu on touch devices and exposes both provider and model controls.
   $("#model-btn").addEventListener("click", (e) => {
     e.preventDefault();
-    try {
-      openSettings("ai");
-    } catch (err) {
-      console.error("[FIZZ DEV] Couldn't open AI settings", err);
-      F.toast(`Couldn't open model settings: ${err?.message || "unexpected error"}`);
-    }
+    F.modelPicker.show(e.currentTarget, { data, save, product: "dev", openSettings, onChange: () => renderComposer() });
   });
   function openMemory() {
     const p = project();

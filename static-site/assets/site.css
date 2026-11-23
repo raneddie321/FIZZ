@@ -819,3 +819,21 @@ h1 .md-logo, h2 .md-logo, h3 .md-logo, h4 .md-logo { width: 1em; height: 1em; ve
 .gen-figure { margin: 10px 0; display: grid; gap: 8px; justify-items: start; }
 .gen-media { display: block; max-width: min(100%, 640px); max-height: 70vh; border-radius: 14px; border: 1px solid var(--border, #333); background: #111; }
 .gen-figure figcaption { display: flex; gap: 8px; }
+.model-pop { position: fixed; z-index: 80; display: flex; flex-direction: column; max-height: min(70vh, 560px); background: var(--card, var(--bg, #1b1b1b)); color: var(--fg); border: 1px solid var(--border, #333); border-radius: 18px; box-shadow: 0 18px 48px rgba(0,0,0,.35); padding: 12px; gap: 10px; animation: mp-in .14s ease-out; }
+@keyframes mp-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.mp-head { display: flex; align-items: baseline; gap: 10px; padding: 2px 4px; }
+.mp-head b { font-size: 16px; }
+.mp-head small { color: var(--muted, #999); flex: 1; }
+.mp-x { margin-inline-start: auto; }
+.mp-list { overflow-y: auto; display: grid; gap: 4px; padding-inline-end: 2px; overscroll-behavior: contain; }
+.mp-item { display: flex; align-items: flex-start; gap: 10px; width: 100%; text-align: start; padding: 10px 12px; border-radius: 12px; background: transparent; border: 0; color: inherit; cursor: pointer; font: inherit; }
+.mp-item:hover, .mp-item:focus-visible { background: var(--muted-bg, rgba(127,127,127,.12)); outline: none; }
+.mp-item.on { background: var(--muted-bg, rgba(127,127,127,.14)); }
+.mp-check { width: 16px; color: #ff7a1a; font-weight: 700; flex: none; }
+.mp-body { display: grid; gap: 2px; min-width: 0; }
+.mp-name { font-weight: 600; overflow-wrap: anywhere; }
+.mp-item small { color: var(--muted, #999); font-size: 12.5px; overflow-wrap: anywhere; }
+.mp-tag { font-style: normal; font-size: 10.5px; font-weight: 700; padding: 1px 7px; border-radius: 99px; background: #ff7a1a; color: #fff; vertical-align: 1px; }
+.mp-msg { padding: 10px 12px; margin: 0; }
+.mp-settings { border: 0; border-top: 1px solid var(--border, #333); background: none; color: var(--muted, #999); padding: 10px 4px 2px; text-align: start; cursor: pointer; font: inherit; font-size: 13.5px; }
+.mp-settings:hover { color: var(--fg); }

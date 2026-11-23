@@ -452,11 +452,9 @@
   comp.addEventListener("drop", (e) => { e.preventDefault(); comp.classList.remove("drag"); addFiles([...e.dataTransfer.files]); });
   $("#pending").addEventListener("click", (e) => { const i = e.target.closest("[data-rm]")?.dataset.rm; if (i !== undefined) { state.pending.splice(+i, 1); renderComposer(); } });
 
-  $("#model-btn").addEventListener("click", async (e) => {
-    if (data.settings.provider !== "anthropic") return openSettings("ai");
-    const k = await menu(e.currentTarget, [{ label: "Model" }, ...MODELS.map((m) => ({ k: m.id, html: `<span>${m.id === data.settings.model ? "✓ " : ""}${m.chat}<small>${m.note}</small></span>` })), "-", { k: "settings", html: "AI settings…" }]);
-    if (k === "settings") openSettings("ai");
-    else if (k) { data.settings.model = k; save(); renderComposer(); }
+  $("#model-btn").addEventListener("click", (e) => {
+    e.preventDefault();
+    F.modelPicker.show(e.currentTarget, { data, save, product: "chat", openSettings, onChange: renderComposer });
   });
   $("#me-btn").addEventListener("click", async (e) => {
     const k = await menu(e.currentTarget, [...F.rid.menuHead(user), { k: "settings", html: "Settings" }, { k: "dev", html: "Switch to FIZZ DEV <small>Ctrl+.</small>" }, { k: "help", html: "Help & support" }, ...F.rid.menuTail(user)]);

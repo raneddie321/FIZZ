@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" />
-<link rel="stylesheet" href="assets/site.css?v=20261123-media" />
+<link rel="stylesheet" href="assets/site.css?v=20261123-mp" />
 <link rel="stylesheet" href="vendor/codemirror/codemirror.css" />
 <link rel="stylesheet" href="vendor/xterm/xterm.css" />
 <link rel="stylesheet" href="assets/dev.css?v=20261117-wa" />
@@ -37,18 +37,19 @@
 <script src="vendor/codemirror/addon/active-line.js"></script>
 <script src="vendor/xterm/xterm.js"></script>
 <script src="vendor/xterm/addon-fit.js"></script>
-<script src="assets/core.js?v=20261123-media"></script>
+<script src="assets/core.js?v=20261123-mp"></script>
 <script src="assets/interactive.js?v=20261113-ix"></script>
 <script src="assets/idb.js?v=20261111-p0"></script>
 <script src="assets/agent-core.js?v=20261117-wa"></script>
 <script src="assets/raneddie-id.js?v=20261110-console1"></script>
-<script src="assets/site.js?v=20261123-media"></script>
+<script src="assets/site.js?v=20261123-mp"></script>
 <script src="assets/connections.js?v=20261122-gall2"></script>
 <script src="assets/logins.js?v=20261117-login"></script>
 <script src="assets/settings.js?v=20261117-login"></script>
 <script src="assets/shell.js"></script>
 <script src="assets/terminal.js?v=20261112-p4"></script>
 <script src="assets/blobs.js"></script>
+<script src="assets/model-picker.js?v=20261123-mp"></script>
 <script src="assets/agent-tools.js?v=20261111-p0"></script>
 <script src="assets/permissions.js?v=20261121-pay1"></script>
 <script src="assets/code-tools.js?v=20261115-big"></script>
@@ -239,6 +240,6 @@
   if (S) return S.boot(list);
   // idb.js didn't load: start the apps anyway (data stays in localStorage, as before).
   list.forEach(function (src) { var s = document.createElement("script"); s.src = src; s.async = false; document.body.appendChild(s); });
-})(["assets/chat.js?v=20261123-media", "assets/dev.js?v=20261123-media"]);</script>
+})(["assets/chat.js?v=20261123-mp", "assets/dev.js?v=20261123-mp"]);</script>
 </body>
 </html>
