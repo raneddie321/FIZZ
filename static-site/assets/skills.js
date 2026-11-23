@@ -33,19 +33,60 @@
 
 
   const lib = (data) => (data.skillLib ||= { custom: [], disabled: [] });
-  function all(data) {
+  function all(data, app = "dev") {
     const l = lib(data);
-    return [...BUILTIN.map((s) => ({ ...s, builtin: true })), ...l.custom.map((s) => ({ ...s, builtin: false }))].map((s) => ({ ...s, enabled: !l.disabled.includes(s.id) }));
+    return [...(app === "dev" ? BUILTIN.map((s) => ({ ...s, builtin: true })) : []), ...l.custom.filter((s) => !s.apps || s.apps.includes(app)).map((s) => ({ ...s, builtin: false }))].map((s) => ({ ...s, enabled: !l.disabled.includes(s.id) }));
+  }
+
+  // ---------- SKILL.md ----------
+  const slug = (t) => String(t || "").toLowerCase().trim().replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "").slice(0, 60) || `skill-${F.uid().slice(0, 6)}`;
+  /** Reads a SKILL.md (front matter "name:" and "description:", then the instructions). */
+  function parseSkillMd(text, fileName = "") {
+    const src = String(text || "").replace(/^\uFEFF/, "").replace(/\r\n/g, "\n");
+    let meta = {}, body = src;
+    const fm = /^---\n([\s\S]*?)\n---\n?/.exec(src);
+    if (fm) {
+      body = src.slice(fm[0].length);
+      for (const line of fm[1].split("\n")) { const m = /^([A-Za-z_-]+)\s*:\s*(.*)$/.exec(line); if (m) meta[m[1].toLowerCase()] = m[2].trim().replace(/^["']|["']$/g, ""); }
+    }
+    const heading = /^#\s+(.+)$/m.exec(body)?.[1];
+    const name = meta.name || heading || fileName.replace(/(\/|^)SKILL\.md$/i, "").replace(/\.md$/i, "").split("/").pop() || "Skill";
+    const description = meta.description || body.replace(/^#.*$/m, "").trim().split("\n").find((l) => l.trim())?.trim().slice(0, 300) || "";
+    if (!body.trim()) throw new Error("This SKILL.md has no instructions.");
+    return { name: name.slice(0, 60), description: description.slice(0, 400), instructions: body.trim().slice(0, 30000) };
+  }
+  /** Adds (or replaces, by name) a skill from SKILL.md text. */
+  function addSkillMd(data, text, fileName) {
+    const p = parseSkillMd(text, fileName);
+    const l = lib(data);
+    const id = `md-${slug(p.name)}`;
+    const rec = { id, icon: "spark", source: "md", name: p.name, description: p.description, instructions: p.instructions, match: "", keywordsText: "", apps: ["chat", "dev"], at: Date.now() };
+    const i = l.custom.findIndex((x) => x.id === id);
+    if (i >= 0) l.custom[i] = rec; else l.custom.push(rec);
+    return rec;
+  }
+  const STOP = new Set("this that with from your what when where which about into have will them they their then than there these those make made just like more most some such only also very each other skill skills using used uses user users code file files want need help write create build".split(" "));
+  const words = (t) => new Set((String(t).toLowerCase().match(/[\p{L}\p{N}]{4,}/gu) || []).filter((w) => !STOP.has(w)));
+  /** Automatic choice: the skill's name (or "/name") is in the message, or enough of its description's words are. */
+  function relevant(skill, text) {
+    const t = String(text || "").toLowerCase();
+    const nm = String(skill.name || "").toLowerCase();
+    if (nm && (t.includes(`/${slug(nm)}`) || (nm.length >= 4 && t.includes(nm)))) return true;
+    const want = words(`${skill.name} ${skill.description}`);
+    let hit = 0;
+    for (const w of words(t)) if (want.has(w) || [...want].some((x) => x.length >= 5 && (x.startsWith(w) || w.startsWith(x)))) hit++;
+    return hit >= 2;
   }
   const byId = (data, id) => all(data).find((s) => s.id === id);
 
   function matches(skill, text) {
+    if (skill.source === "md") return relevant(skill, text);
     if (!skill.match) return false;
     try { return new RegExp(skill.match, "i").test(text); } catch { return false; }
   }
   /** Skills for one message: the ones turned on, plus enabled ones whose "when to use" matches (max 3 automatic). */
-  function forMessage(data, pinnedIds, text) {
-    const list = all(data).filter((s) => s.enabled);
+  function forMessage(data, pinnedIds, text, app = "dev") {
+    const list = all(data, app).filter((s) => s.enabled);
     const pinned = list.filter((s) => pinnedIds.includes(s.id)).map((s) => ({ ...s, auto: false }));
     const auto = list.filter((s) => !pinnedIds.includes(s.id) && matches(s, text)).slice(0, 3).map((s) => ({ ...s, auto: true }));
     return [...pinned, ...auto];
@@ -53,7 +94,7 @@
   /** The system prompt section that carries the skills' instructions (bounded). */
   function promptSection(skills) {
     if (!skills.length) return "";
-    let budget = 8000;
+    let budget = 24000;
     const parts = [];
     for (const s of skills) {
       const text = `## Skill: ${s.name}\n${s.instructions}`.slice(0, Math.max(0, budget));
@@ -61,7 +102,7 @@
       budget -= text.length;
       parts.push(text);
     }
-    return `SKILLS IN USE. Follow these instructions for this request (they come from the user's skill library):\n\n${parts.join("\n\n")}`;
+    return `SKILLS IN USE (chosen automatically from the user's message, or turned on by the user). Follow these instructions for this request (they come from the user's skill library):\n\n${parts.join("\n\n")}`;
   }
 
   // ---------- manager dialog ----------
@@ -132,5 +173,47 @@
     if (!d.open) d.showModal();
   }
 
-  F.skills = { glyph, BUILTIN, all, byId, forMessage, promptSection, manage, matches };
+  // ---------- Settings → Skills ----------
+  function mountSettings(box, { data, save }) {
+    if (!box) return;
+    const draw = () => {
+      const l = lib(data);
+      const mine = l.custom;
+      box.innerHTML = `<p class="muted-sm">Add skills as <b>SKILL.md</b> files (the same format Claude uses: a <code>name</code> and <code>description</code> at the top, then the instructions). Fizz and Fizz DEV pick a skill by themselves when your message is about what it describes, or when you write its name — e.g. <code>/brand-voice</code>.</p>
+        <div class="skill-up">
+          <label class="btn btn-sm"><input type="file" accept=".md,text/markdown,text/plain" multiple hidden data-skill-file />Upload SKILL.md</label>
+          <button type="button" class="btn btn-outline btn-sm" data-skill-paste>Paste SKILL.md</button>
+          <button type="button" class="btn btn-ghost btn-sm" data-skill-manage>All skills (incl. built-in)…</button>
+        </div>
+        <div class="skill-pastebox" hidden><textarea class="textarea mono" rows="10" placeholder="---&#10;name: brand-voice&#10;description: Writes copy in our brand's tone. Use for slogans, posts and about pages.&#10;---&#10;&#10;# Brand voice&#10;Write in a warm, direct voice…" data-skill-text></textarea><div class="dlg-actions"><button type="button" class="btn btn-outline btn-sm" data-skill-cancel>Cancel</button><button type="button" class="btn btn-sm" data-skill-save>Add skill</button></div></div>
+        <div class="skill-list">${mine.map((k) => `<div class="skill-row ${l.disabled.includes(k.id) ? "off" : ""}"><span class="skill-ic">${glyph(k)}</span>
+          <div class="skill-body"><b>${esc(k.name)}</b><small>${esc(k.description || "")}</small><small class="muted-sm"><code>/${esc(slug(k.name))}</code> · ${k.source === "md" ? "SKILL.md" : "Custom"} · Fizz & Fizz DEV · ${Math.round((k.instructions || "").length / 100) / 10}k chars</small></div>
+          <button type="button" class="btn btn-ghost btn-sm" data-skill-dl="${esc(k.id)}" title="Download SKILL.md">Download</button>
+          <button type="button" class="btn btn-ghost btn-sm" data-skill-del="${esc(k.id)}">Remove</button>
+          <label class="switch" title="On"><input type="checkbox" data-skill-on="${esc(k.id)}" ${l.disabled.includes(k.id) ? "" : "checked"} /><span></span></label></div>`).join("") || '<p class="muted-sm">No skills yet. Upload a SKILL.md to add one.</p>'}</div>`;
+    };
+    const addText = (text, name) => { try { const k = addSkillMd(data, text, name); save(); F.toast(`Added the skill "${k.name}"`); return true; } catch (e) { F.toast(`${name || "SKILL.md"}: ${e.message}`); return false; } };
+    box.onclick = async (e) => {
+      const t = e.target;
+      if (t.closest("[data-skill-paste]")) { box.querySelector(".skill-pastebox").hidden = false; box.querySelector("[data-skill-text]").focus(); }
+      if (t.closest("[data-skill-cancel]")) box.querySelector(".skill-pastebox").hidden = true;
+      if (t.closest("[data-skill-save]")) { if (addText(box.querySelector("[data-skill-text]").value)) draw(); }
+      if (t.closest("[data-skill-manage]")) manage({ data, save, onChange: draw });
+      const del = t.closest("[data-skill-del]");
+      if (del && confirm("Remove this skill?")) { const l = lib(data); l.custom = l.custom.filter((x) => x.id !== del.dataset.skillDel); save(); draw(); }
+      const dl = t.closest("[data-skill-dl]");
+      if (dl) { const k = lib(data).custom.find((x) => x.id === dl.dataset.skillDl); if (k) F.download(`${slug(k.name)}-SKILL.md`, `---\nname: ${slug(k.name)}\ndescription: ${String(k.description || "").replace(/\n/g, " ")}\n---\n\n${k.instructions}\n`, "text/markdown"); }
+    };
+    box.onchange = async (e) => {
+      if (e.target.matches("[data-skill-file]")) {
+        for (const f of e.target.files) { if (f.size > 200_000) { F.toast(`${f.name} is too big (max 200 KB).`); continue; } addText(await f.text(), f.name); }
+        draw();
+      }
+      const id = e.target.dataset.skillOn;
+      if (id) { const l = lib(data); l.disabled = e.target.checked ? l.disabled.filter((x) => x !== id) : [...new Set([...l.disabled, id])]; save(); draw(); }
+    };
+    draw();
+  }
+
+  F.skills = { glyph, BUILTIN, all, byId, forMessage, promptSection, manage, matches, parseSkillMd, addSkillMd, relevant, mountSettings, slug };
 })();

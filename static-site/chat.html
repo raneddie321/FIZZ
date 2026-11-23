@@ -16,10 +16,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" />
-<link rel="stylesheet" href="assets/site.css?v=20261123-name" />
+<link rel="stylesheet" href="assets/site.css?v=20261123-skmd" />
 <link rel="stylesheet" href="vendor/codemirror/codemirror.css" />
 <link rel="stylesheet" href="vendor/xterm/xterm.css" />
-<link rel="stylesheet" href="assets/dev.css?v=20261123-name" />
+<link rel="stylesheet" href="assets/dev.css?v=20261123-skmd" />
 <script>document.documentElement.dataset.app=/\/dev(\.html)?$/.test(location.pathname)?"dev":"chat";try{var t=localStorage.getItem("fizz.theme");t=t?JSON.parse(t):"system";if(t==="dark"||(t!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}</script>
 <script src="vendor/marked.min.js"></script>
 <script src="vendor/purify.min.js"></script>
@@ -37,38 +37,38 @@
 <script src="vendor/codemirror/addon/active-line.js"></script>
 <script src="vendor/xterm/xterm.js"></script>
 <script src="vendor/xterm/addon-fit.js"></script>
-<script src="assets/core.js?v=20261123-name"></script>
-<script src="assets/interactive.js?v=20261123-name"></script>
-<script src="assets/idb.js?v=20261123-name"></script>
-<script src="assets/agent-core.js?v=20261123-name"></script>
-<script src="assets/raneddie-id.js?v=20261123-name"></script>
-<script src="assets/site.js?v=20261123-name"></script>
-<script src="assets/connections.js?v=20261123-name"></script>
-<script src="assets/logins.js?v=20261123-name"></script>
-<script src="assets/settings.js?v=20261123-name"></script>
+<script src="assets/core.js?v=20261123-skmd"></script>
+<script src="assets/interactive.js?v=20261123-skmd"></script>
+<script src="assets/idb.js?v=20261123-skmd"></script>
+<script src="assets/agent-core.js?v=20261123-skmd"></script>
+<script src="assets/raneddie-id.js?v=20261123-skmd"></script>
+<script src="assets/site.js?v=20261123-skmd"></script>
+<script src="assets/connections.js?v=20261123-skmd"></script>
+<script src="assets/logins.js?v=20261123-skmd"></script>
+<script src="assets/settings.js?v=20261123-skmd"></script>
 <script src="assets/shell.js"></script>
-<script src="assets/terminal.js?v=20261123-name"></script>
+<script src="assets/terminal.js?v=20261123-skmd"></script>
 <script src="assets/blobs.js"></script>
-<script src="assets/model-picker.js?v=20261123-name"></script>
-<script src="assets/agent-tools.js?v=20261123-name"></script>
-<script src="assets/permissions.js?v=20261123-name"></script>
-<script src="assets/code-tools.js?v=20261123-name"></script>
-<script src="assets/hooks.js?v=20261123-name"></script>
-<script src="assets/git-tools.js?v=20261123-name"></script>
-<script src="assets/canva-tools.js?v=20261123-name"></script>
-<script src="assets/whatsapp-tools.js?v=20261123-name"></script>
-<script src="assets/shopify-tools.js?v=20261123-name"></script>
-<script src="assets/auth-links.js?v=20261123-name"></script>
+<script src="assets/model-picker.js?v=20261123-skmd"></script>
+<script src="assets/agent-tools.js?v=20261123-skmd"></script>
+<script src="assets/permissions.js?v=20261123-skmd"></script>
+<script src="assets/code-tools.js?v=20261123-skmd"></script>
+<script src="assets/hooks.js?v=20261123-skmd"></script>
+<script src="assets/git-tools.js?v=20261123-skmd"></script>
+<script src="assets/canva-tools.js?v=20261123-skmd"></script>
+<script src="assets/whatsapp-tools.js?v=20261123-skmd"></script>
+<script src="assets/shopify-tools.js?v=20261123-skmd"></script>
+<script src="assets/auth-links.js?v=20261123-skmd"></script>
 <script src="assets/docs.js"></script>
-<script src="assets/skills.js"></script>
-<script src="assets/cloud-tools.js?v=20261123-name"></script>
+<script src="assets/skills.js?v=20261123-skmd"></script>
+<script src="assets/cloud-tools.js?v=20261123-skmd"></script>
 <script src="assets/builds.js"></script>
-<script src="assets/sync.js?v=20261123-name"></script>
-<script src="assets/web-browser.js?v=20261123-name"></script>
-<script src="assets/google-tools.js?v=20261123-name"></script>
+<script src="assets/sync.js?v=20261123-skmd"></script>
+<script src="assets/web-browser.js?v=20261123-skmd"></script>
+<script src="assets/google-tools.js?v=20261123-skmd"></script>
 <script src="assets/app-tools.js"></script>
-<script src="assets/mcp-tools.js?v=20261123-name"></script>
-<script src="assets/custom-connectors.js?v=20261123-name"></script>
+<script src="assets/mcp-tools.js?v=20261123-skmd"></script>
+<script src="assets/custom-connectors.js?v=20261123-skmd"></script>
 <script src="assets/fizz-brain.js"></script>
 <script src="assets/brain-design.js"></script>
 <script src="assets/brain-code.js"></script>
@@ -240,6 +240,6 @@
   if (S) return S.boot(list);
   // idb.js didn't load: start the apps anyway (data stays in localStorage, as before).
   list.forEach(function (src) { var s = document.createElement("script"); s.src = src; s.async = false; document.body.appendChild(s); });
-})(["assets/chat.js?v=20261123-name", "assets/dev.js?v=20261123-name"]);</script>
+})(["assets/chat.js?v=20261123-skmd", "assets/dev.js?v=20261123-skmd"]);</script>
 </body>
 </html>

@@ -837,3 +837,5 @@ h1 .md-logo, h2 .md-logo, h3 .md-logo, h4 .md-logo { width: 1em; height: 1em; ve
 .mp-msg { padding: 10px 12px; margin: 0; }
 .mp-settings { border: 0; border-top: 1px solid var(--border, #333); background: none; color: var(--muted, #999); padding: 10px 4px 2px; text-align: start; cursor: pointer; font: inherit; font-size: 13.5px; }
 .mp-settings:hover { color: var(--fg); }
+.skill-up { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 12px; }
+.skill-pastebox { display: grid; gap: 8px; margin-bottom: 12px; }
