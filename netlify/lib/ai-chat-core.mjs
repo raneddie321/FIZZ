@@ -99,7 +99,11 @@ export async function handleChat(req, { env, ip, bump, run = null }) {
     // Include the provider's short reason (e.g. "API key not valid", unknown model); it never contains the key.
     let reason = "";
     try { const d = JSON.parse(detail); reason = String((Array.isArray(d) ? d[0] : d)?.error?.message || "").slice(0, 200); } catch {}
-    const msg = upstream.status === 429 ? "Fizz is very busy right now. Please try again in a moment." : upstream.status === 402 ? "Fizz AI is temporarily unavailable." : `The AI service returned an error${reason ? `: ${reason}` : ""}. Please try again.`;
+    const daily = /per ?day|daily|free_tier|quota/i.test(detail);
+    const msg = upstream.status === 429 && own ? (daily
+      ? `Your own AI key reached its limit${/free_tier/i.test(detail) ? " (free tier: about 20 requests a day for this model)" : ""}. Pick another model in the model menu, wait for the limit to reset, or turn on billing for the key.${reason ? ` (${reason.split("\n")[0].slice(0, 140)})` : ""}`
+      : `Your AI service is rate-limiting this key right now. Wait a minute and try again, or pick another model.${reason ? ` (${reason.split("\n")[0].slice(0, 140)})` : ""}`)
+      : upstream.status === 429 ? "Fizz is very busy right now. Please try again in a moment." : upstream.status === 402 ? "Fizz AI is temporarily unavailable." : `The AI service returned an error${reason ? `: ${reason}` : ""}. Please try again.`;
     return err(upstream.status === 429 ? 429 : 502, msg, "upstream");
   }
   return new Response(upstream.body, { headers });

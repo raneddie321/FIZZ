@@ -32,7 +32,20 @@
       "headers": {
         "X-Content-Type-Options": "nosniff",
         "Referrer-Policy": "strict-origin-when-cross-origin",
-        "X-Frame-Options": "SAMEORIGIN"
+        "X-Frame-Options": "SAMEORIGIN",
+        "Strict-Transport-Security": "max-age=63072000",
+        "Permissions-Policy": "camera=(self), microphone=(self), geolocation=(self), payment=(), usb=(), serial=(), bluetooth=(), hid=(), interest-cohort=()",
+        "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'self'; upgrade-insecure-requests",
+        "X-Permitted-Cross-Domain-Policies": "none"
+      },
+      "continue": true
+    },
+    {
+      "src": "/api/(.*)",
+      "headers": {
+        "Cache-Control": "no-store",
+        "X-Robots-Tag": "noindex"
       },
       "continue": true
     },

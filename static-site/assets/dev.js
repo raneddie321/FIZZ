@@ -724,6 +724,14 @@
     return true;
   }
 
+  let netRetries = 0;
+  /** Resolves when the page is visible and online again (at once if it already is), then gives the network a moment. */
+  const waitUntilBack = () => new Promise((resolve) => {
+    const ok = () => !document.hidden && navigator.onLine !== false;
+    const done = () => { if (!ok()) return; document.removeEventListener("visibilitychange", done); removeEventListener("online", done); setTimeout(resolve, 1200); };
+    if (ok()) return setTimeout(resolve, 1500);
+    document.addEventListener("visibilitychange", done); addEventListener("online", done);
+  });
   async function generate({ step = 1, retried = false, local = false } = {}) {
     const p = project();
     const c = chat();
@@ -765,6 +773,7 @@
       if (e.name === "AbortError") { reply.content += reply.content ? "\n\n*Stopped.*" : ""; stopLoop = true; }
       else if (e.message === "NO_KEY") Object.assign(reply, { error: "Add your key in Settings → AI, or switch to Fizz AI.", soft: true });
       else if (F.agentCore.isContextOverflow(e)) Object.assign(reply, { error: `This conversation is too long for the model (${e.message}). Start a new chat with /new, or choose a model with a bigger context in Settings → AI.`, overflow: true, soft: true });
+      else if (!e.status && /network|failed to fetch|load failed|connection|lost touch|stream/i.test(String(e.message || e))) Object.assign(reply, { error: "The connection dropped (the page was in the background or the network changed). Continuing…", soft: true, netLost: true });
       else Object.assign(reply, { error: e.message, soft: [404, 429, 503].includes(e.status) });
     } finally {
       clearInterval(tick);
@@ -796,6 +805,18 @@
       save();
       renderAll();
     }
+    // A dropped connection (phone switched apps, screen locked, Wi-Fi changed) isn't the end of the task:
+    // wait until the page is back and online, then run this step again (up to 3 times in a row).
+    if (reply.netLost && !stopLoop && netRetries < 3) {
+      netRetries++;
+      await waitUntilBack();
+      if (!stopLoop && c.messages.includes(reply)) {
+        c.messages.splice(c.messages.indexOf(reply), 1);
+        save(); renderAll();
+        return generate({ step, retried: true, local: true });
+      }
+    }
+    if (!reply.error) netRetries = 0;
     if (reply.error) return finishLoop(reply);
     if ((reply.staged || []).some((x) => !x.decided)) return finishLoop(reply, "review");
     if (reply.changes?.length) {
