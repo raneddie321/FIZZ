@@ -1,4 +1,4 @@
-/* Binary files in FIZZ DEV projects (PDF, DOCX, XLSX, PPTX, images…). The bytes live in IndexedDB —
+/* Binary files in Fizz DEV projects (PDF, DOCX, XLSX, PPTX, images…). The bytes live in IndexedDB —
    localStorage is too small — and the project keeps a short marker string in their place:
    "\u0000blob:{"id":"…","type":"application/pdf","size":12345}". */
 (function () {
@@ -13,7 +13,7 @@
     zip: "application/zip", apk: "application/vnd.android.package-archive", aab: "application/octet-stream", mp3: "audio/mpeg", wav: "audio/wav", mp4: "video/mp4", woff2: "font/woff2", ttf: "font/ttf", otf: "font/otf",
   };
   const mimeFor = (path) => MIME[String(path).split(".").pop().toLowerCase()] || "application/octet-stream";
-  /** File types FIZZ DEV stores as binary rather than text. */
+  /** File types Fizz DEV stores as binary rather than text. */
   const BINARY_EXT = /\.(pdf|png|jpe?g|gif|webp|ico|docx|xlsx|pptx|zip|apk|aab|mp3|wav|mp4|woff2?|ttf|otf)$/i;
 
   let dbp = null;

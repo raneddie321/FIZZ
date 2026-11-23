@@ -1,4 +1,4 @@
-/* The FIZZ DEV shell: a bash-like command language over the project's files.
+/* The Fizz DEV shell: a bash-like command language over the project's files.
    Pipes, &&, ||, ;, redirects (> >> < 2> 2>&1), $VARS, ~ and * globs, and ~60 standard commands run right here.
    Anything else (npm, git, make, compilers, unknown programs…) runs in real bash in the cloud sandbox
    when the site has it turned on. Used by terminal.js. */

@@ -3,7 +3,7 @@ import { requireUser } from "../lib/auth.mjs";
 import { clerkConfigured } from "../lib/clerk.mjs";
 import { kvConfigured, redis } from "../lib/kv.mjs";
 
-// Cloud copies of FIZZ DEV projects and FIZZ chats, per RanEddie ID user (Upstash Redis).
+// Cloud copies of Fizz DEV projects and Fizz chats, per RanEddie ID user (Upstash Redis).
 // Each item is stored in chunks (Upstash requests are limited to about 1 MB) with an index of
 // { id, name, updated, size }. Binary files stay in the browser; only text is synced.
 const CHUNK = 700_000;

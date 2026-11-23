@@ -4,7 +4,7 @@
   const add = window.FIZZ.brain.add;
 
   add({
-    id: "tools-playbook", title: "FIZZ DEV TOOLS PLAYBOOK", always: "build",
+    id: "tools-playbook", title: "Fizz DEV TOOLS PLAYBOOK", always: "build",
     match: /\b(build|make|create|run|test|fix|debug|deploy|script|server|app|project|tool)\b|בנה|תבנה|צור|תעשה|תקן/i,
     text: `
 ## The rhythm of a build
@@ -76,7 +76,7 @@
   connected, the user approves, it takes minutes). Failed builds come back to you with the log: fix the cause, build again.
 - <fizz-push message="Add booking form"/> doesn't push by itself: it highlights the Push to GitHub button on your
   reply and the user confirms repository, branch and message. Offer it when a milestone is done. It sends every
-  project file as one commit, except .env files and anything .gitignore lists (FIZZ leaves those out). Still check
+  project file as one commit, except .env files and anything .gitignore lists (Fizz leaves those out). Still check
   for keys hard-coded in other files before suggesting it.
 - Vercel: the user deploys with the Deploy button or /deploy; you can't start it. Make sure the project works as
   plain files (plus api/ functions if any) and tell them when it's ready. /export downloads the project as a ZIP.
@@ -87,7 +87,7 @@
   short line to FIZZ.md with <fizz-edit>. Keep it current; it's not a progress log.
 
 ## Verification sequences
-- Static site: screenshot index.html on desktop and phone, fix, screenshot the other pages. FIZZ DEV checks links,
+- Static site: screenshot index.html on desktop and phone, fix, screenshot the other pages. Fizz DEV checks links,
   syntax and preview errors when you finish; fix what it reports.
 - Front-end app (no build): screenshot each main screen and its empty state; test pure logic modules with node --test
   in the sandbox (ES modules work there), or as a CommonJS script in the browser terminal when there is no sandbox.
@@ -279,7 +279,7 @@ process.env with .env in .gitignore; every route validated, with a 404 path and 
   supabase.auth.onAuthStateChange((event, session) => renderApp(session));
   await supabase.auth.signOut();
 - Every call returns { data, error }: check error every time and show a helpful message. The bare import works in
-  the preview (FIZZ maps it to esm.sh); keep the client in js/supabase.js. Check the docs for unusual calls.
+  the preview (Fizz maps it to esm.sh); keep the client in js/supabase.js. Check the docs for unusual calls.
 
 ## Row level security is mandatory
 The anon / publishable key is public by design: anyone can read it from the page. RLS is what protects the data.
@@ -360,7 +360,7 @@ Ship the SQL in supabase/schema.sql for the SQL editor:
 - Model names change often: never guess. Look up the provider's current models with <fizz-search> and <fizz-fetch>
   and read the model from process.env.AI_MODEL. Use the official SDK (@anthropic-ai/sdk, openai, @google/genai)
   at a version you checked with npm view. OpenRouter and many others speak the OpenAI chat API (openai with baseURL).
-- Keys go in .env (listed in .gitignore) and .env.example lists the names. FIZZ's push and deploy leave .env out,
+- Keys go in .env (listed in .gitignore) and .env.example lists the names. Fizz's push and deploy leave .env out,
   but a key written into any other file would be uploaded.
 
 ## A streaming proxy endpoint (Express, Anthropic SDK)
@@ -731,7 +731,7 @@ In production use a WSGI server: gunicorn -b 0.0.0.0:3000 app:app.
 - Static site or front-end app: GitHub Pages, Vercel or Netlify (free for small sites, HTTPS included).
 - Static front end plus a few API routes (contact form, AI proxy, webhooks): Vercel or Netlify functions.
 - Long-running servers, websockets, bots: an always-on host (Render, Railway, Fly.io, a VPS).
-- From FIZZ DEV the user can deploy to Vercel (Deploy button or /deploy, it uploads the project files), push to
+- From Fizz DEV the user can deploy to Vercel (Deploy button or /deploy, it uploads the project files), push to
   GitHub (Push to GitHub) and download a ZIP (/export) for Netlify Drop or any other host.
 
 ## GitHub Pages
@@ -769,7 +769,7 @@ In production use a WSGI server: gunicorn -b 0.0.0.0:3000 app:app.
               path: dist
           - uses: actions/deploy-pages@v4
   Check the current major versions of these actions with <fizz-search>. With Vite set base: "./" in vite.config.js.
-  Pushing workflow files needs GitHub's workflow permission; if FIZZ asks the user to reconnect GitHub, that's why.
+  Pushing workflow files needs GitHub's workflow permission; if Fizz asks the user to reconnect GitHub, that's why.
 
 ## Vercel
 - Static projects deploy as they are (index.html at the root). Functions go in api/ (api/contact.js is /api/contact):
@@ -813,7 +813,7 @@ In production use a WSGI server: gunicorn -b 0.0.0.0:3000 app:app.
     id: "documents-deep", title: "DOCUMENT RECIPES",
     match: /\b(pdf|pdfs|docx|word|xlsx|excel|spreadsheet|pptx|powerpoint|presentation|slides|deck|pitch deck|invoice|invoices|cv|resume|report|certificate|brochure|letter)\b|מצגת|קורות חיים|חשבונית|מסמך|דוח|אקסל|תעודה/i,
     text: `
-## How document scripts run in FIZZ
+## How document scripts run in Fizz
 - Write the script as a project file (scripts/make-report.js) and run <fizz-run>node scripts/make-report.js</fizz-run>.
   It runs in the browser worker: CommonJS with top-level await; require("docx"), require("xlsx"), require("pptxgenjs"),
   require("jspdf"), require("pdf-lib") load on first use, plus fs, path and project files (require("../data/sales.json")).
@@ -925,7 +925,7 @@ In production use a WSGI server: gunicorn -b 0.0.0.0:3000 app:app.
 - Hebrew text: add rtlMode: true and align: "right" to the text options.
 
 ## HTML to PDF with <fizz-export> (best for designed documents)
-FIZZ renders the page 794px wide and cuts it every 1123px from the top (A4). So build the document from page
+Fizz renders the page 794px wide and cuts it every 1123px from the top (A4). So build the document from page
 elements of exactly that size, stacked with no gaps, margins or body padding:
   <body>
     <section class="page">
@@ -1109,7 +1109,7 @@ Files: manifest.json, popup.html, popup.css, popup.js, background.js, content.js
 - No remote code, no eval, no inline scripts or onclick attributes (the extension CSP blocks them).
 
 ## Testing
-- chrome.* APIs don't exist in FIZZ's preview: check popup.html there for layout only and validate the manifest
+- chrome.* APIs don't exist in Fizz's preview: check popup.html there for layout only and validate the manifest
   with <fizz-run>jq . manifest.json</fizz-run>.
 - Real test: download the project ZIP (/export), unzip, open chrome://extensions, turn on Developer mode, Load
   unpacked, pick the folder. After each change press reload on the extension card and reload the page.
@@ -1129,14 +1129,14 @@ Files: manifest.json, popup.html, popup.css, popup.js, background.js, content.js
     id: "git-workflow", title: "GIT AND GITHUB",
     match: /\b(git|github|commit|commits|repo|repository|branch|branches|pull request|pr|push|version control|gitignore|readme)\b|גיט|גיטהאב|מאגר/i,
     text: `
-## Pushing from FIZZ
+## Pushing from Fizz
 - <fizz-push message="..."/> highlights Push to GitHub on your reply; the user picks (or creates) the repository and
   branch and confirms. It makes one commit with every project file and keeps other files already in the repo.
 - It leaves out .env files (except .env.example) and whatever .gitignore lists; everything else is uploaded. Before
   suggesting a push, check other files for keys, tokens, personal data and big generated files. node_modules never enters
   the project (it stays in the sandbox). Workflow files (.github/workflows/) need GitHub's workflow permission;
-  FIZZ asks the user to reconnect when needed.
-- git in the sandbox (git init, git diff, git log) is fine for checking; pushing goes through FIZZ's connection.
+  Fizz asks the user to reconnect when needed.
+- git in the sandbox (git init, git diff, git log) is fine for checking; pushing goes through Fizz's connection.
 
 ## Commit messages
 - Imperative, under about 60 characters, says what changes: "Add booking form with validation", "Fix cart total

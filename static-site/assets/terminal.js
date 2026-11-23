@@ -1,4 +1,4 @@
-/* FIZZ DEV terminal: a bash-like shell over the project's files (see shell.js), JavaScript in a Web Worker,
+/* Fizz DEV terminal: a bash-like shell over the project's files (see shell.js), JavaScript in a Web Worker,
    Python 3 with Pyodide, and real Linux bash in the cloud sandbox for npm, git and everything else. */
 (function () {
   "use strict";
@@ -293,7 +293,7 @@
 
     /** Built-in commands: (args, io) → exit code. io: { stdin, out(text), err(text), tty } */
     const B = {
-      help(a, io) { io.out(`${C.bold}FIZZ DEV terminal${C.reset} — your project at fizzdev/${userSlug()}/${projSlug()}\n`); for (const [k, v] of HELP) io.out(`  ${C.bold}${k.padEnd(7)}${C.reset} ${v}\n`); io.out(`${C.dim}${api.sandboxAvailable?.() ? "The cloud sandbox is on: npm, git and other programs run in real Linux." : "The cloud sandbox is off on this site, so npm, git and other programs can't run (the site owner sets FIZZ_SANDBOX=on)."}${C.reset}\n`); return 0; },
+      help(a, io) { io.out(`${C.bold}Fizz DEV terminal${C.reset} — your project at fizzdev/${userSlug()}/${projSlug()}\n`); for (const [k, v] of HELP) io.out(`  ${C.bold}${k.padEnd(7)}${C.reset} ${v}\n`); io.out(`${C.dim}${api.sandboxAvailable?.() ? "The cloud sandbox is on: npm, git and other programs run in real Linux." : "The cloud sandbox is off on this site, so npm, git and other programs can't run (the site owner sets FIZZ_SANDBOX=on)."}${C.reset}\n`); return 0; },
       clear() { term.clear(); return 0; },
       pwd(a, io) { io.out("/" + cwd + "\n"); return 0; },
       cd(a, io) { const t = a[0] === "-" ? vars.OLDPWD?.slice(1) ?? "" : abs(a[0] || "/"); if (!isDir(t)) return err(io, "cd", `${a[0]}: No such file or directory`); vars.OLDPWD = "/" + cwd; cwd = t; vars.PWD = "/" + cwd; return 0; },
@@ -666,7 +666,7 @@
         return runPython({ kind: "pip", pkgs: a.slice(1).filter((x) => !x.startsWith("-")) }, io);
       },
       async node(a, io) {
-        if (a[0] === "--version" || a[0] === "-v") { io.out("v22 (FIZZ DEV browser runner)\n"); return 0; }
+        if (a[0] === "--version" || a[0] === "-v") { io.out("v22 (Fizz DEV browser runner)\n"); return 0; }
         if (a[0] === "-e" || a[0] === "-p") { const tmp = `.fizz-eval-${Date.now()}.js`; api.write(tmp, a[0] === "-p" ? `console.log(${a.slice(1).join(" ")})` : a.slice(1).join(" ")); try { return await runNode(tmp, [], io); } finally { api.remove(tmp); } }
         if (!a[0]) { io.err("Usage: node file.js — interactive Node isn't available in the browser."); return 2; }
         const p = abs(a[0]);
@@ -686,7 +686,7 @@
     /** Runs a command line in real bash in the cloud sandbox, in the current folder. */
     async function runCloud(line, io, { background = false } = {}) {
       if (!api.sandboxAvailable?.() || !api.sandbox) {
-        io.err(`${line.split(/\s+/)[0]}: this needs a real Linux machine. FIZZ DEV's cloud sandbox isn't turned on for this site (the site owner sets FIZZ_SANDBOX=on in Vercel). Everything else in this terminal works in your browser — type 'help'.`);
+        io.err(`${line.split(/\s+/)[0]}: this needs a real Linux machine. Fizz DEV's cloud sandbox isn't turned on for this site (the site owner sets FIZZ_SANDBOX=on in Vercel). Everything else in this terminal works in your browser — type 'help'.`);
         return 127;
       }
       io.err(`${C.dim}running in the cloud sandbox…${C.reset}`);
@@ -828,7 +828,7 @@
       redraw();
     });
 
-    wl(`${C.bold}FIZZ DEV${C.reset} ${C.dim}— a shell for ${api.projectName()}. Pipes, && and ~60 commands work here; npm, git and other programs run in the cloud sandbox. Type 'help'.${C.reset}`);
+    wl(`${C.bold}Fizz DEV${C.reset} ${C.dim}— a shell for ${api.projectName()}. Pipes, && and ~60 commands work here; npm, git and other programs run in the cloud sandbox. Type 'help'.${C.reset}`);
     w(prompt());
     return {
       focus: () => term.focus(),

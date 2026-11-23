@@ -1,8 +1,8 @@
 /* Custom connectors (MCP servers), like "Add custom connector" in Claude:
-   step 1 — a name and the server's URL; step 2 — FIZZ asks the server how it wants to be signed in to and
-   pre-selects that (Sign in now / Sign in when needed / No sign-in; register FIZZ automatically or use your
+   step 1 — a name and the server's URL; step 2 — Fizz asks the server how it wants to be signed in to and
+   pre-selects that (Sign in now / Sign in when needed / No sign-in; register Fizz automatically or use your
    own OAuth client; up to four request headers; scope under Advanced). Sign-in happens on the server's own
-   page; the tokens stay on FIZZ's server. Settings → Connections lists them with Reconnect and Remove. */
+   page; the tokens stay on Fizz's server. Settings → Connections lists them with Reconnect and Remove. */
 (function () {
   "use strict";
   const F = window.FIZZ;
@@ -38,7 +38,7 @@
     return dlg;
   }
   const radio = (name, value, label, desc, { checked, detected, disabled } = {}) => `<label class="cc-opt${disabled ? " off" : ""}"><input type="radio" name="${name}" value="${value}" ${checked ? "checked" : ""} ${disabled ? "disabled" : ""}/><span><b>${label}${detected ? ' <span class="cc-badge">Detected</span>' : ""}</b><small>${desc}</small></span></label>`;
-  const WARN = `<p class="cc-warn">Only use connectors from developers you trust. FIZZ doesn't control which tools a server offers and can't verify that they work as intended or won't change.</p>`;
+  const WARN = `<p class="cc-warn">Only use connectors from developers you trust. Fizz doesn't control which tools a server offers and can't verify that they work as intended or won't change.</p>`;
 
   function render() {
     const d = ensure();
@@ -58,15 +58,15 @@
       <div class="cc-head"><b>${esc(st.name || hostOf(st.url))}</b><code>${esc(st.url)}</code></div>
       <fieldset class="cc-group"><legend>Authentication</legend>
         ${radio("auth", "now", "Sign in now", "You sign in through the server's own page before Fizz can use any tools.", { checked: st.auth === "now", detected: det.auth === "oauth" })}
-        ${radio("auth", "needed", "Sign in when needed", "FIZZ connects without signing in first and asks you to sign in only if the server requires it. Pick this for servers that offer some tools without an account.", { checked: st.auth === "needed" })}
+        ${radio("auth", "needed", "Sign in when needed", "Fizz connects without signing in first and asks you to sign in only if the server requires it. Pick this for servers that offer some tools without an account.", { checked: st.auth === "needed" })}
         ${radio("auth", "none", "No sign-in", "For servers with open access, or servers that use an API key instead of OAuth (add it as a request header below).", { checked: st.auth === "none", detected: det.auth === "none" })}
       </fieldset>
       ${oauthOn ? `<fieldset class="cc-group"><legend>OAuth client</legend>
-        ${radio("client", "auto", "Register automatically", "FIZZ registers itself with the server when you sign in (Dynamic Client Registration). Works with most servers.", { checked: st.client === "auto", detected: det.dcr })}
+        ${radio("client", "auto", "Register automatically", "Fizz registers itself with the server when you sign in (Dynamic Client Registration). Works with most servers.", { checked: st.client === "auto", detected: det.dcr })}
         ${radio("client", "own", "Use your own OAuth client", "Enter a client ID you registered with the server yourself. Leave the secret blank unless the server requires one.", { checked: st.client === "own" })}
         ${st.client === "own" ? `<div class="cc-own"><input class="input mono" name="clientId" placeholder="Client ID" value="${esc(st.clientId)}" autocomplete="off" spellcheck="false" /><input class="input mono" type="password" name="clientSecret" placeholder="Client secret (optional)" value="${esc(st.clientSecret)}" autocomplete="off" /><small class="muted-sm">Redirect URL to register: <code>${esc(location.origin)}/api/mcp/oauth-callback</code></small></div>` : ""}
       </fieldset>` : ""}
-      <fieldset class="cc-group"><legend>Request headers</legend><small class="muted-sm">Sent with every request${oauthOn ? " alongside the OAuth token" : ""}. Values are stored securely on FIZZ's server and never shown again. You can add up to four.</small>
+      <fieldset class="cc-group"><legend>Request headers</legend><small class="muted-sm">Sent with every request${oauthOn ? " alongside the OAuth token" : ""}. Values are stored securely on Fizz's server and never shown again. You can add up to four.</small>
         ${st.headers.map(([k, v], i) => `<div class="cc-hdr"><input class="input mono" data-hk="${i}" placeholder="Header name" value="${esc(k)}" autocomplete="off" spellcheck="false" /><input class="input mono" type="password" data-hv="${i}" placeholder="Value" value="${esc(v)}" autocomplete="off" /><button type="button" class="icon-btn" data-cc-del="${i}" aria-label="Remove header">${F.icon("x")}</button></div>`).join("")}
         ${st.headers.length < 4 ? `<button type="button" class="btn btn-outline btn-sm cc-add" data-cc="header">${F.icon("plus")}Add header</button>` : ""}
       </fieldset>
@@ -125,7 +125,7 @@
       clientId: st.client === "own" ? st.clientId.trim() : "", clientSecret: st.client === "own" ? st.clientSecret : "",
       returnTo: location.pathname.replace(/\/$/, "") || "/dev.html",
     });
-    // Off to the server's own sign-in page; it sends the user back to FIZZ when done.
+    // Off to the server's own sign-in page; it sends the user back to Fizz when done.
     location.href = r.authorizeUrl;
   }
 
@@ -166,7 +166,7 @@
     let servers = [], storage = "";
     try { const r = await F.conn.mcp.list(); servers = r.servers || []; storage = r.storage || ""; } catch { return `<p class="muted-sm">Custom connectors are unavailable right now.</p>`; }
     const rows = servers.map((s) => `<div class="conn"><span class="app-ic" aria-hidden="true">${esc((s.name || "M").slice(0, 1).toUpperCase())}</span><div class="conn-body"><b>${esc(s.name)}</b><small class="mono">${esc(s.url)}</small><small class="conn-state">${s.toolCount} tool${s.toolCount === 1 ? "" : "s"} · ${s.auth === "oauth" ? "signed in" : s.auth === "headers" ? "API key / headers" : "no sign-in"}</small></div><div class="row-inline">${s.auth === "oauth" ? `<button type="button" class="btn btn-outline btn-sm" data-cc-reconnect="${esc(s.id)}" data-url="${esc(s.url)}" data-name="${esc(s.name)}">Reconnect</button>` : ""}<button type="button" class="btn btn-outline btn-sm" data-cc-remove="${esc(s.id)}">Remove</button></div></div>`).join("");
-    return `<h3 class="conn-group">Custom connectors</h3><p class="muted-sm">Connect any MCP server by its URL. Fizz uses its tools when you ask; tools that send, post or delete ask you first.</p>${rows}${storage === "vault" ? '<p class="muted-sm">Saved encrypted in this browser. When the site owner connects a database (Neon), they follow you to every device.</p>' : storage === "neon" || storage === "redis" ? '<p class="muted-sm">Saved encrypted on FIZZ\'s server for your account — no limit on how many.</p>' : ""}<button type="button" class="btn btn-outline btn-sm" data-cc-open>${F.icon("plus")}Add custom connector</button>`;
+    return `<h3 class="conn-group">Custom connectors</h3><p class="muted-sm">Connect any MCP server by its URL. Fizz uses its tools when you ask; tools that send, post or delete ask you first.</p>${rows}${storage === "vault" ? '<p class="muted-sm">Saved encrypted in this browser. When the site owner connects a database (Neon), they follow you to every device.</p>' : storage === "neon" || storage === "redis" ? '<p class="muted-sm">Saved encrypted on Fizz\'s server for your account — no limit on how many.</p>' : ""}<button type="button" class="btn btn-outline btn-sm" data-cc-open>${F.icon("plus")}Add custom connector</button>`;
   }
   /** Handles the list's buttons; returns true when it handled the click. */
   async function handleListClick(t, rerender) {

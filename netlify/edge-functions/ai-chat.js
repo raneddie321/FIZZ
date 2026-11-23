@@ -1,4 +1,4 @@
-// FIZZ AI proxy on Netlify. Runs at the edge so long streams aren't cut off; quota in Netlify Blobs.
+// Fizz AI proxy on Netlify. Runs at the edge so long streams aren't cut off; quota in Netlify Blobs.
 import { getStore } from "@netlify/blobs";
 import { handleChat } from "../lib/ai-chat-core.mjs";
 

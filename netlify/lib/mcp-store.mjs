@@ -1,4 +1,4 @@
-// Where FIZZ keeps each user's MCP servers (custom connectors), with no size limit:
+// Where Fizz keeps each user's MCP servers (custom connectors), with no size limit:
 //   • Neon Postgres when the site has a database (DATABASE_URL / POSTGRES_URL): one row per server,
 //     the same on every device the user signs in on.
 //   • Upstash Redis when connected (KV_REST_API_URL/TOKEN).

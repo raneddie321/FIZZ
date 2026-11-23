@@ -1,5 +1,5 @@
 // MCP (Model Context Protocol) servers the user adds in Settings → Connections → MCP servers.
-// FIZZ's server talks to them for the user: it does the handshake, lists their tools and calls them,
+// Fizz's server talks to them for the user: it does the handshake, lists their tools and calls them,
 // so Fizz Code can use any MCP server (Streamable HTTP, or the older HTTP+SSE transport) while the
 // browser never sees the server's Authorization header. The URL and headers come from the user, so
 // every hop is checked against private/internal addresses the same way page reading does.
@@ -50,7 +50,7 @@ export async function validateServer({ url, headers }) {
     if (!/^[A-Za-z0-9-]{1,40}$/.test(key)) throw bad(`"${key.slice(0, 40)}" isn't a valid header name.`);
     if (/[\r\n]/.test(val)) throw bad("Header values can't contain line breaks.");
     if (val.length > 2000) throw bad(`The ${key} header is too long.`);
-    if (["host", "content-length", "content-type", "accept", "connection", "transfer-encoding", "cookie", "proxy-authorization", "proxy-connection", "upgrade", "expect"].includes(key.toLowerCase())) throw bad(`FIZZ sets or blocks the ${key} header itself.`);
+    if (["host", "content-length", "content-type", "accept", "connection", "transfer-encoding", "cookie", "proxy-authorization", "proxy-connection", "upgrade", "expect"].includes(key.toLowerCase())) throw bad(`Fizz sets or blocks the ${key} header itself.`);
     if (val.trim()) out[key] = val;
   }
   return { url: u.href, headers: out };
@@ -259,7 +259,7 @@ const legacyStatus = (s) => [400, 404, 405, 406, 415, 501].includes(s);
 const INIT = () => ({
   protocolVersion: PROTOCOL,
   capabilities: {},
-  clientInfo: { name: "FIZZ DEV", version: "1.0.0", title: "FIZZ" },
+  clientInfo: { name: "Fizz DEV", version: "1.0.0", title: "Fizz" },
 });
 
 /** Opens a session: Streamable HTTP first, the older GET-SSE transport as a fallback. */

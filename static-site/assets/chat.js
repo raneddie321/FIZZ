@@ -1,4 +1,4 @@
-/* FIZZ chat */
+/* Fizz chat */
 (function () {
   "use strict";
   const F = window.FIZZ;
@@ -14,12 +14,12 @@
 
   const state = { id: location.hash.slice(1) || null, archived: false, query: "", pending: [], controller: null, streamingId: null, renaming: null };
   const conv = () => data.conversations.find((c) => c.id === state.id);
-  const modelName = (id) => (MODELS.find((m) => m.id === id)?.chat ?? id ?? "FIZZ");
+  const modelName = (id) => (MODELS.find((m) => m.id === id)?.chat ?? id ?? "Fizz");
   const host = (u) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return u; } };
 
   // ---------- web search in chat ----------
-  // FIZZ asks for the web by writing tags in its reply, e.g. <search>query</search> or <fetch>https://…</fetch>.
-  // FIZZ runs them through the server (/api/web), feeds the results back, and keeps going — the saved
+  // Fizz asks for the web by writing tags in its reply, e.g. <search>query</search> or <fetch>https://…</fetch>.
+  // Fizz runs them through the server (/api/web), feeds the results back, and keeps going — the saved
   // conversation only keeps the question and the final answer.
   const TOOL_TAG_RE = /<(search|fetch)>([\s\S]*?)<\/\1>/g;
   const webTools = () => Boolean(F.serverStatusCached?.()?.tools?.search);
@@ -107,14 +107,14 @@
     }
     let body;
     if (m.error) body = `<div class="notice ${m.noKey ? "warn" : ""}"><span>${esc(m.error)}</span>${m.noKey ? `<button class="btn btn-sm" data-open-settings="ai">Open AI settings</button>` : isLast ? `<button class="btn btn-outline btn-sm" data-regen>Retry</button>` : ""}</div>`;
-    else if (!m.content) body = `<span class="dots" aria-label="FIZZ is writing"><i></i><i></i><i></i></span>`;
+    else if (!m.content) body = `<span class="dots" aria-label="Fizz is writing"><i></i><i></i><i></i></span>`;
     else body = `<div class="md">${F.markdown(stripTools(m.content))}</div>`;
     if (m.interrupted) body += `<div class="notice">This response was interrupted when the tab was closed or suspended. The saved partial answer is above; retry to continue.</div>`;
-    // While FIZZ is searching or reading pages, say exactly what it's doing.
+    // While Fizz is searching or reading pages, say exactly what it's doing.
     const working = m.pending && (m.working || []).length
       ? `<div class="m-working">${icon("globe")}<span>${m.working.map((w) => esc(w)).join(" · ")}</span></div>`
       : "";
-    const actions = m.pending ? "" : `<div class="m-actions">${m.content ? `<button data-copy="${i}">Copy</button>` : ""}${isLast && !m.error ? `<button data-regen>Regenerate</button>` : ""}${m.content && /```/.test(m.content) && !m.pending ? `<button data-build="${i}" title="Open this in FIZZ DEV">Build in FIZZ DEV</button>` : ""}<span>${t} · ${modelName(m.model)}</span>${m.stopped ? "<span>· Stopped</span>" : ""}</div>`;
+    const actions = m.pending ? "" : `<div class="m-actions">${m.content ? `<button data-copy="${i}">Copy</button>` : ""}${isLast && !m.error ? `<button data-regen>Regenerate</button>` : ""}${m.content && /```/.test(m.content) && !m.pending ? `<button data-build="${i}" title="Open this in Fizz DEV">Build in Fizz DEV</button>` : ""}<span>${t} · ${modelName(m.model)}</span>${m.stopped ? "<span>· Stopped</span>" : ""}</div>`;
     return `<div class="m-ai">${F.MARK(false)}<div class="content">${working}${body}${actions}</div></div>`;
   }
 
@@ -124,10 +124,10 @@
     if (!c || !c.messages.length) {
       const first = user.name.split(" ")[0];
       th.innerHTML = `<div class="welcome"><div><h1>How can I help${user.guest ? "" : `, ${esc(first)}`}?</h1></div></div>`;
-      setTitle("FIZZ");
+      setTitle("Fizz");
       return;
     }
-    setTitle(`${c.title} · FIZZ`);
+    setTitle(`${c.title} · Fizz`);
     const sc = $("#scroll");
     const atBottom = sc.scrollHeight - sc.scrollTop - sc.clientHeight < 120;
     th.innerHTML = c.messages.map((m, i) => msgHtml(m, i, i === c.messages.length - 1)).join("");
@@ -158,7 +158,7 @@
     F.serverStatus().then((st) => {
       const noServer = data.settings.provider === "fizz" && !st.ai?.configured;
       $("#key-notice").innerHTML = missing || noServer
-        ? `<div class="notice warn"><span>${noServer ? "FIZZ AI isn't available on this deployment yet. Connect your own OpenRouter account to start chatting." : "Add your key in Settings → AI to start chatting."}</span><button type="button" class="btn btn-sm" data-open-settings="ai">Open AI settings</button></div>`
+        ? `<div class="notice warn"><span>${noServer ? "Fizz AI isn't available on this deployment yet. Connect your own OpenRouter account to start chatting." : "Add your key in Settings → AI to start chatting."}</span><button type="button" class="btn btn-sm" data-open-settings="ai">Open AI settings</button></div>`
         : "";
     });
   }
@@ -177,7 +177,7 @@
         ]
       : ["Be honest. Never invent facts, sources or links. You cannot browse the web or take actions outside this chat."];
     return [
-      "You are FIZZ, a helpful AI assistant made by RANEDDIE. You help with questions, writing, brainstorming, programming, and analysis of documents and images.",
+      "You are Fizz, a helpful AI assistant made by RanEddie. You help with questions, writing, brainstorming, programming, and analysis of documents and images.",
       `The user's name is ${user.name}. Today's date is ${new Date().toISOString().slice(0, 10)}.`,
       style,
       "Use GitHub-flavored Markdown when it helps: headings for long answers, lists, tables and fenced code blocks with a language.",
@@ -236,7 +236,7 @@
     // The answer is written in the cloud when it can, so it keeps going if the page is closed or the phone locks.
     if (await cloudChat(c, reply)) return;
     const search = webTools();
-    // Tool rounds stay in this request only — the saved chat keeps the question and FIZZ's answer.
+    // Tool rounds stay in this request only — the saved chat keeps the question and Fizz's answer.
     const msgs = c.messages.slice(0, -1);
     let last = 0, usedCalls = 0;
     try {
@@ -257,10 +257,10 @@
           },
         });
         reply.content = r.text;
-        if (r.stop === "refusal" && !r.text) reply.error = "FIZZ can't help with that request.";
+        if (r.stop === "refusal" && !r.text) reply.error = "Fizz can't help with that request.";
         if (r.stop === "max_tokens") reply.content += "\n\n*The response reached its maximum length.*";
         if (reply.error || !search || state.controller.signal.aborted || round === MAX_TOOL_ROUNDS) break;
-        // Did FIZZ ask for the web? Give it the results and let it answer for real.
+        // Did Fizz ask for the web? Give it the results and let it answer for real.
         const pending = [...reply.content.matchAll(TOOL_TAG_RE)].filter((m) => m[2].trim() && (m[1] === "search" || /^https?:\/\//i.test(m[2].trim())));
         if (!pending.length || usedCalls >= MAX_TOOL_CALLS) break;
         reply.working = [];
@@ -276,7 +276,7 @@
       }
     } catch (e) {
       if (e.name === "AbortError") reply.stopped = true;
-      else if (e.message === "NO_KEY") Object.assign(reply, { error: "Add your API key in Settings → AI, or switch to FIZZ AI.", noKey: true });
+      else if (e.message === "NO_KEY") Object.assign(reply, { error: "Add your API key in Settings → AI, or switch to Fizz AI.", noKey: true });
       else Object.assign(reply, { error: e.message, noKey: e.status === 404 || e.status === 503 || e.status === 429 });
     } finally {
       reply.pending = false;
@@ -297,7 +297,7 @@
     }
   }
 
-  // ---------- answers written in the cloud (the same runner as FIZZ DEV, in "chat" mode) ----------
+  // ---------- answers written in the cloud (the same runner as Fizz DEV, in "chat" mode) ----------
   const following = new Set();
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   async function cloudChat(c, reply) {
@@ -431,7 +431,7 @@
     catch (err) {
       if (draft && !input.value) input.value = draft;
       grow();
-      console.error("[FIZZ] Couldn't send message", err);
+      console.error("[Fizz] Couldn't send message", err);
       F.toast(`Couldn't send message: ${err?.message || "unexpected error"}`);
     }
   });
@@ -457,7 +457,7 @@
     F.modelPicker.show(e.currentTarget, { data, save, product: "chat", openSettings, onChange: renderComposer });
   });
   $("#me-btn").addEventListener("click", async (e) => {
-    const k = await menu(e.currentTarget, [...F.rid.menuHead(user), { k: "settings", html: "Settings" }, { k: "dev", html: "Switch to FIZZ DEV <small>Ctrl+.</small>" }, { k: "help", html: "Help & support" }, ...F.rid.menuTail(user)]);
+    const k = await menu(e.currentTarget, [...F.rid.menuHead(user), { k: "settings", html: "Settings" }, { k: "dev", html: "Switch to Fizz DEV <small>Ctrl+.</small>" }, { k: "help", html: "Help & support" }, ...F.rid.menuTail(user)]);
     F.rid.onMenu(k);
     if (k === "settings") openSettings();
     if (k === "dev") F.app.switch("dev");
@@ -470,7 +470,7 @@
       const c = data.conversations.find((x) => x.id === mb.dataset.menu);
       const k = await menu(mb, [{ k: "rename", html: "Rename" }, { k: "export", html: "Export as Markdown" }, { k: "archive", html: c.archived ? "Unarchive" : "Archive" }, "-", { k: "delete", html: "Delete", danger: true }]);
       if (k === "rename") { state.renaming = c.id; renderSide(); }
-      if (k === "export") F.download(`${(c.title || "chat").replace(/[^\w-]+/g, "-").slice(0, 60)}.md`, [`# ${c.title || "FIZZ chat"}`, ...c.messages.map((m) => `## ${m.role === "user" ? "You" : "FIZZ"}\n\n${m.content || ""}`)].join("\n\n") + "\n");
+      if (k === "export") F.download(`${(c.title || "chat").replace(/[^\w-]+/g, "-").slice(0, 60)}.md`, [`# ${c.title || "Fizz chat"}`, ...c.messages.map((m) => `## ${m.role === "user" ? "You" : "Fizz"}\n\n${m.content || ""}`)].join("\n\n") + "\n");
       if (k === "archive") { c.archived = !c.archived; save(); if (c.id === state.id && c.archived) newChat(); else renderSide(); F.toast(c.archived ? "Conversation archived" : "Conversation restored"); }
       if (k === "delete" && (await confirmDlg("Delete conversation?", `"${c.title}" will be permanently deleted.`))) {
         data.conversations = data.conversations.filter((x) => x.id !== c.id);

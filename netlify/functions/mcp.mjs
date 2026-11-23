@@ -128,7 +128,7 @@ export default async (req, context) => {
       return json({ auth: d.auth, dcr: Boolean(d.dcr), cimd: Boolean(d.cimd), scopes: d.scopes || [], status: d.status || null });
     }
 
-    // Sign in now: register FIZZ with the server (or use the user's client), then send the user to sign in.
+    // Sign in now: register Fizz with the server (or use the user's client), then send the user to sign in.
     if (action === "oauth-start") {
       const cfg = await validateServer({ url: body.url, headers: body.headers });
       active = cfg;
@@ -167,7 +167,7 @@ export default async (req, context) => {
       const s = pick(body.id);
       if (!s) return fail(404, "That MCP server isn't connected.", "not_found");
       const name = String(body.tool || "").trim();
-      if (!name || name.length > 120) return fail(400, "Which tool should FIZZ call?", "bad_tool");
+      if (!name || name.length > 120) return fail(400, "Which tool should Fizz call?", "bad_tool");
       let args = body.arguments;
       if (args !== undefined && args !== null && typeof args !== "object") return fail(400, "The arguments must be JSON.", "bad_arguments");
       try {

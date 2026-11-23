@@ -151,7 +151,7 @@
   }
 - Save data only, never UI or status fields. Version the key; when the shape changes, read the old key, convert it
   and save under the new one instead of throwing the user's data away.
-- In the FIZZ preview, localStorage and sessionStorage work (FIZZ provides them and keeps the data per project).
+- In the Fizz preview, localStorage and sessionStorage work (Fizz provides them and keeps the data per project).
   IndexedDB, downloads, camera, microphone, location, notifications and clipboard may be blocked in the preview
   frame. Catch those errors and keep working (in memory, with a clear message); they work when the app runs on its
   own (published, exported or built). Never remove the try/catch.
@@ -330,7 +330,7 @@
 - Usage: await db.put("notes", note); const notes = await db.getAll("notes"); await db.delete("notes", id).
 - Never await anything else (fetch, timers) in the middle of a transaction: it auto-commits and later requests fail.
 - New stores or indexes: raise DB_VERSION and add them in onupgradeneeded behind objectStoreNames.contains checks.
-- If indexedDB.open throws (it does in the FIZZ preview frame, and with disabled storage) the promise rejects: catch
+- If indexedDB.open throws (it does in the Fizz preview frame, and with disabled storage) the promise rejects: catch
   it in main.js and fall back to localStorage (small data) or memory, with "Changes won't be saved in this window".
 
 ## Files and blobs
@@ -670,7 +670,7 @@
     text: `
 ## Ground rules
 - Feature-detect every API and design a fallback; most need a user gesture (a click) and a secure (https) page.
-- The FIZZ preview frame is sandboxed: camera, microphone, location, notifications, clipboard and downloads may be
+- The Fizz preview frame is sandboxed: camera, microphone, location, notifications, clipboard and downloads may be
   refused there. Handle the error with a clear message; tell the user these work when the app runs on its own.
 - In the preview, images and sounds referenced only from JS (img.src = "assets/x.png", new Audio("sfx/hit.mp3"))
   don't resolve. Put them in the HTML, or load them through fetch, which works for project files:
@@ -1400,7 +1400,7 @@ a menu / playing / paused / gameover state machine, keyboard and touch input, ge
 
 ## Web workers for heavy computation
 - Normal hosting and Vite: new Worker(new URL("./worker.js", import.meta.url), { type: "module" }).
-- In the FIZZ preview, project modules are served as data: URLs, so a worker file from the project may not load.
+- In the Fizz preview, project modules are served as data: URLs, so a worker file from the project may not load.
   The safe pattern everywhere is an inline worker built from a self-contained function:
   // js/worker-client.js
   function workerMain() {                        // runs inside the worker: no imports, no outer variables, no DOM

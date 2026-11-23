@@ -1,4 +1,4 @@
-// FIZZ's own cloud browser: Chromium in the user's Vercel Sandbox (no Browserbase account needed).
+// Fizz's own cloud browser: Chromium in the user's Vercel Sandbox (no Browserbase account needed).
 // The agent (browser-agent.js) runs next to Chromium and only answers requests with the user's token,
 // which is derived from FIZZ_SECRET and the user id, so nothing has to be stored.
 import { createHash, createHmac } from "node:crypto";

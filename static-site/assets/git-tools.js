@@ -92,7 +92,7 @@
           if (!p.git.lastSha) return { ok: false, text: "Commit to the branch first, then open the pull request." };
           const existing = (await gh().prs(p.git.owner, p.git.repo, { head: p.git.branch }).catch(() => ({ prs: [] }))).prs[0];
           if (existing) return { ok: true, text: `There's already an open PR for ${p.git.branch}: #${existing.number} ${existing.url}. New commits on the branch update it.` };
-          const r = await gh().prCreate({ owner: p.git.owner, repo: p.git.repo, head: p.git.branch, base, title: t.attrs.title || "Changes from FIZZ DEV", body: `${t.body || ""}\n\n— Opened by Fizz Code in FIZZ DEV`, draft: t.attrs.draft === "true" });
+          const r = await gh().prCreate({ owner: p.git.owner, repo: p.git.repo, head: p.git.branch, base, title: t.attrs.title || "Changes from Fizz DEV", body: `${t.body || ""}\n\n— Opened by Fizz Code in Fizz DEV`, draft: t.attrs.draft === "true" });
           p.git = { ...p.git, pr: r.pr.number };
           ctx.save();
           return { ok: true, text: `Opened PR #${r.pr.number}: ${r.pr.url}. Check it with <fizz-git action="pr-status" number="${r.pr.number}"/> once CI has had a minute.`, html: `<div class="web-read"><a href="${esc(r.pr.url)}" target="_blank" rel="noopener">Pull request #${r.pr.number}: ${esc(r.pr.title)}</a></div>` };
@@ -104,7 +104,7 @@
         }
         if (a === "reply") {
           const n = t.attrs.number || p.git.pr;
-          const r = await gh().prReply({ owner: p.git.owner, repo: p.git.repo, number: n, commentId: t.attrs.comment || undefined, body: `${t.body}\n\n— Fizz Code (FIZZ DEV)` });
+          const r = await gh().prReply({ owner: p.git.owner, repo: p.git.repo, number: n, commentId: t.attrs.comment || undefined, body: `${t.body}\n\n— Fizz Code (Fizz DEV)` });
           return { ok: true, text: `Replied: ${r.url}` };
         }
         if (a === "rerun") { await gh().rerun(p.git.owner, p.git.repo, t.attrs.run); return { ok: true, text: "Re-running the failed jobs. Check again in a minute or two." }; }

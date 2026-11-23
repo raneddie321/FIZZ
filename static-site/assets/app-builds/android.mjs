@@ -1,4 +1,4 @@
-// FIZZ DEV: turns this web project into an Android project (Capacitor) in .fizz-build/.
+// Fizz DEV: turns this web project into an Android project (Capacitor) in .fizz-build/.
 // GitHub Actions then builds it with Gradle into an APK and an AAB.
 import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";

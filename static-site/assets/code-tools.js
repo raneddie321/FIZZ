@@ -91,7 +91,7 @@
       if (!pattern.trim()) return { ok: false, text: "Give a pattern to search for: <fizz-grep pattern=\"…\"/>." };
       const max = Math.min(200, Math.max(1, Number(t.attrs.max) || 80));
       if (remote(ctx.project())) {
-        // Files changed in FIZZ but not yet run in the sandbox are searched here; the rest with git grep there.
+        // Files changed in Fizz but not yet run in the sandbox are searched here; the rest with git grep there.
         const r = await look(ctx.project(), { kind: "grep", pattern, path: clean(t.attrs.path), glob: t.attrs.glob || "", ignoreCase: t.attrs["ignore-case"] === "true", max });
         if (r.error) return { ok: false, text: `The search failed: ${r.error}` };
         const local = C.grepFiles(ctx.project().files, { pattern, path: clean(t.attrs.path), glob: t.attrs.glob || "", ignoreCase: t.attrs["ignore-case"] === "true", max, skip: (p, text) => isBin(text) || SECRET.test(p) });

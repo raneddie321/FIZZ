@@ -1,4 +1,4 @@
-// FIZZ DEV's cloud runner: Fizz Code's loop, running in the user's cloud sandbox so a task keeps going after the
+// Fizz DEV's cloud runner: Fizz Code's loop, running in the user's cloud sandbox so a task keeps going after the
 // page is closed or the phone locks. Started by api/sandbox (action "agent-start") as `node agent-runner.mjs <dir>`.
 //
 // It does what it can on its own — writes files, runs commands, searches the web, reads pages, looks through the
@@ -6,7 +6,7 @@
 // connected app, the cloud browser, pushing, a question for the user) or that needs the user's OK stops the run as a
 // "handoff": the page picks up from exactly that point when it's open again, with its own permission gate.
 //
-// It never holds the user's keys: model calls and web searches go through FIZZ with a short-lived run token that only
+// It never holds the user's keys: model calls and web searches go through Fizz with a short-lived run token that only
 // allows those two things.
 import { readFile, writeFile, rename, mkdir, access } from "node:fs/promises";
 import { spawn } from "node:child_process";
@@ -39,7 +39,7 @@ async function save() {
 }
 const stopped = async () => { try { await access(join(DIR, "stop")); return true; } catch { return false; } };
 
-// ---------- the model, through FIZZ ----------
+// ---------- the model, through Fizz ----------
 async function callModel(messages, onText) {
   const res = await fetch(`${input.origin}/api/ai/chat`, {
     method: "POST",
@@ -101,7 +101,7 @@ function allowed(t) {
 async function web(path) {
   const res = await fetch(`${input.origin}${path}`, { headers: { "x-fizz-run": input.token } });
   const j = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(j.error?.message || `FIZZ returned ${res.status}.`);
+  if (!res.ok) throw new Error(j.error?.message || `Fizz returned ${res.status}.`);
   return j;
 }
 
@@ -270,7 +270,7 @@ async function applyReply(reply, parsed) {
   return errors;
 }
 
-// ---------- FIZZ chat: one answer, with up to 3 rounds of web searches and page reads ----------
+// ---------- Fizz chat: one answer, with up to 3 rounds of web searches and page reads ----------
 async function chatRun() {
   const TAG = /<(search|fetch)>([\s\S]*?)<\/\1>/g;
   const reply = { id: input.replyId || uid(), role: "assistant", content: "", pending: true, model: input.modelLabel || "", at: Date.now(), working: [] };

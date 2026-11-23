@@ -1,8 +1,8 @@
 /* Fizz Code and WhatsApp: a message the user sends from their own WhatsApp.
      <fizz-whatsapp to="+972501234567" name="Barber Shop">Hi, …</fizz-whatsapp>
-   WhatsApp has no way for a website to send from someone's personal account, so FIZZ prepares the message and shows a
+   WhatsApp has no way for a website to send from someone's personal account, so Fizz prepares the message and shows a
    "Send in WhatsApp" button (wa.me): it opens the chat with the text filled in, and the user presses Send. Nothing is
-   sent by FIZZ itself. */
+   sent by Fizz itself. */
 (function () {
   "use strict";
   const F = window.FIZZ;
@@ -25,7 +25,7 @@
     summary: (k) => `prepared ${k} WhatsApp message${k === 1 ? "" : "s"}`,
     prompt: [
       '<fizz-whatsapp to="+972501234567" name="who it is">the message</fizz-whatsapp> prepares a WhatsApp message from the user\'s own WhatsApp:',
-      'FIZZ shows a "Send in WhatsApp" button that opens the chat with your text filled in, and the user presses Send. You cannot send it yourself.',
+      'Fizz shows a "Send in WhatsApp" button that opens the chat with your text filled in, and the user presses Send. You cannot send it yourself.',
       "One tag per recipient. Use the number with its country code. Write in the recipient's language, as the user, short and polite.",
       "Finding businesses to contact (e.g. barbershops in a city): search with <fizz-search>, read their pages or listings with <fizz-fetch>, and use only phone numbers and emails you actually found — never guess one.",
       "Show the user the list (name, phone or email, where you found it) and the message, and prepare messages only for the people they asked for: no mass messaging to people who didn't ask to hear from them.",

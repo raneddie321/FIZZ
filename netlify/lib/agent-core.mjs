@@ -1,4 +1,4 @@
-// FIZZ agent core: the parts of Fizz Code's agent that don't need a page — reading tool tags out of a reply,
+// Fizz agent core: the parts of Fizz Code's agent that don't need a page — reading tool tags out of a reply,
 // working out what a message wants, deciding whether an action is allowed, and deciding what the loop does next.
 // The browser gets the same code as static-site/assets/agent-core.js (run `node scripts/build-agent-core.mjs`
 // after editing); the server will run it for automation. Keep it free of imports, DOM and Node APIs.
@@ -272,7 +272,7 @@ export const SUMMARY_SYSTEM = [
 
 /** The older messages as a transcript for the summariser, within a size the model can read. */
 export function summaryTranscript(messages, { proseOf = (m) => m.content, maxChars = 120_000, files = [] } = {}) {
-  const who = (m) => (m.summary ? "EARLIER SUMMARY" : m.role === "user" ? (m.auto ? "TOOL RESULTS" : "USER") : "FIZZ CODE");
+  const who = (m) => (m.summary ? "EARLIER SUMMARY" : m.role === "user" ? (m.auto ? "TOOL RESULTS" : "USER") : "Fizz CODE");
   const body = (messages || []).map((m) => `${who(m)}: ${String(proseOf(m) || m.content || "")}`.slice(0, 6000)).join("\n\n");
   const list = files.length ? `\n\nFILES CHANGED IN THESE MESSAGES: ${[...new Set(files)].slice(0, 80).join(", ")}` : "";
   // The start (the goal) and the end (where things stand) matter most.
@@ -450,7 +450,7 @@ export function ignoreMatcher(text) {
   };
 }
 
-// ---------------- replies: files, edits, plans (shared by FIZZ DEV and the cloud runner) ----------------
+// ---------------- replies: files, edits, plans (shared by Fizz DEV and the cloud runner) ----------------
 const FILE_TAG_RE = /<fizz-file path="([^"]+)">\n?([\s\S]*?)(<\/fizz-file>|$)/g;
 const EDIT_TAG_RE = /<fizz-edit path="([^"]+)">\n?([\s\S]*?)(<\/fizz-edit>|$)/g;
 const HUNK_TAG_RE = /<{5,7} SEARCH\n([\s\S]*?)\n?={5,7}\n([\s\S]*?)\n?>{5,7} REPLACE/g;

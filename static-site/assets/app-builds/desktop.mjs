@@ -1,4 +1,4 @@
-// FIZZ DEV: turns this web project into a desktop app (Electron) in .fizz-build/.
+// Fizz DEV: turns this web project into a desktop app (Electron) in .fizz-build/.
 // GitHub Actions builds it on Windows (.exe installer), macOS (.dmg) and Linux (.AppImage).
 import { cpSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -13,7 +13,7 @@ if (icon) cpSync(icon, join(out, "icon.png"));
 const pkgName = cfg.appId.split(".").pop().toLowerCase().replace(/[^a-z0-9-]/g, "-") || "fizz-app";
 writeFileSync(join(out, "package.json"), JSON.stringify({
   name: pkgName, desktopName: `${pkgName}.desktop`,
-  productName: cfg.name, version: cfg.version, description: cfg.name, author: cfg.author || "FIZZ DEV", main: "main.js", private: true,
+  productName: cfg.name, version: cfg.version, description: cfg.name, author: cfg.author || "Fizz DEV", main: "main.js", private: true,
   devDependencies: { electron: "44.5.0", "electron-builder": "26.17.0" },
   build: {
     appId: cfg.appId, productName: cfg.name, directories: { output: "dist" }, files: ["main.js", "app/**/*"],

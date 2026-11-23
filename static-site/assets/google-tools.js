@@ -185,7 +185,7 @@
         const path = String(a.path || "").replace(/^\.?\/+/, "");
         const v = ctx.project().files[path];
         if (v === undefined) return { ok: false, text: `There's no file ${path} in the project.` };
-        if (/(^|\/)\.env/.test(path)) return { ok: false, text: "FIZZ doesn't upload .env files (they hold secrets)." };
+        if (/(^|\/)\.env/.test(path)) return { ok: false, text: "Fizz doesn't upload .env files (they hold secrets)." };
         const blob = typeof v === "string" && v.startsWith("\u0000blob:") ? await (await fetch(await F.blobs.url(v))).blob() : new Blob([v], { type: "text/plain" });
         const boundary = "fizz" + Math.random().toString(36).slice(2);
         const body = new Blob([`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({ name: a.name || path.split("/").pop() })}\r\n--${boundary}\r\nContent-Type: ${blob.type || "application/octet-stream"}\r\n\r\n`, blob, `\r\n--${boundary}--`]);
@@ -319,7 +319,7 @@
       '  contacts: search q="dana"',
       '  forms: use app="api" with the Forms API (https://forms.googleapis.com/v1/forms, …/forms/ID/responses).',
       '  api: get|post|patch|put|delete url="https://….googleapis.com/…">JSON body — ANY other Google API the user allowed (Forms, Search Console, Analytics, People, Photos, Keep, Blogger, …). Use it whenever the apps above don\'t cover the task; never say you can\'t reach a Google product before trying it. get runs at once; changes wait for the user\'s OK.',
-      '    Add product="…" for products outside the first connect, so FIZZ asks Google for that permission first: classroom (classroom.googleapis.com/v1/courses…), play (androidpublisher.googleapis.com — Google Play Console: apps, reviews, releases), bigquery (bigquery.googleapis.com), storage (storage.googleapis.com), search (cloudsearch.googleapis.com), cloud (any other Google Cloud API: Cloud SQL, Logging, Monitoring…).',
+      '    Add product="…" for products outside the first connect, so Fizz asks Google for that permission first: classroom (classroom.googleapis.com/v1/courses…), play (androidpublisher.googleapis.com — Google Play Console: apps, reviews, releases), bigquery (bigquery.googleapis.com), storage (storage.googleapis.com), search (cloudsearch.googleapis.com), cloud (any other Google Cloud API: Cloud SQL, Logging, Monitoring…).',
       '    Available on this site: Gmail, Calendar, Docs, Sheets, Slides, Drive, Forms, YouTube, Classroom, Google Play Console, BigQuery, Cloud Storage, Cloud SQL, Cloud Search, Logging, Monitoring.',
       '  Before listing what you can do in Google, look at the GOOGLE ACCESS line (the scopes the user actually granted) and describe all of them, not just the apps above.',
       '  youtube: list (the user\'s latest videos, q="…") · upload path="videos/clip.mp4" (a project file) or drive="Drive file id/link" title="…" tags="a,b,c" privacy="private|unlisted|public">description · update id="…" title="…" privacy="…" tags="…">description. Upload waits for the user\'s OK; default privacy is private.',

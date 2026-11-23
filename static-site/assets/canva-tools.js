@@ -59,7 +59,7 @@
         if (a.action === "create") {
           const w = Number(a.width), h = Number(a.height);
           const design_type = w && h ? { type: "custom", width: Math.round(w), height: Math.round(h) } : { type: "preset", name: ["presentation", "doc", "whiteboard"].includes(a.type) ? a.type : "presentation" };
-          const d = await call({ method: "POST", path: "/designs", body: { design_type, title: String(a.title || "From FIZZ").slice(0, 255) } });
+          const d = await call({ method: "POST", path: "/designs", body: { design_type, title: String(a.title || "From Fizz").slice(0, 255) } });
           const design = d.design || d;
           return { ok: true, text: `Created: ${fmtDesign(design)}`, html: design.urls?.edit_url ? `<div class="web-read"><a href="${esc(design.urls.edit_url)}" target="_blank" rel="noopener">Open “${esc(design.title || "the design")}” in Canva</a></div>` : "" };
         }

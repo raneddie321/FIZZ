@@ -1,4 +1,4 @@
-// Runs the FIZZ server functions on Vercel. Vercel routes by file path (api/...), so the
+// Runs the Fizz server functions on Vercel. Vercel routes by file path (api/...), so the
 // path parameters that Netlify passes in `context.params` are read from the URL here.
 export function route(handler, names) {
   const run = (req) => {
@@ -15,5 +15,5 @@ export function clientIp(req) {
   return (req.headers.get("x-real-ip") || req.headers.get("x-forwarded-for")?.split(",")[0] || "").trim() || null;
 }
 
-// Daily quota counter for the FIZZ AI proxy (Upstash Redis when connected, else per-instance memory).
+// Daily quota counter for the Fizz AI proxy (Upstash Redis when connected, else per-instance memory).
 export { quotaCounter } from "./kv.mjs";

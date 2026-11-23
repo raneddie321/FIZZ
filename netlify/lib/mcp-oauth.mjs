@@ -1,7 +1,7 @@
 // Signing in to MCP servers with OAuth, the way the MCP authorization spec describes it:
 //   1. discover: an unauthenticated initialize → 401 + WWW-Authenticate → protected-resource metadata
 //      (RFC 9728) → authorization-server metadata (RFC 8414 / OpenID) — endpoints, scopes, registration.
-//   2. register the FIZZ client automatically (Dynamic Client Registration, RFC 7591) unless the user
+//   2. register the Fizz client automatically (Dynamic Client Registration, RFC 7591) unless the user
 //      brought their own client ID.
 //   3. authorization code + PKCE (S256), with the MCP server named as the resource (RFC 8707).
 //   4. tokens kept server-side with the rest of the connector; refreshed before they expire.
@@ -32,7 +32,7 @@ const param = (header, name) => new RegExp(`${name}\\s*=\\s*"([^"]*)"`, "i").exe
  * { auth: "oauth", dcr, cimd, scopes, issuer, authorizationEndpoint, tokenEndpoint, registrationEndpoint }.
  */
 export async function discover(url) {
-  const init = { jsonrpc: "2.0", id: 0, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "FIZZ DEV", version: "1.0" } } };
+  const init = { jsonrpc: "2.0", id: 0, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "Fizz DEV", version: "1.0" } } };
   const res = await send(url, { method: "POST", headers: { Accept: "application/json, text/event-stream", "Content-Type": "application/json", "User-Agent": "FIZZ-DEV/1.0" }, body: JSON.stringify(init) }, MS);
   const www = res.headers.get("www-authenticate") || "";
   res.body?.cancel?.().catch(() => {});
@@ -64,16 +64,16 @@ export async function discover(url) {
   };
 }
 
-/** Dynamic Client Registration: FIZZ registers itself as a public client with this server. */
+/** Dynamic Client Registration: Fizz registers itself as a public client with this server. */
 export async function register(meta, redirectUri) {
   if (!meta.registrationEndpoint) throw bad("This server doesn't allow automatic registration. Choose “Use your own OAuth client” and enter a client ID you registered with it.", 400, "no_dcr");
   const res = await send(meta.registrationEndpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json", "User-Agent": "FIZZ-DEV/1.0" },
-    body: JSON.stringify({ client_name: "FIZZ DEV", redirect_uris: [redirectUri], grant_types: ["authorization_code", "refresh_token"], response_types: ["code"], token_endpoint_auth_method: "none", ...(meta.scopes.length ? { scope: meta.scopes.join(" ") } : {}) }),
+    body: JSON.stringify({ client_name: "Fizz DEV", redirect_uris: [redirectUri], grant_types: ["authorization_code", "refresh_token"], response_types: ["code"], token_endpoint_auth_method: "none", ...(meta.scopes.length ? { scope: meta.scopes.join(" ") } : {}) }),
   }, MS);
   const j = await res.json().catch(() => null);
-  if (!res.ok || !j?.client_id) throw bad(`The server didn't accept FIZZ's registration${j?.error_description ? `: ${String(j.error_description).slice(0, 200)}` : ` (${res.status})`}.`, 502, "dcr_failed");
+  if (!res.ok || !j?.client_id) throw bad(`The server didn't accept Fizz's registration${j?.error_description ? `: ${String(j.error_description).slice(0, 200)}` : ` (${res.status})`}.`, 502, "dcr_failed");
   return { clientId: j.client_id, clientSecret: j.client_secret || "", authMethod: j.token_endpoint_auth_method || (j.client_secret ? "client_secret_post" : "none") };
 }
 

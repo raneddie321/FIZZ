@@ -22,7 +22,7 @@
 
   /**
    * Renders a page in a hidden, sandboxed frame and captures it with html-to-image (inside the frame, so the
-   * project's code never runs with FIZZ's origin). mode "viewport" → one image; "pages" → one per page.
+   * project's code never runs with Fizz's origin). mode "viewport" → one image; "pages" → one per page.
    */
   async function capture(html, { width = 794, height = 1123, mode = "pages", scale = 2, quality = 0.92, frame = null } = {}) {
     const own = !frame;

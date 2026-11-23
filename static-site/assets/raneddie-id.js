@@ -1,6 +1,6 @@
 /* RanEddie ID (Clerk) in the browser: loads clerk-js, keeps the signed-in user in sync with this
-   page, and saves a few small FIZZ settings to the account (privateMetadata.fizz, via /api/account).
-   Signing in is optional: without it FIZZ works as a guest. */
+   page, and saves a few small Fizz settings to the account (privateMetadata.fizz, via /api/account).
+   Signing in is optional: without it Fizz works as a guest. */
 (function () {
   "use strict";
   const F = window.FIZZ;
@@ -39,7 +39,7 @@
     return loading;
   }
 
-  /** The small, non-secret profile FIZZ keeps in localStorage so pages can render before Clerk loads. */
+  /** The small, non-secret profile Fizz keeps in localStorage so pages can render before Clerk loads. */
   function profile(u) {
     if (!u) return null;
     const email = u.primaryEmailAddress?.emailAddress || "";
@@ -131,11 +131,11 @@
     window.dispatchEvent(new CustomEvent("fizz:settings"));
   }
 
-  // Every save in FIZZ / FIZZ DEV also queues the small settings for the account (only if they changed).
+  // Every save in Fizz / Fizz DEV also queues the small settings for the account (only if they changed).
   const saveData = F.saveData;
   F.saveData = (user, data) => { const r = saveData(user, data); queuePush(user, data); return r; };
 
-  // ---------- account UI shared by FIZZ and FIZZ DEV ----------
+  // ---------- account UI shared by Fizz and Fizz DEV ----------
   const INVITE_KEY = "fizz.rid.inviteHidden";
   const initials = (n) => String(n || "?").split(/\s+/).map((x) => x[0]).slice(0, 2).join("").toUpperCase();
   /** Fills the sidebar account button and shows a gentle sign-in invite to guests. */
@@ -151,7 +151,7 @@
     const hiddenAt = F.store.get(INVITE_KEY, 0);
     if (!user.rid && !user.guest && foot && Date.now() - hiddenAt > 14 * 86400000) {
       foot.insertAdjacentHTML("beforebegin", `<div class="rid-invite"><button type="button" class="x" data-rid-hide aria-label="Hide">${F.icon("x")}</button>
-        <p><b>Keep your settings everywhere</b>Sign in with your RanEddie ID — one account for FIZZ and RanEddie games. Your chats and projects stay in this browser.</p>
+        <p><b>Keep your settings everywhere</b>Sign in with your RanEddie ID — one account for Fizz and RanEddie games. Your chats and projects stay in this browser.</p>
         <a class="btn btn-sm rid-signin-btn" href="${F.esc(F.auth.url())}"><img src="assets/raneddie-logo.png" alt="" />Sign in with RanEddie ID</a></div>`);
       root.querySelector("[data-rid-hide]").onclick = () => { F.store.set(INVITE_KEY, Date.now()); root.querySelector(".rid-invite")?.remove(); };
     }
@@ -167,7 +167,7 @@
     if (k === "signout") F.auth.signOut();
   }
 
-  /** The RanEddie ID session token for FIZZ's own API (null when signed out or RanEddie ID is off). */
+  /** The RanEddie ID session token for Fizz's own API (null when signed out or RanEddie ID is off). */
   async function token() {
     try { const clerk = await load(); return (await clerk?.session?.getToken()) || null; } catch { return null; }
   }

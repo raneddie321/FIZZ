@@ -3,7 +3,7 @@ import { env } from "./util.mjs";
 
 // OAuth providers handled on the server. Google uses Google Identity Services in the
 // browser (client ID only), so it is not listed here.
-/** What FIZZ asks Canva for: the profile, designs (list, create, export) and uploads. Tick the same scopes in the Canva Developer Portal. */
+/** What Fizz asks Canva for: the profile, designs (list, create, export) and uploads. Tick the same scopes in the Canva Developer Portal. */
 export const CANVA_SCOPES = "profile:read design:meta:read design:content:read design:content:write asset:read asset:write";
 // Shopify: each store signs in on its own (the store's address is part of every URL). The Vercel variables may be
 // named SHOPIFY_CLIENT_ID/SECRET or SHOPIFY_CLINET_ID/SECRET (as first typed).

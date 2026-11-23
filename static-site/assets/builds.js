@@ -1,4 +1,4 @@
-/* FIZZ DEV app builds: Android (APK + AAB) and desktop (Windows / macOS / Linux) apps, built by GitHub Actions
+/* Fizz DEV app builds: Android (APK + AAB) and desktop (Windows / macOS / Linux) apps, built by GitHub Actions
    in the user's own repository. Fizz Code adds the build files to the project (.github/workflows and .fizz/),
    pushes with [fizz-android] or [fizz-desktop] in the commit message, and this module follows the run and
    offers the downloads. */
@@ -47,10 +47,10 @@
     if (!T) return { ok: false, text: `Unknown build target "${target}". Use target="android" or target="desktop".` };
     const p = ctx.project();
     const st = await F.conn.status();
-    if (!st.connections?.github?.configured) return { ok: false, text: "GitHub isn't set up on this FIZZ site, so apps can't be built yet. Tell the user the site owner needs to add GitHub (see the README)." };
+    if (!st.connections?.github?.configured) return { ok: false, text: "GitHub isn't set up on this Fizz site, so apps can't be built yet. Tell the user the site owner needs to add GitHub (see the README)." };
     if (!st.connections.github.connected) {
       await ctx.needConnection("github", "GitHub");
-      return { ok: false, text: "The user needs to connect GitHub first (FIZZ asked them). Builds run on GitHub Actions in their repository. Ask them to tell you when it's connected." };
+      return { ok: false, text: "The user needs to connect GitHub first (Fizz asked them). Builds run on GitHub Actions in their repository. Ask them to tell you when it's connected." };
     }
     const hasIndex = Object.keys(p.files).some((f) => /(^|\/)index\.html$/.test(f)) || /"build"\s*:/.test(p.files["package.json"] || "");
     if (!hasIndex) return { ok: false, text: "The project needs an index.html (or a package.json with a build script) before it can become an app." };
@@ -72,7 +72,7 @@
     return {
       ok: true,
       data: { buildId: b.id },
-      text: `The ${T.label} build${attempt > 1 ? ` (attempt ${attempt} of ${MAX_ATTEMPTS})` : ""} started on GitHub Actions in ${b.owner}/${b.repo} (commit ${b.sha.slice(0, 7)}). It usually takes ${T.minutes} minutes. If it fails, FIZZ sends you the error log automatically so you can fix it and build again. The user can follow it and download the files from the build card in this chat${target === "android" ? " (APK to install on a phone, AAB for Google Play)" : " (Windows .exe, macOS .dmg, Linux .AppImage)"}. You don't need to wait for it.`,
+      text: `The ${T.label} build${attempt > 1 ? ` (attempt ${attempt} of ${MAX_ATTEMPTS})` : ""} started on GitHub Actions in ${b.owner}/${b.repo} (commit ${b.sha.slice(0, 7)}). It usually takes ${T.minutes} minutes. If it fails, Fizz sends you the error log automatically so you can fix it and build again. The user can follow it and download the files from the build card in this chat${target === "android" ? " (APK to install on a phone, AAB for Google Play)" : " (Windows .exe, macOS .dmg, Linux .AppImage)"}. You don't need to wait for it.`,
     };
   }
 
@@ -151,7 +151,7 @@
     const text = [
       `[Automatic build fix — attempt ${next} of ${MAX_ATTEMPTS}] The ${T.label} build on GitHub Actions failed${b.url ? ` (${b.url})` : ""}.`,
       parts.join("\n\n") || "GitHub didn't report which job failed.",
-      `Find the root cause in the log and fix it in the project: the app's own files, package.json, .fizz/app.json, or the build files in .fizz/build/ and .github/workflows/${T.workflow} (they are yours to edit — e.g. versions, Gradle or Capacitor settings, icons, the web build output folder). Don't ask the user and don't just explain: make the change, then build again with <fizz-build target="${b.target}"/>. FIZZ keeps sending you the new log until the build passes (at most ${MAX_ATTEMPTS} attempts).`,
+      `Find the root cause in the log and fix it in the project: the app's own files, package.json, .fizz/app.json, or the build files in .fizz/build/ and .github/workflows/${T.workflow} (they are yours to edit — e.g. versions, Gradle or Capacitor settings, icons, the web build output folder). Don't ask the user and don't just explain: make the change, then build again with <fizz-build target="${b.target}"/>. Fizz keeps sending you the new log until the build passes (at most ${MAX_ATTEMPTS} attempts).`,
     ].join("\n\n");
     await host.sendAuto({ projectId: b.projectId, chatId: b.chatId, text, notice: `The ${T.label} build failed — Fizz Code is reading the log on GitHub and fixing it (attempt ${next} of ${MAX_ATTEMPTS})` });
   }

@@ -18,11 +18,11 @@ HEAD = """<!doctype html>
 {extra}<link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" />
-<link rel="stylesheet" href="assets/site.css?v=20261123-mp" />
+<link rel="stylesheet" href="assets/site.css?v=20261123-name" />
 <script>try{{var t=localStorage.getItem("fizz.theme");t=t?JSON.parse(t):"system";if(t==="dark"||(t!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}}catch(e){{}}</script>
-<script src="assets/core.js?v=20261112-att" defer></script>
-<script src="assets/raneddie-id.js?v=20261110-console1" defer></script>
-<script src="assets/site.js?v=20261123-mp" defer></script>
+<script src="assets/core.js?v=20261123-name" defer></script>
+<script src="assets/raneddie-id.js?v=20261123-name" defer></script>
+<script src="assets/site.js?v=20261123-name" defer></script>
 </head>
 <body>
 """
@@ -31,10 +31,10 @@ HEAD = """<!doctype html>
 HOME_META = """<link rel="canonical" href="https://fizz.raneddie.com/" />
 <meta property="og:site_name" content="Fizz" />
 <meta property="og:title" content="Fizz - AI by RanEddie" />
-<meta property="og:description" content="FIZZ is RANEDDIE's AI assistant. FIZZ DEV is the AI workspace for building software, websites and games." />
+<meta property="og:description" content="Fizz is RanEddie's AI assistant. Fizz DEV is the AI workspace for building software, websites and games." />
 <meta property="og:url" content="https://fizz.raneddie.com/" />
 <meta property="og:image" content="https://fizz.raneddie.com/icon-512.png" />
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"Fizz","alternateName":["Fizz - AI by RanEddie","FIZZ"],"url":"https://fizz.raneddie.com/"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"Fizz","alternateName":["Fizz - AI by RanEddie","Fizz"],"url":"https://fizz.raneddie.com/"}</script>
 """
 
 def page(name, title, desc, body, chrome=True):
@@ -53,7 +53,7 @@ def features(items):
 
 # ---------------- home ----------------
 # ---------------- phones: get the app ----------------
-# FIZZ itself is in the app on phones (and on the website on computers, or in a phone browser in desktop mode).
+# Fizz itself is in the app on phones (and on the website on computers, or in a phone browser in desktop mode).
 # Store links: fill these in when the apps are published; until then the buttons say "Coming soon".
 APP_STORE_URL = ""
 PLAY_STORE_URL = ""
@@ -63,22 +63,22 @@ def store_button(url, top, name, icon):
 def store_row(): return f'<div class="store-row">{store_button(APP_STORE_URL, "Download on the", "App Store", APPLE_SVG)}{store_button(PLAY_STORE_URL, "GET IT ON", "Google Play", PLAY_SVG)}</div>'
 APPLE_SVG = '<svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M16.37 12.6c-.02-2.2 1.8-3.26 1.88-3.31-1.03-1.5-2.62-1.7-3.18-1.73-1.35-.14-2.64.8-3.33.8-.69 0-1.74-.78-2.87-.76-1.47.02-2.83.86-3.59 2.18-1.53 2.66-.39 6.6 1.1 8.76.73 1.06 1.6 2.24 2.73 2.2 1.1-.05 1.51-.71 2.84-.71 1.32 0 1.7.71 2.86.69 1.18-.02 1.93-1.07 2.65-2.13.84-1.23 1.18-2.42 1.2-2.48-.03-.01-2.3-.88-2.32-3.5zM14.2 6.13c.6-.73 1.01-1.75.9-2.76-.87.04-1.92.58-2.54 1.3-.56.64-1.05 1.67-.92 2.66.97.08 1.96-.49 2.56-1.2z"/></svg>'
 PLAY_SVG = '<svg viewBox="0 0 24 26" width="24" height="26"><path fill="#00D7FE" d="M.6.5C.2.9 0 1.5 0 2.3v21.4c0 .8.2 1.4.6 1.8l.1.1L12.7 13.6v-.3L.7.4z"/><path fill="#FFCE00" d="M16.7 17.6l-4-4v-.3l4-4 .1.1 4.7 2.7c1.4.8 1.4 2 0 2.8l-4.7 2.7z"/><path fill="#FF3A44" d="M16.8 17.5L12.7 13.4 .6 25.5c.4.5 1.2.5 2 .1l14.2-8.1"/><path fill="#00F076" d="M16.8 9.4L2.6 1.3C1.8.8 1 .9.6 1.3l12.1 12.1z"/></svg>'
-page("index.html", "Fizz - AI by RanEddie", "FIZZ is RANEDDIE's AI assistant. FIZZ DEV is the AI workspace for building software, websites and games.", f"""
+page("index.html", "Fizz - AI by RanEddie", "Fizz is RanEddie's AI assistant. Fizz DEV is the AI workspace for building software, websites and games.", f"""
 
 <section class="landing-hero">
   <div class="hero-glow hero-glow-a" aria-hidden="true"></div><div class="hero-glow hero-glow-b" aria-hidden="true"></div>
   <div class="hero-copy">
     <span class="hero-kicker"><span class="hero-kicker-dot"></span> MEET YOUR NEW CREATIVE WORKSPACE</span>
-    <h1 class="hero-title">Think bigger.<br><span>Make it with FIZZ.</span></h1>
-    <p class="hero-description">One AI workspace for thinking, creating and building. Explore ideas with FIZZ, then bring websites, apps and games to life with FIZZ DEV.</p>
+    <h1 class="hero-title">Think bigger.<br><span>Make it with Fizz.</span></h1>
+    <p class="hero-description">One AI workspace for thinking, creating and building. Explore ideas with Fizz, then bring websites, apps and games to life with Fizz DEV.</p>
     <div class="hero-actions">
       <a class="btn btn-lg hero-primary" href="signin.html?mode=signup&amp;redirect_url=%2Fchat.html">Get started for free <span data-icon="arrow"></span></a>
-      <a class="btn btn-lg hero-secondary" href="product.html">Meet FIZZ DEV</a>
+      <a class="btn btn-lg hero-secondary" href="product.html">Meet Fizz DEV</a>
     </div>
-    <div class="hero-app"><p class="hero-app-note">On your phone, FIZZ lives in the app.</p>{store_row()}</div>
+    <div class="hero-app"><p class="hero-app-note">On your phone, Fizz lives in the app.</p>{store_row()}</div>
     <div class="hero-proof"><span><span data-icon="check"></span> One RanEddie ID</span><span><span data-icon="check"></span> Ideas to working projects</span><span><span data-icon="check"></span> Built for every screen</span></div>
   </div>
-  <div class="hero-visual" aria-label="Preview of the FIZZ and FIZZ DEV workspace">
+  <div class="hero-visual" aria-label="Preview of the Fizz and Fizz DEV workspace">
     <div class="visual-orbit orbit-one"></div><div class="visual-orbit orbit-two"></div>
     <div class="workspace-window">
       <div class="workspace-top"><div class="window-dots"><i></i><i></i><i></i></div><div class="workspace-label"><span class="mini-brand">f.</span> Your creative workspace</div><span class="live-pill"><i></i> Ready to build</span></div>
@@ -87,40 +87,40 @@ page("index.html", "Fizz - AI by RanEddie", "FIZZ is RANEDDIE's AI assistant. FI
         <div class="workspace-main">
           <div class="workspace-greeting">Your next project starts here.</div><div class="workspace-subtitle">Go from a blank page to a real result.</div>
           <div class="prompt-card"><span class="prompt-spark" data-icon="spark"></span><span>Build a modern landing page for my new idea...</span><span class="prompt-send" data-icon="arrow"></span></div>
-          <div class="workspace-options"><div class="workspace-option"><span class="option-icon purple" data-icon="chat"></span><span><b>Explore an idea</b><small>Think it through with FIZZ</small></span><span data-icon="chevron"></span></div><div class="workspace-option"><span class="option-icon orange" data-icon="code"></span><span><b>Build something real</b><small>Code, preview and refine with FIZZ DEV</small></span><span data-icon="chevron"></span></div></div>
+          <div class="workspace-options"><div class="workspace-option"><span class="option-icon purple" data-icon="chat"></span><span><b>Explore an idea</b><small>Think it through with Fizz</small></span><span data-icon="chevron"></span></div><div class="workspace-option"><span class="option-icon orange" data-icon="code"></span><span><b>Build something real</b><small>Code, preview and refine with Fizz DEV</small></span><span data-icon="chevron"></span></div></div>
           <div class="mini-preview"><div class="mini-preview-top"><span>LIVE PREVIEW</span><span class="preview-dots">•••</span></div><div class="mini-site"><div class="mini-site-nav"><b>northstar</b><span>Work&nbsp;&nbsp; About&nbsp;&nbsp; Contact</span></div><div class="mini-site-copy"><small>MADE FOR WHAT'S NEXT</small><strong>Make room<br>for possibility.</strong><span class="mini-site-button">Discover more ↗</span></div><div class="mini-art"><div class="art-ring"></div><div class="art-card"></div><div class="art-orb"></div></div></div></div>
         </div>
       </div>
     </div>
     <div class="float-note note-top"><span class="float-check" data-icon="check"></span><span><b>From idea to interface</b><small>One simple workflow</small></span></div>
-    <div class="float-note note-bottom"><span class="float-code" data-icon="code"></span><span><b>Built with FIZZ DEV</b><small>Code · Preview · Improve</small></span></div>
+    <div class="float-note note-bottom"><span class="float-code" data-icon="code"></span><span><b>Built with Fizz DEV</b><small>Code · Preview · Improve</small></span></div>
   </div>
 </section>
 <section class="hero-trust-strip"><span>MADE FOR CURIOUS MINDS</span><i></i><span>WRITING & IDEAS</span><i></i><span>WEBSITES & APPS</span><i></i><span>GAMES & EXPERIMENTS</span></section>
 <section class="section" style="padding-top:40px">
   <div class="grid-2">
-    <a class="product-card" href="fizz.html"><div style="display:flex;gap:12px;align-items:center"><span data-mark></span><div><b>FIZZ</b><div style="color:var(--muted);font-size:14px">The everyday AI assistant</div></div></div>
+    <a class="product-card" href="fizz.html"><div style="display:flex;gap:12px;align-items:center"><span data-mark></span><div><b>Fizz</b><div style="color:var(--muted);font-size:14px">The everyday AI assistant</div></div></div>
       <p style="margin:0;color:var(--muted)">Ask questions, write and edit, analyze documents and images, and brainstorm ideas in a fast, focused chat.</p>
       <ul><li>Streaming answers with Markdown and code</li><li>File and image understanding</li><li>Organized, searchable history</li></ul><span class="more">Learn more →</span></a>
-    <a class="product-card dev" href="fizz-dev.html"><div style="display:flex;gap:12px;align-items:center"><span data-mark="dev"></span><div><b>FIZZ DEV</b><div style="color:var(--muted);font-size:14px">The AI development workspace</div></div></div>
-      <p style="margin:0;color:var(--muted)">Describe what you want to build. FIZZ DEV writes the files, shows a live preview and lets you edit the code.</p>
+    <a class="product-card dev" href="fizz-dev.html"><div style="display:flex;gap:12px;align-items:center"><span data-mark="dev"></span><div><b>Fizz DEV</b><div style="color:var(--muted);font-size:14px">The AI development workspace</div></div></div>
+      <p style="margin:0;color:var(--muted)">Describe what you want to build. Fizz DEV writes the files, shows a live preview and lets you edit the code.</p>
       <ul><li>Projects with files and chats</li><li>Code editor and live preview on any device size</li><li>Download your project as a ZIP</li></ul><span class="more">Learn more →</span></a>
   </div>
 </section>
 <section class="section">
   <p class="eyebrow">Capabilities</p><h2 class="h2">Everything in one place, controlled from a single conversation</h2>
-  <p class="lead">FIZZ keeps the tools you need close at hand, and never pretends to do something it didn't.</p>
-  <div class="feature-grid"><div class="feature"><span data-icon="chat"></span><h3>Natural conversation</h3><p>Clear answers that stream as they're written, with the ability to stop, regenerate or edit your message.</p></div><div class="feature"><span data-icon="file"></span><h3>Documents & images</h3><p>Attach text, code and images. FIZZ reads them and answers with the context you provide.</p></div><div class="feature"><span data-icon="pen"></span><h3>Writing & editing</h3><p>Draft, rewrite, summarize and translate — with formatting that holds up when you paste it elsewhere.</p></div><div class="feature"><span data-icon="code"></span><h3>Multi-file coding</h3><p>FIZZ DEV writes complete files into your project and you can edit every one of them.</p></div><div class="feature"><span data-icon="eye"></span><h3>Live preview</h3><p>See websites and games run instantly at desktop, tablet and phone sizes.</p></div><div class="feature"><span data-icon="folder"></span><h3>Projects that persist</h3><p>Websites, apps, games and dashboards are saved with their chats and files.</p></div></div>
+  <p class="lead">Fizz keeps the tools you need close at hand, and never pretends to do something it didn't.</p>
+  <div class="feature-grid"><div class="feature"><span data-icon="chat"></span><h3>Natural conversation</h3><p>Clear answers that stream as they're written, with the ability to stop, regenerate or edit your message.</p></div><div class="feature"><span data-icon="file"></span><h3>Documents & images</h3><p>Attach text, code and images. Fizz reads them and answers with the context you provide.</p></div><div class="feature"><span data-icon="pen"></span><h3>Writing & editing</h3><p>Draft, rewrite, summarize and translate — with formatting that holds up when you paste it elsewhere.</p></div><div class="feature"><span data-icon="code"></span><h3>Multi-file coding</h3><p>Fizz DEV writes complete files into your project and you can edit every one of them.</p></div><div class="feature"><span data-icon="eye"></span><h3>Live preview</h3><p>See websites and games run instantly at desktop, tablet and phone sizes.</p></div><div class="feature"><span data-icon="folder"></span><h3>Projects that persist</h3><p>Websites, apps, games and dashboards are saved with their chats and files.</p></div></div>
 </section>
 <section class="section"><div class="grid-2" style="align-items:start">
-  <div><p class="eyebrow">Trust & control</p><h2 class="h2">Powerful tools, with you in charge</h2><p class="lead">Your projects stay yours. Content from files and websites is treated as data — it can never change what FIZZ is allowed to do.</p></div>
+  <div><p class="eyebrow">Trust & control</p><h2 class="h2">Powerful tools, with you in charge</h2><p class="lead">Your projects stay yours. Content from files and websites is treated as data — it can never change what Fizz is allowed to do.</p></div>
   <ul class="trust" style="margin:0;padding:0">
-    <li><span data-icon="shield" style="color:var(--primary)"></span><div><b>Honest by design</b><p>No invented answers, results or actions. When something isn't connected, FIZZ tells you.</p></div></li>
+    <li><span data-icon="shield" style="color:var(--primary)"></span><div><b>Honest by design</b><p>No invented answers, results or actions. When something isn't connected, Fizz tells you.</p></div></li>
     <li><span data-icon="lock" style="color:var(--primary)"></span><div><b>Secure accounts</b><p>Passwords are never stored — only a salted PBKDF2 hash.</p></div></li>
     <li><span data-icon="devices" style="color:var(--primary)"></span><div><b>Works everywhere</b><p>Designed for phones, tablets and desktops, in light and dark themes.</p></div></li>
   </ul></div>
 </section>
-<section class="section" style="padding-bottom:40px"><div class="cta-box"><span data-mark></span><h2 class="h2" style="margin:0">Start with a question. Finish with a product.</h2><p style="color:var(--muted);margin:0">Create a free RanEddie ID — one account for FIZZ, FIZZ DEV and every RANEDDIE product.</p><div class="cta-row" style="margin:0"><a class="btn btn-lg" href="signin.html?mode=signup&amp;redirect_url=%2Fchat.html">Create a RanEddie ID</a><a class="btn btn-lg btn-outline" href="signin.html?redirect_url=%2Fchat.html">Sign in</a></div></div></section>
+<section class="section" style="padding-bottom:40px"><div class="cta-box"><span data-mark></span><h2 class="h2" style="margin:0">Start with a question. Finish with a product.</h2><p style="color:var(--muted);margin:0">Create a free RanEddie ID — one account for Fizz, Fizz DEV and every RanEddie product.</p><div class="cta-row" style="margin:0"><a class="btn btn-lg" href="signin.html?mode=signup&amp;redirect_url=%2Fchat.html">Create a RanEddie ID</a><a class="btn btn-lg btn-outline" href="signin.html?redirect_url=%2Fchat.html">Sign in</a></div></div></section>
 """)
 
 # ---------------- product overview ----------------
@@ -128,40 +128,40 @@ rows = [("Best for", "Questions, writing, research, analysis", "Building website
         ("Main surface", "Conversational chat", "Projects with chat, code editor and live preview"),
         ("Files", "Attach documents and images to a message", "A full project file list you can edit"),
         ("Control", "Stop, regenerate, edit messages", "Review, edit and download every file")]
-page("product.html", "Product overview · FIZZ", "FIZZ and FIZZ DEV compared.", f"""
+page("product.html", "Product overview · Fizz", "Fizz and Fizz DEV compared.", f"""
 <section class="section"><p class="eyebrow">Product overview</p><h1 class="h2">Two experiences, one RanEddie ID</h1>
-<p class="lead">FIZZ is a fast, friendly assistant for everyday work. FIZZ DEV is an AI development workspace. Switch between them any time without signing in again.</p>
-<div class="table-wrap"><table class="compare"><thead><tr><th></th><th>FIZZ</th><th>FIZZ DEV</th></tr></thead><tbody>
+<p class="lead">Fizz is a fast, friendly assistant for everyday work. Fizz DEV is an AI development workspace. Switch between them any time without signing in again.</p>
+<div class="table-wrap"><table class="compare"><thead><tr><th></th><th>Fizz</th><th>Fizz DEV</th></tr></thead><tbody>
 {"".join(f"<tr><td style='color:var(--muted);font-weight:500'>{a}</td><td>{b}</td><td>{c}</td></tr>" for a,b,c in rows)}
 </tbody></table></div>
-<div class="cta-row"><a class="btn" href="fizz.html">Explore FIZZ</a><a class="btn btn-outline" href="fizz-dev.html">Explore FIZZ DEV</a></div></section>
+<div class="cta-row"><a class="btn" href="fizz.html">Explore Fizz</a><a class="btn btn-outline" href="fizz-dev.html">Explore Fizz DEV</a></div></section>
 """)
 
-# ---------------- FIZZ ----------------
-page("fizz.html", "FIZZ — AI assistant", "FIZZ, the everyday AI assistant by RANEDDIE.", f"""
-<section class="section"><p class="eyebrow">FIZZ</p><h1 class="h2">An AI assistant that's simple, fast and genuinely helpful</h1>
+# ---------------- Fizz ----------------
+page("fizz.html", "Fizz — AI assistant", "Fizz, the everyday AI assistant by RanEddie.", f"""
+<section class="section"><p class="eyebrow">Fizz</p><h1 class="h2">An AI assistant that's simple, fast and genuinely helpful</h1>
 <p class="lead">Ask anything, write better, understand documents and images, and keep every conversation organized.</p>
-<div class="cta-row"><a class="btn btn-lg" href="chat.html">Try FIZZ</a><a class="btn btn-lg btn-outline" href="pricing.html">View plans</a></div>
+<div class="cta-row"><a class="btn btn-lg" href="chat.html">Try Fizz</a><a class="btn btn-lg btn-outline" href="pricing.html">View plans</a></div>
 {features([
   ("chat", "Natural conversations", "Responses stream in real time. Stop, regenerate, copy, or edit an earlier message and continue from there.", ""),
-  ("globe", "Searches the web", "Current facts, news and documentation — FIZZ looks them up mid-answer and cites its sources.", ""),
+  ("globe", "Searches the web", "Current facts, news and documentation — Fizz looks them up mid-answer and cites its sources.", ""),
   ("pen", "Writing and editing", "Drafts, rewrites, tone changes, summaries and translations with clean formatting.", ""),
   ("brain", "Multi-step reasoning", "Works through complex questions step by step when a problem calls for it.", ""),
   ("code", "Programming help", "Explains code, finds bugs and writes snippets in clear code blocks.", ""),
   ("clip", "Attachments", "Drag and drop text files, code and images into the conversation.", ""),
   ("image", "Image understanding", "Describe, compare and extract information from the images you share.", ""),
   ("history", "Organized history", "Search, rename, archive and delete conversations. Titles are set automatically.", ""),
-  ("bulb", "Custom instructions", "Tell FIZZ how you like answers — concise, detailed, or in your own style.", ""),
+  ("bulb", "Custom instructions", "Tell Fizz how you like answers — concise, detailed, or in your own style.", ""),
   ("keyboard", "Keyboard friendly", "Enter to send, Shift+Enter for a new line, Esc to stop — and a responsive mobile layout.", ""),
 ])}</section>
 """)
 
-# ---------------- FIZZ DEV ----------------
+# ---------------- Fizz DEV ----------------
 steps = ["Understands your request", "Writes the project files — HTML, CSS, JavaScript and more", "Saves them to your project automatically", "Shows a live preview at desktop, tablet and phone sizes", "Lets you edit any file in the code editor", "Packages the project as a ZIP, ready to deploy"]
-page("fizz-dev.html", "FIZZ DEV — AI development workspace", "Describe it. FIZZ DEV builds it.", f"""
-<section class="section" style="--primary:var(--dev)"><p class="eyebrow">FIZZ DEV</p><h1 class="h2">Describe it. FIZZ DEV builds it — with you in control.</h1>
+page("fizz-dev.html", "Fizz DEV — AI development workspace", "Describe it. Fizz DEV builds it.", f"""
+<section class="section" style="--primary:var(--dev)"><p class="eyebrow">Fizz DEV</p><h1 class="h2">Describe it. Fizz DEV builds it — with you in control.</h1>
 <p class="lead">An AI-powered workspace that combines a coding assistant, a code editor and a live preview, organized into projects.</p>
-<div class="cta-row"><a class="btn btn-lg" href="dev.html">Start a project</a><a class="btn btn-lg btn-outline" href="dev.html">Open FIZZ DEV</a></div>
+<div class="cta-row"><a class="btn btn-lg" href="dev.html">Start a project</a><a class="btn btn-lg btn-outline" href="dev.html">Open Fizz DEV</a></div>
 <div class="panel-box grid-2" style="margin-top:48px"><div><h3 style="margin-top:0">From idea to working project</h3><p style="color:var(--muted)">Ask for something like “a landing page for my bakery with a menu and contact form” or “a bubble-popping game”. Fizz Code writes complete files you can see, run and change.</p></div>
 <ol class="steps">{"".join(f"<li><span>{i+1}</span>{s}</li>" for i,s in enumerate(steps))}</ol></div>
 {features([
@@ -179,7 +179,7 @@ page("fizz-dev.html", "FIZZ DEV — AI development workspace", "Describe it. FIZ
 """)
 
 # ---------------- pricing ----------------
-plans = [("Free", "Try FIZZ and FIZZ DEV.", "Free", False, ["FIZZ chat", "FIZZ DEV projects", "Live preview & ZIP export"]),
+plans = [("Free", "Try Fizz and Fizz DEV.", "Free", False, ["Fizz chat", "Fizz DEV projects", "Live preview & ZIP export"]),
          ("Plus", "More usage for everyday work.", None, False, ["Everything in Free", "Higher usage limits", "Faster models"]),
          ("Pro", "For builders who ship every day.", None, True, ["Everything in Plus", "Most capable models", "Priority access to new features"]),
          ("Team", "Shared workspace for teams.", None, False, ["Everything in Pro", "Team seats", "Centralized billing"])]
@@ -187,42 +187,42 @@ def plan_html(n, d, price, featured, items):
     price_html = '<div class="price">Free</div>' if price else '<div class="price soon">Pricing to be announced</div>'
     btn = '<a class="btn btn-block" href="signin.html?mode=signup&amp;redirect_url=%2Fchat.html">Get started</a>' if price else '<a class="btn btn-outline btn-block" href="contact.html">Join the waitlist</a>'
     return f'<div class="plan{" featured" if featured else ""}"><h3>{n}{" <span class=\"badge badge-primary\">Popular</span>" if featured else ""}</h3><p class="desc">{d}</p>{price_html}{btn}<ul>{"".join(f"<li>{i}</li>" for i in items)}</ul></div>'
-page("pricing.html", "Pricing · FIZZ", "FIZZ plans.", f"""
+page("pricing.html", "Pricing · Fizz", "Fizz plans.", f"""
 <section class="section center" style="padding-bottom:0"><p class="eyebrow">Pricing</p><h1 class="h2">Plans for every stage</h1><p class="lead">Start free. Paid plans with higher limits and team features are coming soon.</p></section>
 <section class="section" style="padding-top:0"><div class="plans">{"".join(plan_html(*p) for p in plans)}</div>
 <p class="fine">Plan names and features are provisional and may change before general availability.</p></section>
 """)
 
-page("get-app.html", "Get the FIZZ app", "FIZZ on your phone: the FIZZ app for iPhone and Android.", f"""
+page("get-app.html", "Get the Fizz app", "Fizz on your phone: the Fizz app for iPhone and Android.", f"""
 <section class="section center get-app">
   <img class="get-app-icon" src="/icon-192.png" alt="" width="96" height="96" />
-  <p class="eyebrow">FIZZ on your phone</p>
-  <h1 class="h2">Download the FIZZ app</h1>
-  <p class="lead">On a phone, FIZZ and FIZZ DEV live in the FIZZ app — faster, with notifications, and made for a small screen.</p>
+  <p class="eyebrow">Fizz on your phone</p>
+  <h1 class="h2">Download the Fizz app</h1>
+  <p class="lead">On a phone, Fizz and Fizz DEV live in the Fizz app — faster, with notifications, and made for a small screen.</p>
   {store_row()}
-  <p class="fine">On a computer, use FIZZ at fizz.raneddie.com or in the desktop app. In a phone browser you can also switch to desktop mode (browser menu → “Desktop site”) to open the full FIZZ website.</p>
-  <div class="get-app-links"><a class="btn btn-outline" href="/pricing.html">Plans</a><a class="btn btn-outline" href="/product.html">What FIZZ can do</a><a class="btn btn-outline" href="/">Home</a></div>
+  <p class="fine">On a computer, use Fizz at fizz.raneddie.com or in the desktop app. In a phone browser you can also switch to desktop mode (browser menu → “Desktop site”) to open the full Fizz website.</p>
+  <div class="get-app-links"><a class="btn btn-outline" href="/pricing.html">Plans</a><a class="btn btn-outline" href="/product.html">What Fizz can do</a><a class="btn btn-outline" href="/">Home</a></div>
 </section>
 """)
 
 # ---------------- FAQ ----------------
-faq = [("What is the difference between FIZZ and FIZZ DEV?", "FIZZ is a general AI assistant for conversation, writing, analysis and research. FIZZ DEV is a workspace where Fizz Code writes, edits and previews software projects with you."),
-       ("What is a RanEddie ID?", "RanEddie ID is one account for every RanEddie product, including FIZZ and the RanEddie games. You need one to use FIZZ and FIZZ DEV. Your settings (theme, model, mode) are saved to it and follow you to every device; your chats and projects stay in your browser."),
-       ("Do I need an account?", "Yes. FIZZ is a RANEDDIE product, so you sign in with a free RanEddie ID. If you already have one from a RANEDDIE game, use the same account."),
+faq = [("What is the difference between Fizz and Fizz DEV?", "Fizz is a general AI assistant for conversation, writing, analysis and research. Fizz DEV is a workspace where Fizz Code writes, edits and previews software projects with you."),
+       ("What is a RanEddie ID?", "RanEddie ID is one account for every RanEddie product, including Fizz and the RanEddie games. You need one to use Fizz and Fizz DEV. Your settings (theme, model, mode) are saved to it and follow you to every device; your chats and projects stay in your browser."),
+       ("Do I need an account?", "Yes. Fizz is a RanEddie product, so you sign in with a free RanEddie ID. If you already have one from a RanEddie game, use the same account."),
        ("Where are my account and projects stored?", "In this version, your account, chats and projects are stored securely in your browser on this device. Use Settings → Export my data to keep a copy."),
-       ("Why do I need to add an API key?", "FIZZ connects to an AI model provider (Anthropic). Add your API key in Settings to start chatting. It's stored only in your browser and sent only to the provider."),
-       ("Can I use FIZZ on my phone or tablet?", "On a phone, FIZZ is used through the FIZZ app for iPhone and Android. On a computer, use the website or the desktop app. In a phone browser you can also switch to desktop mode (“Request desktop site”) to open the full website."),
-       ("Can files or websites trick FIZZ?", "Content from files and websites is treated as untrusted data. It can't change FIZZ's rules or make it take actions on its own."),
+       ("Why do I need to add an API key?", "Fizz connects to an AI model provider (Anthropic). Add your API key in Settings to start chatting. It's stored only in your browser and sent only to the provider."),
+       ("Can I use Fizz on my phone or tablet?", "On a phone, Fizz is used through the Fizz app for iPhone and Android. On a computer, use the website or the desktop app. In a phone browser you can also switch to desktop mode (“Request desktop site”) to open the full website."),
+       ("Can files or websites trick Fizz?", "Content from files and websites is treated as untrusted data. It can't change Fizz's rules or make it take actions on its own."),
        ("Can I export or delete my data?", "Yes. Settings lets you download an export of your data or permanently delete your account.")]
-page("faq.html", "FAQ · FIZZ", "Frequently asked questions.", f"""
+page("faq.html", "FAQ · Fizz", "Frequently asked questions.", f"""
 <section class="section" style="max-width:860px"><p class="eyebrow">FAQ</p><h1 class="h2">Frequently asked questions</h1>
 <div class="faq">{"".join(f"<details><summary>{q}</summary><p>{a}</p></details>" for q,a in faq)}</div></section>
 """)
 
 # ---------------- contact ----------------
-page("contact.html", "Contact support · FIZZ", "Contact the RANEDDIE support team.", """
+page("contact.html", "Contact support · Fizz", "Contact the RanEddie support team.", """
 <section class="section"><div class="grid-2" style="align-items:start">
-<div><p class="eyebrow">Support</p><h1 class="h2">How can we help?</h1><p class="lead">Send us a message and the RANEDDIE support team will get back to you by email.</p></div>
+<div><p class="eyebrow">Support</p><h1 class="h2">How can we help?</h1><p class="lead">Send us a message and the RanEddie support team will get back to you by email.</p></div>
 <div><div id="contact-status" class="hidden"></div>
 <form id="contact-form" name="contact" method="POST" data-netlify="true" netlify-honeypot="company" class="form panel-box">
   <input type="hidden" name="form-name" value="contact" />
@@ -240,25 +240,25 @@ page("contact.html", "Contact support · FIZZ", "Contact the RANEDDIE support te
 
 # ---------------- legal ----------------
 def legal(name, title, sections):
-    page(name, f"{title} · FIZZ", title, f"""
+    page(name, f"{title} · Fizz", title, f"""
 <article class="legal"><h1 class="h2">{title}</h1><p>Last updated: to be determined</p>
-<div class="alert alert-warning"><div><strong>Placeholder document</strong><p>This page has not been reviewed by legal counsel. RANEDDIE will replace it with final terms before public launch.</p></div></div>
+<div class="alert alert-warning"><div><strong>Placeholder document</strong><p>This page has not been reviewed by legal counsel. RanEddie will replace it with final terms before public launch.</p></div></div>
 {"".join(f"<h2>{h}</h2><p>{t}</p>" for h,t in sections)}</article>""")
 legal("terms.html", "Terms of Service", [
-  ("1. Agreement", "These terms govern your use of FIZZ, FIZZ DEV and related services provided by RANEDDIE."),
-  ("2. Accounts", "You need a RanEddie ID to use FIZZ. You are responsible for activity on your account and for keeping your password and API keys secure."),
-  ("3. Acceptable use", "Don't use FIZZ to break the law, harm others, or abuse AI systems or third-party services."),
+  ("1. Agreement", "These terms govern your use of Fizz, Fizz DEV and related services provided by RanEddie."),
+  ("2. Accounts", "You need a RanEddie ID to use Fizz. You are responsible for activity on your account and for keeping your password and API keys secure."),
+  ("3. Acceptable use", "Don't use Fizz to break the law, harm others, or abuse AI systems or third-party services."),
   ("4. AI output", "AI-generated content can be inaccurate. Review it before relying on it."),
-  ("5. Your content", "You keep ownership of the projects and content you create with FIZZ DEV."),
-  ("6. Changes", "RANEDDIE may update these terms. Placeholder for termination, liability and governing law.")])
+  ("5. Your content", "You keep ownership of the projects and content you create with Fizz DEV."),
+  ("6. Changes", "RanEddie may update these terms. Placeholder for termination, liability and governing law.")])
 legal("privacy.html", "Privacy Policy", [
   ("1. Information stored", "Your chats, projects, API keys and settings are stored in your browser's local storage on your device. You sign in with a RanEddie ID."),
-  ("RanEddie ID", "If you sign in with RanEddie ID, your account (email, username, date of birth and country you gave at sign-up) is managed by RANEDDIE through Clerk, our authentication provider. FIZZ saves only a few small settings to your account — theme, response style, AI model and FIZZ DEV mode — so they follow you to other devices. Your chats, projects and API keys are never sent to your account."),
-  ("2. AI requests", "When you send a message, its content, attachments and the results of the tools the AI uses are sent to the AI provider you chose in Settings → AI: FIZZ AI (through FIZZ's server), OpenRouter, Google AI Studio or Anthropic (directly from your browser with your own key)."),
-  ("Google user data", "FIZZ DEV can connect to your Google account only when you choose to, through Google's own sign-in window. With your permission it can use Gmail (read, search, write drafts and send emails), Google Calendar (read, create and delete events), Google Docs, Sheets and Slides (create, read and edit), Google Drive (search, read and upload files), Google Tasks and Google Contacts (read). It does this only to carry out what you ask Fizz Code to do in a chat. Sending an email, inviting people to an event and deleting an event always wait for your confirmation."),
-  ("How Google data is handled", "Your Google access token stays in your browser tab and expires after about an hour; it is never sent to or stored on FIZZ's servers. Requests go directly from your browser to Google. The Google data needed for a task (for example the emails Fizz Code found) is shown to the AI provider you chose so it can complete the task, and is kept in that chat in your browser (and in your RanEddie ID cloud sync if you turned it on). FIZZ does not sell Google data, does not use it for advertising, does not use it to train AI models, and does not let anyone read it except to provide the feature you asked for, for security, or to comply with the law. You can disconnect Google at any time in Settings → Connections, and remove FIZZ's access in your Google account at myaccount.google.com/permissions. Deleting a chat deletes the Google data in it."),
-  ("Limited Use", "FIZZ's use and transfer of information received from Google APIs adheres to the Google API Services User Data Policy, including the Limited Use requirements."),
-  ("3. Support messages", "Messages sent through the contact form are delivered to RANEDDIE's support team."),
+  ("RanEddie ID", "If you sign in with RanEddie ID, your account (email, username, date of birth and country you gave at sign-up) is managed by RanEddie through Clerk, our authentication provider. Fizz saves only a few small settings to your account — theme, response style, AI model and Fizz DEV mode — so they follow you to other devices. Your chats, projects and API keys are never sent to your account."),
+  ("2. AI requests", "When you send a message, its content, attachments and the results of the tools the AI uses are sent to the AI provider you chose in Settings → AI: Fizz AI (through Fizz's server), OpenRouter, Google AI Studio or Anthropic (directly from your browser with your own key)."),
+  ("Google user data", "Fizz DEV can connect to your Google account only when you choose to, through Google's own sign-in window. With your permission it can use Gmail (read, search, write drafts and send emails), Google Calendar (read, create and delete events), Google Docs, Sheets and Slides (create, read and edit), Google Drive (search, read and upload files), Google Tasks and Google Contacts (read). It does this only to carry out what you ask Fizz Code to do in a chat. Sending an email, inviting people to an event and deleting an event always wait for your confirmation."),
+  ("How Google data is handled", "Your Google access token stays in your browser tab and expires after about an hour; it is never sent to or stored on Fizz's servers. Requests go directly from your browser to Google. The Google data needed for a task (for example the emails Fizz Code found) is shown to the AI provider you chose so it can complete the task, and is kept in that chat in your browser (and in your RanEddie ID cloud sync if you turned it on). Fizz does not sell Google data, does not use it for advertising, does not use it to train AI models, and does not let anyone read it except to provide the feature you asked for, for security, or to comply with the law. You can disconnect Google at any time in Settings → Connections, and remove Fizz's access in your Google account at myaccount.google.com/permissions. Deleting a chat deletes the Google data in it."),
+  ("Limited Use", "Fizz's use and transfer of information received from Google APIs adheres to the Google API Services User Data Policy, including the Limited Use requirements."),
+  ("3. Support messages", "Messages sent through the contact form are delivered to RanEddie's support team."),
   ("4. Your rights", "You can export your data or delete your account at any time from Settings."),
   ("5. Contact", "Questions about privacy or your data: use the contact page (contact.html) or email raneddie321@gmail.com.")])
 
@@ -271,7 +271,7 @@ RID_HEAD = """<!doctype html>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Sign in · RanEddie ID</title>
-<meta name="description" content="Sign in to FIZZ with your RanEddie ID — one account for every RanEddie product." />
+<meta name="description" content="Sign in to Fizz with your RanEddie ID — one account for every RanEddie product." />
 <link rel="icon" href="/favicon.ico" sizes="any" />
 <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
 <link rel="icon" type="image/svg+xml" href="/icon.svg" />
@@ -283,8 +283,8 @@ RID_HEAD = """<!doctype html>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" />
 <link rel="stylesheet" href="assets/site.css" />
 <link rel="stylesheet" href="assets/rid.css" />
-<script src="assets/core.js?v=20261112-att" defer></script>
-<script src="assets/raneddie-id.js?v=20261110-console1" defer></script>
+<script src="assets/core.js?v=20261123-name" defer></script>
+<script src="assets/raneddie-id.js?v=20261123-name" defer></script>
 <script src="assets/rid-auth.js" defer></script>
 </head>
 <body class="rid-page">
@@ -318,14 +318,14 @@ SIGNIN_REDIRECT = r"""<script>
 </html>
 """)
 
-page("404.html", "Page not found · FIZZ", "Page not found.", """
+page("404.html", "Page not found · Fizz", "Page not found.", """
 <section class="section center"><p class="eyebrow">404</p><h1 class="h2">This page doesn't exist</h1><p class="lead">The link may be broken or the page may have moved.</p><div class="cta-row"><a class="btn" href="index.html">Go home</a></div></section>
 """)
-# FIZZ and FIZZ DEV are one page (scripts/app-shell.html) so switching between them never reloads.
+# Fizz and Fizz DEV are one page (scripts/app-shell.html) so switching between them never reloads.
 # chat.html and dev.html are the same document; the path only picks which app shows first.
 import pathlib as _pl
 _shell = (_pl.Path(__file__).parent / "app-shell.html").read_text()
 _out = _pl.Path(__file__).parent.parent / "static-site"
 (_out / "chat.html").write_text(_shell)
-(_out / "dev.html").write_text(_shell.replace("<title>FIZZ</title>", "<title>FIZZ DEV</title>", 1))
+(_out / "dev.html").write_text(_shell.replace("<title>Fizz</title>", "<title>Fizz DEV</title>", 1))
 print("pages written")

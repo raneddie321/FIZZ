@@ -1,4 +1,4 @@
-// Small key-value store for FIZZ's server features (daily limits, cloud sync).
+// Small key-value store for Fizz's server features (daily limits, cloud sync).
 // Upstash Redis when connected (Vercel → Storage → Upstash sets KV_REST_API_URL/TOKEN), otherwise an
 // in-memory map that only lives as long as one server instance.
 import { env } from "./util.mjs";

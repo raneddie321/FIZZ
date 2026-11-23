@@ -1,4 +1,4 @@
-/* FIZZ DEV — FIZZ's design system with a developer workspace. Builds on site.css tokens. */
+/* Fizz DEV — Fizz's design system with a developer workspace. Builds on site.css tokens. */
 .dev-app {
   --panel-w: 46%;
   display: flex; height: 100dvh; overflow: hidden; background: var(--bg);
@@ -123,7 +123,7 @@
 .diff-host { flex: 1; overflow: auto; }
 .editor-empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 14px; padding: 20px; text-align: center; background: var(--bg); }
 
-/* CodeMirror theme mapped to FIZZ tokens */
+/* CodeMirror theme mapped to Fizz tokens */
 .CodeMirror-gutters { background: var(--bg); border-right: 1px solid var(--border); }
 .CodeMirror-linenumber { color: color-mix(in srgb, var(--muted) 70%, transparent); }
 .CodeMirror-cursor { border-left-color: var(--fg); }
@@ -206,7 +206,7 @@
 
 @media (max-width: 1280px) and (min-width: 1101px) { .starter { grid-template-columns: minmax(0, 1fr); } }
 
-/* ---- FIZZ DEV look: same calm controls as FIZZ ---- */
+/* ---- Fizz DEV look: same calm controls as Fizz ---- */
 .pill-btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); color: var(--fg); font-size: 13px; font-weight: 500; white-space: nowrap; }
 .pill-btn:hover { background: var(--accent); }
 .pill-btn .i { width: 15px; height: 15px; }

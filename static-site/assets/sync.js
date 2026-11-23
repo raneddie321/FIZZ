@@ -1,5 +1,5 @@
-/* Cloud sync: FIZZ DEV projects and FIZZ chats follow the user's RanEddie ID to other devices.
-   Stored per user on the FIZZ server (/api/sync, Upstash Redis) — never in RanEddie ID metadata.
+/* Cloud sync: Fizz DEV projects and Fizz chats follow the user's RanEddie ID to other devices.
+   Stored per user on the Fizz server (/api/sync, Upstash Redis) — never in RanEddie ID metadata.
    Only text is synced; binary files (PDFs, images…) stay in the browser that made them. */
 (function () {
   "use strict";
@@ -23,7 +23,7 @@
     const out = {};
     for (const p of data.projects || []) {
       const d = cleanProject(p); out[`p-${p.id}`] = { kind: "project", name: p.name, data: d, hash: hash(JSON.stringify(d)) }; }
-    if ((data.conversations || []).length) { const d = cleanChats(data.conversations); out.chats = { kind: "chats", name: "FIZZ chats", data: d, hash: hash(JSON.stringify(d)) }; }
+    if ((data.conversations || []).length) { const d = cleanChats(data.conversations); out.chats = { kind: "chats", name: "Fizz chats", data: d, hash: hash(JSON.stringify(d)) }; }
     return out;
   }
 
@@ -105,7 +105,7 @@
       F.sync.last = Date.now();
     } catch (e) {
       if (e.status === 503 || e.status === 401) disabled = true;
-      else console.warn("[FIZZ sync]", e);
+      else console.warn("[Fizz sync]", e);
     } finally {
       busy = false;
       if (again) { again = false; schedule(5000); }

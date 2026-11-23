@@ -1,4 +1,4 @@
-/* FIZZ DEV hooks: commands that run by themselves at fixed points, set per project in .fizz/hooks.json:
+/* Fizz DEV hooks: commands that run by themselves at fixed points, set per project in .fizz/hooks.json:
      {
        "afterEdit":     [{ "match": "*.{js,css}", "run": "npx prettier --write {file}" }],
        "afterTurn":     [{ "run": "npm test --silent", "timeout": 120 }],

@@ -1,4 +1,4 @@
-/* Shared Settings dialog for FIZZ and FIZZ DEV: General, AI, Connections, Tools, Account. */
+/* Shared Settings dialog for Fizz and Fizz DEV: General, AI, Connections, Tools, Account. */
 (function () {
   "use strict";
   const F = window.FIZZ;
@@ -7,7 +7,7 @@
   const CONN = [
     { id: "github", name: "GitHub", desc: "Import repositories and push your projects as commits.", icon: '<svg viewBox="0 0 24 24" class="i" aria-hidden="true"><path fill="currentColor" stroke="none" d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.46-1.16-1.11-1.47-1.11-1.47-.9-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02a9.6 9.6 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2z"/></svg>' },
     { id: "vercel", name: "Vercel", desc: "Deploy projects and get a live URL.", icon: '<svg viewBox="0 0 24 24" class="i conn-logo logo-vercel" aria-hidden="true"><path fill="currentColor" stroke="none" d="M12 3l10 18H2z"/></svg>' },
-    { id: "canva", name: "Canva", desc: "Connect Canva to prepare design workflows in FIZZ DEV.", icon: F.logoImg("Canva", ["https://cdn.simpleicons.org/canva/00C4CC", ...F.faviconUrls("canva.com")], "i conn-logo app-mark") },
+    { id: "canva", name: "Canva", desc: "Connect Canva to prepare design workflows in Fizz DEV.", icon: F.logoImg("Canva", ["https://cdn.simpleicons.org/canva/00C4CC", ...F.faviconUrls("canva.com")], "i conn-logo app-mark") },
     { id: "shopify", name: "Shopify store", desc: "Connect your Shopify store — Fizz Code can read and update products, orders, inventory and pages.", icon: F.logoImg("Shopify", ["https://cdn.simpleicons.org/shopify/7AB55C", ...F.faviconUrls("shopify.com")], "i conn-logo app-mark") },
     { id: "google", name: "Google Workspace", desc: "Gmail, Calendar, Docs, Sheets, Slides, Drive, Tasks and Contacts — Fizz Code can use them for you.", icon: '<svg viewBox="0 0 24 24" class="i conn-logo logo-google" aria-hidden="true"><path fill="#4285F4" stroke="none" d="M21.6 12.23c0-.72-.06-1.42-.18-2.09H12v3.95h5.38a4.6 4.6 0 0 1-2 3.02v2.56h3.23c1.89-1.74 2.99-4.3 2.99-7.44z"/><path fill="#34A853" stroke="none" d="M12 22c2.7 0 4.97-.9 6.62-2.43l-3.23-2.56c-.9.6-2.05.96-3.39.96-2.6 0-4.8-1.75-5.59-4.1H3.08v2.64A10 10 0 0 0 12 22z"/><path fill="#FBBC05" stroke="none" d="M6.41 13.87a6 6 0 0 1 0-3.74V7.49H3.08a10 10 0 0 0 0 9.02z"/><path fill="#EA4335" stroke="none" d="M12 6.03c1.47 0 2.79.5 3.82 1.5l2.86-2.86A9.6 9.6 0 0 0 12 2a10 10 0 0 0-8.92 5.49l3.33 2.64C7.2 7.78 9.4 6.03 12 6.03z"/></svg>' },
   ];
@@ -19,7 +19,7 @@
     d.id = "fizz-settings";
     d.className = "dlg settings-dlg";
     d.innerHTML = `<form method="dialog" class="dlg-body">
-      <div class="settings-heading"><div><span class="settings-kicker">FIZZ PREFERENCES</span><h2>Settings</h2><p>Customize your workspace, AI models and connected tools.</p></div><button type="button" class="settings-close" aria-label="Close settings" data-settings-close>×</button></div>
+      <div class="settings-heading"><div><span class="settings-kicker">Fizz PREFERENCES</span><h2>Settings</h2><p>Customize your workspace, AI models and connected tools.</p></div><button type="button" class="settings-close" aria-label="Close settings" data-settings-close>×</button></div>
       <div class="dlg-tabs" role="tablist">
         <button type="button" data-tab="general"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span>General</span></button><button type="button" data-tab="ai"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg><span>AI</span></button>
         <button type="button" data-tab="connections"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 7V3M15 7V3M7 7h10v4a5 5 0 0 1-10 0z"/><path d="M12 16v5"/></svg><span>Connections</span></button><button type="button" data-tab="tools"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/></svg><span>Tools</span></button><button type="button" data-tab="account"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span>Account</span></button>
@@ -28,12 +28,12 @@
         <label class="field"><span>Name</span><input class="input" name="name" maxlength="80" /></label>
         <label class="field"><span>Theme</span><select class="select" name="theme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
         <label class="field"><span>Response style</span><select class="select" name="style"><option value="balanced">Balanced</option><option value="concise">Concise</option><option value="detailed">Detailed</option></select></label>
-        <label class="field"><span>Custom instructions</span><textarea class="textarea" name="instructions" maxlength="2000" rows="3" placeholder="Anything FIZZ should know about you or how to respond"></textarea></label>
+        <label class="field"><span>Custom instructions</span><textarea class="textarea" name="instructions" maxlength="2000" rows="3" placeholder="Anything Fizz should know about you or how to respond"></textarea></label>
         <label class="field"><span>What Fizz remembers about you</span><textarea class="textarea" name="memory" maxlength="12000" rows="4" placeholder="One fact per line. Fizz adds things here when you tell it to remember them; edit or delete freely."></textarea><small class="muted-sm">Kept in this browser. Never put passwords or card numbers here.</small></label>
       </div>
       <div data-pane="ai" class="form" data-title="AI">
         <div class="provider-list" role="radiogroup" aria-label="AI provider">
-          <label class="provider"><input type="radio" name="provider" value="fizz" /><span><b>FIZZ AI</b><small data-ai-status>Checking…</small></span></label>
+          <label class="provider"><input type="radio" name="provider" value="fizz" /><span><b>Fizz AI</b><small data-ai-status>Checking…</small></span></label>
           <label class="provider"><input type="radio" name="provider" value="openrouter" /><span><b>Your OpenRouter account</b><small>Hundreds of models (GLM, Qwen, DeepSeek, Llama, Claude, GPT…). Usage is billed to your OpenRouter account; free models available.</small></span></label>
           <label class="provider"><input type="radio" name="provider" value="gemini" /><span><b>Your Google AI Studio key</b><small>Gemini models with your own key from aistudio.google.com — there's a free tier.</small></span></label>
           <label class="provider"><input type="radio" name="provider" value="anthropic" /><span><b>Your Anthropic API key</b><small>Use Claude models directly with your own key.</small></span></label>
@@ -61,28 +61,28 @@
           <label class="field"><span>Model</span><select class="select" name="model"></select></label>
         </div>
         <div data-sub="groq" class="form">
-          <label class="field"><span>Groq API key</span><input class="input" name="groqKey" type="password" autocomplete="off" placeholder="gsk_…" /><small>Saved in this browser only. FIZZ sends it to Groq when you use this provider.</small></label>
+          <label class="field"><span>Groq API key</span><input class="input" name="groqKey" type="password" autocomplete="off" placeholder="gsk_…" /><small>Saved in this browser only. Fizz sends it to Groq when you use this provider.</small></label>
           <label class="field"><span>Model ID</span><input class="input mono" name="groqModel" placeholder="llama-3.3-70b-versatile" /><small>Use a model ID available in your Groq account.</small></label>
         </div>
         <div data-sub="zai" class="form">
-          <label class="field"><span>Z.AI API key</span><input class="input" name="zaiKey" type="password" autocomplete="off" placeholder="…" /><small>Saved in this browser only. FIZZ sends it to Z.AI when you use this provider.</small></label>
+          <label class="field"><span>Z.AI API key</span><input class="input" name="zaiKey" type="password" autocomplete="off" placeholder="…" /><small>Saved in this browser only. Fizz sends it to Z.AI when you use this provider.</small></label>
           <label class="field"><span>Base URL</span><input class="input mono" name="zaiBaseUrl" type="url" placeholder="https://api.z.ai/api/paas/v4" /><small>Global endpoint: api.z.ai/api/paas/v4. For Coding Plan use api.z.ai/api/coding/paas/v4.</small></label>
           <label class="field"><span>Model ID</span><input class="input mono" name="zaiModel" placeholder="glm-4.6" /></label>
         </div>
         <div data-sub="requesty" class="form">
-          <label class="field"><span>Requesty AI API key</span><input class="input" name="requestyKey" type="password" autocomplete="off" placeholder="…" /><small>Saved in this browser only. FIZZ sends it to Requesty AI when you use this provider.</small></label>
+          <label class="field"><span>Requesty AI API key</span><input class="input" name="requestyKey" type="password" autocomplete="off" placeholder="…" /><small>Saved in this browser only. Fizz sends it to Requesty AI when you use this provider.</small></label>
           <label class="field"><span>Model ID</span><input class="input mono" name="requestyModel" placeholder="openai/gpt-4o-mini" /><small>Use a model ID available in Requesty's model catalog.</small></label>
         </div>
         <div data-sub="deepseek" class="form">
-          <label class="field"><span>DeepSeek API key</span><input class="input" name="deepseekKey" type="password" autocomplete="off" placeholder="sk-…" /><small>Saved in this browser only. FIZZ sends it to DeepSeek when you use this provider.</small></label>
+          <label class="field"><span>DeepSeek API key</span><input class="input" name="deepseekKey" type="password" autocomplete="off" placeholder="sk-…" /><small>Saved in this browser only. Fizz sends it to DeepSeek when you use this provider.</small></label>
           <label class="field"><span>Model ID</span><input class="input mono" name="deepseekModel" placeholder="deepseek-chat" /><small>Use a model ID enabled for your account.</small></label>
         </div>
         <div data-sub="cerebras" class="form">
-          <label class="field"><span>Cerebras API key</span><input class="input" name="cerebrasKey" type="password" autocomplete="off" placeholder="csk-…" /><small>Saved in this browser only. FIZZ sends it to Cerebras when you use this provider.</small></label>
+          <label class="field"><span>Cerebras API key</span><input class="input" name="cerebrasKey" type="password" autocomplete="off" placeholder="csk-…" /><small>Saved in this browser only. Fizz sends it to Cerebras when you use this provider.</small></label>
           <label class="field"><span>Model ID</span><input class="input mono" name="cerebrasModel" placeholder="llama-3.3-70b" /><small>Use a model ID available in your Cerebras account.</small></label>
         </div>
         <div data-sub="together" class="form">
-          <label class="field"><span>Together AI API key</span><input class="input" name="togetherKey" type="password" autocomplete="off" placeholder="…" /><small>Saved in this browser only. FIZZ sends it to Together AI when you use this provider.</small></label>
+          <label class="field"><span>Together AI API key</span><input class="input" name="togetherKey" type="password" autocomplete="off" placeholder="…" /><small>Saved in this browser only. Fizz sends it to Together AI when you use this provider.</small></label>
           <label class="field"><span>Model ID</span><input class="input mono" name="togetherModel" placeholder="meta-llama/Llama-3.3-70B-Instruct-Turbo" /><small>Use a model ID available in Together AI.</small></label>
         </div>
         <div data-sub="custom-openai" class="form">
@@ -97,19 +97,19 @@
         <p class="muted-sm">Tests the selected provider with one short request using the values currently in this form. It doesn't save your settings.</p>
       </div>
       <div data-pane="connections" class="form" data-title="Connections"><div class="conn-list" data-conn-list></div>
-        <p class="muted-sm">Connected services use scoped access where supported. App tokens are stored by the FIZZ server in secure, HttpOnly cookies; FIZZ does not display saved secrets. You can disconnect an integration at any time. Google access is temporary and stays in this tab only.</p></div>
+        <p class="muted-sm">Connected services use scoped access where supported. App tokens are stored by the Fizz server in secure, HttpOnly cookies; Fizz does not display saved secrets. You can disconnect an integration at any time. Google access is temporary and stays in this tab only.</p></div>
       <div data-pane="tools" class="form" data-title="Tools">
         <div class="conn-list" data-tools></div>
         <label class="check"><input type="checkbox" name="cloudSync" /><span>Sync chats and projects to my RanEddie ID<small>Use them on every device. Images and PDFs stay in the browser that made them.</small></span></label>
-        <label class="check"><input type="checkbox" name="autoFixBuilds" /><span>Fix failed app builds automatically<small>When an APK, AAB or desktop build fails, Fizz Code reads the log on GitHub, fixes the project and builds again (up to 6 attempts). Keep FIZZ DEV open while it works.</small></span></label>
+        <label class="check"><input type="checkbox" name="autoFixBuilds" /><span>Fix failed app builds automatically<small>When an APK, AAB or desktop build fails, Fizz Code reads the log on GitHub, fixes the project and builds again (up to 6 attempts). Keep Fizz DEV open while it works.</small></span></label>
         <div class="conn" data-tg-row><div class="conn-body"><b>Telegram updates</b><small>Get a Telegram message when Fizz finishes a task or needs you. Connect your Telegram bot (Connections → Apps), send it any message, then press Link.</small><small class="conn-state" data-tg-state></small></div><button type="button" class="btn btn-outline btn-sm" data-tg-link>Link</button></div>
-        <label class="check"><input type="checkbox" name="autoVerify" /><span>Check Fizz Code's work automatically<small>After every change FIZZ DEV runs 5 checks — code, every page, phone layout, pressing every button, and an AI code review — and has Fizz Code fix what they find.</small></span></label>
+        <label class="check"><input type="checkbox" name="autoVerify" /><span>Check Fizz Code's work automatically<small>After every change Fizz DEV runs 5 checks — code, every page, phone layout, pressing every button, and an AI code review — and has Fizz Code fix what they find.</small></span></label>
         <label class="check"><input type="checkbox" name="aiReview" /><span>Include the AI code review<small>The fifth check: a second AI pass that reads the changed files for real bugs. Uses one extra AI message per task.</small></span></label>
         <label class="field"><span>Steps per task</span><input class="input" type="number" name="agentSteps" min="5" max="40" step="1" /><small class="muted-sm">How many rounds Fizz Code may work on its own before it asks you to keep going (5–40).</small></label>
-        <label class="field"><span>Context size</span><input class="input" type="number" name="contextWindow" min="2000" step="1000" placeholder="Automatic" /><small class="muted-sm">How many tokens the model can read at once. Leave it empty and FIZZ works it out from the model. FIZZ DEV summarises a chat when it reaches 70% of this, and keeps the last six messages as they are.</small></label>
+        <label class="field"><span>Context size</span><input class="input" type="number" name="contextWindow" min="2000" step="1000" placeholder="Automatic" /><small class="muted-sm">How many tokens the model can read at once. Leave it empty and Fizz works it out from the model. Fizz DEV summarises a chat when it reaches 70% of this, and keeps the last six messages as they are.</small></label>
         <label class="check"><input type="checkbox" name="reviewChanges" /><span>Review file changes before they're applied</span></label>
         ${F.perm.settingsHtml()}
-        <label class="check"><input type="checkbox" name="autoActions" /><span>Allow automatic GitHub Push and Vercel deploys<small>When enabled, FIZZ DEV can publish the current project after you request it, without an extra confirmation dialog. It still must be connected and must report the real result.</small></span></label>
+        <label class="check"><input type="checkbox" name="autoActions" /><span>Allow automatic GitHub Push and Vercel deploys<small>When enabled, Fizz DEV can publish the current project after you request it, without an extra confirmation dialog. It still must be connected and must report the real result.</small></span></label>
 
       </div>
       <div data-pane="account" class="form" data-title="Account"><div data-acct></div></div>
@@ -149,11 +149,11 @@
     const signIn = `<a class="btn btn-sm rid-signin-btn" href="${esc(F.auth.url("signin"))}"><img src="assets/raneddie-logo.png" alt="" />Sign in with RanEddie ID</a>`;
     const exp = `<button type="button" class="btn btn-outline btn-sm" data-export>Export my data</button>`;
     if (user.rid) return `<div class="conn"><span class="avatar">${esc(user.name.slice(0, 1).toUpperCase())}</span><div class="conn-body"><b>${esc(user.name)}</b><small>${esc(user.email)}</small><small class="conn-state">Signed in with RanEddie ID</small></div></div>
-      <p class="muted-sm">Your theme, response style, model and FIZZ DEV mode are saved to your RanEddie ID. API keys stay in this browser. Chats and projects sync to your account when cloud sync is on (Settings → Tools).</p>
+      <p class="muted-sm">Your theme, response style, model and Fizz DEV mode are saved to your RanEddie ID. API keys stay in this browser. Chats and projects sync to your account when cloud sync is on (Settings → Tools).</p>
       <div class="row-inline">${exp}<button type="button" class="btn btn-outline btn-sm" data-signout>Sign out</button></div>`;
-    if (user.legacy) return `<p class="muted-sm">You're using an older FIZZ account saved only in this browser (${esc(user.email)}). Sign in with RanEddie ID to keep your settings on every device — your chats and projects stay here.</p>
+    if (user.legacy) return `<p class="muted-sm">You're using an older Fizz account saved only in this browser (${esc(user.email)}). Sign in with RanEddie ID to keep your settings on every device — your chats and projects stay here.</p>
       <div class="row-inline">${signIn}${exp}<button type="button" class="btn btn-outline btn-sm" data-signout>Sign out</button></div>`;
-    return `<p class="muted-sm">You're using FIZZ without an account. Everything is saved in this browser. Sign in with your RanEddie ID — one account for FIZZ and RanEddie games — to keep your settings on every device.</p>
+    return `<p class="muted-sm">You're using Fizz without an account. Everything is saved in this browser. Sign in with your RanEddie ID — one account for Fizz and RanEddie games — to keep your settings on every device.</p>
       <div class="row-inline">${signIn}<a class="btn btn-outline btn-sm" href="${esc(F.auth.url("signup"))}">Create a RanEddie ID</a>${exp}</div>`;
   }
 
@@ -203,7 +203,7 @@
     };
     const apps = (st.apps || []).map((a) => `<div class="conn">${appLogo(a)}<div class="conn-body"><b>${esc(a.name)}</b><small>${esc(a.desc)}</small><small class="conn-state">${a.connected ? `Connected · ${esc(a.account || "")}` : "Not connected"}</small>
       ${a.connected ? "" : `<div class="vtoken"><input class="input mono" type="password" data-app-token="${a.id}" placeholder="Paste your ${esc(a.name)} token" autocomplete="off" spellcheck="false" /><button type="button" class="btn btn-sm" data-app-save="${a.id}">Connect</button></div><small><a href="${esc(a.help)}" target="_blank" rel="noopener">Get a token</a> — ${esc(a.how)}</small>`}</div>${a.connected ? `<button type="button" class="btn btn-outline btn-sm" data-app-off="${a.id}">Disconnect</button>` : ""}</div>`).join("");
-    box.innerHTML = (st.server ? "" : `<div class="alert alert-info"><div><strong>Connections need the FIZZ server</strong><p>Deploy this site from GitHub to Netlify (with the environment variables from the README) to enable GitHub, Vercel, Canva and Google.</p></div></div>`) + CONN.map((c) => connCard(c, st)).join("") + (F.customConnectors ? `<div data-cc-list><p class="muted-sm">Loading custom connectors…</p></div>` : "") + (apps ? `<h3 class="conn-group">Apps Fizz can use</h3><p class="muted-sm">Connect an app with your own token. FIZZ only uses connected apps when you ask. Actions that send, publish, or delete should be reviewed before they happen.</p>${apps}` : "");
+    box.innerHTML = (st.server ? "" : `<div class="alert alert-info"><div><strong>Connections need the Fizz server</strong><p>Deploy this site from GitHub to Netlify (with the environment variables from the README) to enable GitHub, Vercel, Canva and Google.</p></div></div>`) + CONN.map((c) => connCard(c, st)).join("") + (F.customConnectors ? `<div data-cc-list><p class="muted-sm">Loading custom connectors…</p></div>` : "") + (apps ? `<h3 class="conn-group">Apps Fizz can use</h3><p class="muted-sm">Connect an app with your own token. Fizz only uses connected apps when you ask. Actions that send, publish, or delete should be reviewed before they happen.</p>${apps}` : "");
     const cc = box.querySelector("[data-cc-list]");
     if (cc) F.customConnectors.listHtml().then((html) => { cc.innerHTML = html; });
     if (F.logins) { const lb = document.createElement("div"); lb.setAttribute("data-logins", ""); box.appendChild(lb); F.logins.mount(lb); }
@@ -303,7 +303,7 @@
           customOpenAIModel: f.customOpenAIModel.value.trim(),
           model: f.model.value,
         };
-        const providerNames = { fizz: "FIZZ AI", anthropic: "Anthropic Claude", gemini: "Google Gemini", openrouter: "OpenRouter", groq: "Groq", zai: "Z.AI", requesty: "Requesty AI", deepseek: "DeepSeek", cerebras: "Cerebras", together: "Together AI", "custom-openai": "custom provider" };
+        const providerNames = { fizz: "Fizz AI", anthropic: "Anthropic Claude", gemini: "Google Gemini", openrouter: "OpenRouter", groq: "Groq", zai: "Z.AI", requesty: "Requesty AI", deepseek: "DeepSeek", cerebras: "Cerebras", together: "Together AI", "custom-openai": "custom provider" };
         t.disabled = true;
         out.textContent = "Testing the selected provider…";
         const controller = new AbortController();
@@ -374,7 +374,7 @@
           ctx.data.settings.telegramChat = String(msg.chat.id);
           ctx.data.settings.telegramNotify = true;
           ctx.save();
-          await F.conn.apps.call("telegram", { method: "POST", path: "/sendMessage", body: { chat_id: msg.chat.id, text: "FIZZ DEV is linked. You'll get a message here when Fizz finishes a task or needs you." } });
+          await F.conn.apps.call("telegram", { method: "POST", path: "/sendMessage", body: { chat_id: msg.chat.id, text: "Fizz DEV is linked. You'll get a message here when Fizz finishes a task or needs you." } });
           out.textContent = `Linked to ${msg.chat.first_name || msg.chat.title || "your chat"} — a test message was sent.`;
         } catch (err) { out.textContent = `Couldn't link: ${err.message}`; }
       }
@@ -468,7 +468,7 @@
   }
 
   /** Call on page load: finishes an OpenRouter sign-in redirect if present. */
-  // FIZZ and FIZZ DEV share one page, so the redirect is processed once and every app is told.
+  // Fizz and Fizz DEV share one page, so the redirect is processed once and every app is told.
   let redirectRun = null;
   function handleRedirects(ctx) {
     redirectRun ||= processRedirects(ctx);

@@ -1,4 +1,4 @@
-/* The model picker above the composer (FIZZ and FIZZ DEV): a list of the models the chosen AI service offers,
+/* The model picker above the composer (Fizz and Fizz DEV): a list of the models the chosen AI service offers,
    with search. Which service and which keys are used stays in Settings → AI. */
 (function () {
   "use strict";
@@ -51,7 +51,7 @@
     el.className = "model-pop";
     el.setAttribute("role", "dialog");
     el.setAttribute("aria-label", "Select model");
-    el.innerHTML = `<div class="mp-head"><b>Select model</b><small>${esc(NAMES[p] || "FIZZ AI")}</small><button type="button" class="icon-btn mp-x" aria-label="Close"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    el.innerHTML = `<div class="mp-head"><b>Select model</b><small>${esc(NAMES[p] || "Fizz AI")}</small><button type="button" class="icon-btn mp-x" aria-label="Close"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
       <input class="input mp-search" type="search" placeholder="Search models" autocomplete="off" spellcheck="false" />
       <div class="mp-list" role="listbox"><p class="muted-sm mp-msg">Loading models…</p></div>
       <button type="button" class="mp-settings">AI settings — service and keys</button>`;
@@ -69,7 +69,7 @@
     const search = el.querySelector(".mp-search"), listEl = el.querySelector(".mp-list");
     if (!p || !NAMES[p]) {
       search.hidden = true;
-      listEl.innerHTML = `<div class="mp-item on"><span class="mp-name">${esc(F.providerLabel(s, ctx.product))}</span><small>Included with FIZZ. To pick from more models, connect an AI service in AI settings.</small></div>`;
+      listEl.innerHTML = `<div class="mp-item on"><span class="mp-name">${esc(F.providerLabel(s, ctx.product))}</span><small>Included with Fizz. To pick from more models, connect an AI service in AI settings.</small></div>`;
       return;
     }
     let models = [];

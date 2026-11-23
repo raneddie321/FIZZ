@@ -1,7 +1,7 @@
 /* Fizz Code tools. The model asks for tools with tags in its reply, e.g.
      <fizz-run>node test.js</fizz-run>      <fizz-ask question="…" options="A|B"/>
      <fizz-search>query</fizz-search>       <fizz-browser action="open" url="…"/>
-   FIZZ DEV parses them, runs them in order, shows each as a step, and (for tools whose results the model
+   Fizz DEV parses them, runs them in order, shows each as a step, and (for tools whose results the model
    needs) sends the results back so the agent can keep working. Modules register their tools here. */
 (function () {
   "use strict";

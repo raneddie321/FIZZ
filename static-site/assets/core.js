@@ -1,4 +1,4 @@
-/* FIZZ core: storage, accounts (guest or RanEddie ID), theme, AI client. */
+/* Fizz core: storage, accounts (guest or RanEddie ID), theme, AI client. */
 (function () {
   "use strict";
 
@@ -37,7 +37,7 @@
   };
 
   // ---------- accounts ----------
-  // FIZZ needs a RanEddie ID (Clerk, loaded by raneddie-id.js), the account for every RANEDDIE product.
+  // Fizz needs a RanEddie ID (Clerk, loaded by raneddie-id.js), the account for every RanEddie product.
   // Small settings sync to the account; chats and projects stay in this browser. Data from before
   // RanEddie ID (the guest's, or an older FIZZ-only account) is linked to the account on first sign-in.
   const users = () => store.get("fizz.users", {});
@@ -56,7 +56,7 @@
   /**
    * Which browser data a RanEddie ID uses. Decided once per device, the first time that account
    * signs in here, so nothing already in this browser is lost:
-   * an older FIZZ account with the same email, else the signed-in older account, else the guest's
+   * an older Fizz account with the same email, else the signed-in older account, else the guest's
    * chats and projects (moved to the account, so signing out leaves a clean guest), else a new store.
    */
   function dataKeyFor(rid) {
@@ -89,7 +89,7 @@
       return { id: "guest", name: "Guest", email: "", guest: true };
     },
     /**
-     * FIZZ and FIZZ DEV need a RanEddie ID: without one, go to the RanEddie ID page and come back here.
+     * Fizz and Fizz DEV need a RanEddie ID: without one, go to the RanEddie ID page and come back here.
      * Only when this deployment has no RanEddie ID configured (the page sets fizz.rid.off) do guests get in.
      */
     require() {
@@ -135,7 +135,7 @@
   };
 
   // ---------- per-user data ----------
-  // One shared object per user, so FIZZ and FIZZ DEV running on the same page never overwrite each other.
+  // One shared object per user, so Fizz and Fizz DEV running on the same page never overwrite each other.
   const dataCache = {};
   function loadData(user) {
     if (dataCache[user.id]) return dataCache[user.id];
@@ -158,7 +158,7 @@
   }
   const saveData = (user, d) => store.set(`fizz.data.${user.id}`, d);
 
-  // A stream that goes silent (a dropped connection the browser never notices) must not hang FIZZ forever.
+  // A stream that goes silent (a dropped connection the browser never notices) must not hang Fizz forever.
   const IDLE_MS = 90_000;
   function readIdle(reader) {
     let timer;
@@ -203,9 +203,9 @@
 
   // ---------- AI (Anthropic Messages API, streamed) ----------
   const MODELS = [
-    { id: "claude-opus-5-5", chat: "FIZZ 1.0", dev: "Fizz Code 1.0", note: "Most capable — reasoning, writing and code" },
-    { id: "claude-sonnet-5-5", chat: "FIZZ Swift", dev: "Fizz Code Swift", note: "Fast and capable for everyday work" },
-    { id: "claude-haiku-5-5", chat: "FIZZ Lite", dev: "Fizz Lite", note: "Quickest for simple questions" },
+    { id: "claude-opus-5-5", chat: "Fizz 1.0", dev: "Fizz Code 1.0", note: "Most capable — reasoning, writing and code" },
+    { id: "claude-sonnet-5-5", chat: "Fizz Swift", dev: "Fizz Code Swift", note: "Fast and capable for everyday work" },
+    { id: "claude-haiku-5-5", chat: "Fizz Lite", dev: "Fizz Lite", note: "Quickest for simple questions" },
   ];
 
   async function streamChat({ apiKey, model, system, messages, signal, onText }) {
@@ -271,7 +271,7 @@
   /** The last /api/status answer, or null before it arrives. */
   const serverStatusCached = () => statusCache;
 
-  // ---------- OpenAI-compatible streaming (FIZZ server proxy and OpenRouter) ----------
+  // ---------- OpenAI-compatible streaming (Fizz server proxy and OpenRouter) ----------
   /** Image/video generation models (OpenRouter and similar): they answer with media instead of (or with) text. */
   const MEDIA_MODEL_RE = /image|imagen|flux|dall-?e|gpt-image|seedream|nano-?banana|riverflow|veo|sora|kling|wan-?2|hailuo|video/i;
   const isMediaModel = (m) => MEDIA_MODEL_RE.test(String(m || ""));
@@ -319,17 +319,17 @@
         url.includes("deepseek.com") ? "DeepSeek" :
         url.includes("cerebras.ai") ? "Cerebras" :
         url.includes("api.together.xyz") ? "Together AI" :
-        url.includes("/api/ai/chat") ? "FIZZ AI" : "The selected AI provider";
-      if (res.status === 404 && url.startsWith("/api/ai/chat")) msg = "FIZZ AI isn't available on this deployment. Check the Vercel deployment and AI environment variables.";
-      else if (res.status === 429) msg = `${providerName} is rate-limiting requests. FIZZ retried once; wait a moment or choose another model.`;
+        url.includes("/api/ai/chat") ? "Fizz AI" : "The selected AI provider";
+      if (res.status === 404 && url.startsWith("/api/ai/chat")) msg = "Fizz AI isn't available on this deployment. Check the Vercel deployment and AI environment variables.";
+      else if (res.status === 429) msg = `${providerName} is rate-limiting requests. Fizz retried once; wait a moment or choose another model.`;
       else if (res.status === 402) msg = `${providerName} reports a billing or credit limit. Check the provider account and usage limits.`;
       else if ((res.status === 401 || res.status === 403) && !url.startsWith("/api/ai/chat")) msg = `${providerName} rejected the API key or access to this model. Check the key and model permissions in Settings → AI.`;
-      else if (res.status >= 500) msg = `${providerName} is temporarily unavailable (HTTP ${res.status}). FIZZ retried once; try again or choose another model if it continues.`;
+      else if (res.status >= 500) msg = `${providerName} is temporarily unavailable (HTTP ${res.status}). Fizz retried once; try again or choose another model if it continues.`;
       if (url.includes("generativelanguage")) {
         if ((res.status === 400 && /api key/i.test(msg)) || res.status === 401 || res.status === 403) msg = "Google AI Studio rejected your API key. Check it in Settings → AI (aistudio.google.com → Get API key).";
         else if (res.status === 404) msg = `Google doesn't have the model "${payload.model}". Use Settings → AI → Load my models to select a supported model.`;
-        else if (res.status === 429) msg = "Google AI Studio is rate-limiting this key. FIZZ retried once; wait a moment or choose another available model.";
-        else if (res.status >= 500) msg = `Google AI Studio is temporarily unavailable (HTTP ${res.status}). FIZZ retried once; try again or select another model.`;
+        else if (res.status === 429) msg = "Google AI Studio is rate-limiting this key. Fizz retried once; wait a moment or choose another available model.";
+        else if (res.status >= 500) msg = `Google AI Studio is temporarily unavailable (HTTP ${res.status}). Fizz retried once; try again or select another model.`;
       }
       const e = new Error(msg);
       e.status = res.status;
@@ -386,7 +386,7 @@
     const compatible = {
       groq: { key: settings.groqKey, model: settings.groqModel || "llama-3.3-70b-versatile", url: "https://api.groq.com/openai/v1/chat/completions" },
       zai: { key: settings.zaiKey, model: settings.zaiModel || "glm-4.6", url: settings.zaiBaseUrl || "https://api.z.ai/api/paas/v4" },
-      requesty: { key: settings.requestyKey, model: settings.requestyModel || "openai/gpt-4o-mini", url: "https://router.requesty.ai/v1/chat/completions", headers: { "HTTP-Referer": location.origin, "X-Title": "FIZZ" } },
+      requesty: { key: settings.requestyKey, model: settings.requestyModel || "openai/gpt-4o-mini", url: "https://router.requesty.ai/v1/chat/completions", headers: { "HTTP-Referer": location.origin, "X-Title": "Fizz" } },
       deepseek: { key: settings.deepseekKey, model: settings.deepseekModel || "deepseek-chat", url: "https://api.deepseek.com/v1/chat/completions" },
       cerebras: { key: settings.cerebrasKey, model: settings.cerebrasModel || "llama-3.3-70b", url: "https://api.cerebras.ai/v1/chat/completions" },
       together: { key: settings.togetherKey, model: settings.togetherModel || "meta-llama/Llama-3.3-70B-Instruct-Turbo", url: "https://api.together.xyz/v1/chat/completions" },
@@ -402,13 +402,13 @@
   }
   /**
    * Where a cloud run sends model calls for these settings: the user's own provider ({ kind, url, key, model, headers }),
-   * null for FIZZ AI, or { missing: true } when a key is missing. Used only for runs in the user's sandbox; the key is
+   * null for Fizz AI, or { missing: true } when a key is missing. Used only for runs in the user's sandbox; the key is
    * sealed by the server and never reaches the sandbox.
    */
   function aiTarget(settings) {
     if (settings.provider === "anthropic") return settings.apiKey ? { kind: "anthropic", url: "https://api.anthropic.com/v1/messages", key: settings.apiKey, model: settings.model || MODELS[0].id } : { missing: true };
     if (settings.provider === "gemini") return settings.geminiKey ? { kind: "openai", url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", key: settings.geminiKey, model: settings.geminiModel || "gemini-3.8-flash" } : { missing: true };
-    if (settings.provider === "openrouter") return settings.openrouterKey ? { kind: "openai", url: "https://openrouter.ai/api/v1/chat/completions", key: settings.openrouterKey, model: settings.openrouterModel || "z-ai/glm-4.6", headers: { "X-Title": "FIZZ" } } : { missing: true };
+    if (settings.provider === "openrouter") return settings.openrouterKey ? { kind: "openai", url: "https://openrouter.ai/api/v1/chat/completions", key: settings.openrouterKey, model: settings.openrouterModel || "z-ai/glm-4.6", headers: { "X-Title": "Fizz" } } : { missing: true };
     const p = compatibleProviders(settings)[settings.provider];
     if (p) {
       let url = String(p.url || "").trim().replace(/\/+$/, "");
@@ -443,11 +443,11 @@
     }
     if (settings.provider === "openrouter") {
       if (!settings.openrouterKey) throw new Error("NO_KEY");
-      return streamOpenAI("https://openrouter.ai/api/v1/chat/completions", { Authorization: `Bearer ${settings.openrouterKey}`, "X-Title": "FIZZ" }, { model: settings.openrouterModel || "z-ai/glm-4.6", stream: true, messages: [{ role: "system", content: system }, ...history.map(toOpenAI)] }, signal, onText);
+      return streamOpenAI("https://openrouter.ai/api/v1/chat/completions", { Authorization: `Bearer ${settings.openrouterKey}`, "X-Title": "Fizz" }, { model: settings.openrouterModel || "z-ai/glm-4.6", stream: true, messages: [{ role: "system", content: system }, ...history.map(toOpenAI)] }, signal, onText);
     }
 
     // OpenAI-compatible providers share the same streaming protocol. Keys stay in local
-    // settings and are sent only to the endpoint selected below; none are uploaded to FIZZ.
+    // settings and are sent only to the endpoint selected below; none are uploaded to Fizz.
     const compatible = compatibleProviders(settings);
     const provider = compatible[settings.provider];
     if (provider) {
@@ -467,7 +467,7 @@
     if (settings.provider === "gemini") return settings.geminiModel || "Gemini";
     if (settings.provider === "anthropic") return (MODELS.find((m) => m.id === settings.model) || MODELS[0])[product];
     if (names[settings.provider]) return names[settings.provider] || settings.provider;
-    return product === "dev" ? "Fizz Code 1.0" : "FIZZ 1.0";
+    return product === "dev" ? "Fizz Code 1.0" : "Fizz 1.0";
   }
 
   // ---------- OpenRouter OAuth (PKCE, fully in the browser) ----------
@@ -598,7 +598,7 @@
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   }
 
-  // ---------- in-page switch between FIZZ and FIZZ DEV (no reload) ----------
+  // ---------- in-page switch between Fizz and Fizz DEV (no reload) ----------
   const APP_PAGES = { chat: "chat.html", dev: "dev.html" };
   const appHooks = { chat: [], dev: [] };
   const app = {

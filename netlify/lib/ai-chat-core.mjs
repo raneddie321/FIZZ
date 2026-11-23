@@ -1,4 +1,4 @@
-// FIZZ AI proxy core, shared by the Netlify edge function and the Vercel function.
+// Fizz AI proxy core, shared by the Netlify edge function and the Vercel function.
 // Streams completions from OpenRouter using the site owner's key, with a per-visitor daily quota.
 // Host-specific pieces are passed in: env lookup, client IP and a quota counter `bump(key, limit) -> boolean`.
 // Which AI service the site owner configured. OpenRouter wins if both keys are set.
@@ -28,7 +28,7 @@ export async function handleChat(req, { env, ip, bump, run = null }) {
   if (!run && req.headers.get("origin") !== new URL(req.url).origin) return err(403, "Not allowed.", "origin");
   const own = run?.ai || null; // the user's own provider, sealed in the run token
   const backend = own ? { name: own.kind === "anthropic" ? "anthropic" : "byo", key: own.key, url: own.url, model: own.model, headers: own.headers || {} } : aiBackend(env);
-  if (!backend) return err(503, "FIZZ AI isn't configured on this server yet.", "not_configured");
+  if (!backend) return err(503, "Fizz AI isn't configured on this server yet.", "not_configured");
 
   let body;
   try {
@@ -52,7 +52,7 @@ export async function handleChat(req, { env, ip, bump, run = null }) {
     if (own) throw "skip"; // the user's own key: their provider's limits apply
     const okUser = await bump(run ? `${day}/run/${run.u}` : `${day}/u/${uid}`, limit);
     const okIp = okUser && (await bump(`${day}/ip/${ip || "unknown"}`, limit * 3));
-    if (!okUser || !okIp) return err(429, `You've used today's ${limit} free FIZZ messages. Connect your own OpenRouter account in Settings to keep going, or come back tomorrow.`, "quota");
+    if (!okUser || !okIp) return err(429, `You've used today's ${limit} free Fizz messages. Connect your own OpenRouter account in Settings to keep going, or come back tomorrow.`, "quota");
   } catch (e) {
     if (e !== "skip") console.error("quota store unavailable", e);
   }
@@ -68,7 +68,7 @@ export async function handleChat(req, { env, ip, bump, run = null }) {
     signal: req.signal,
   }).catch(() => null) : fetch(backend.url, {
     method: "POST",
-    headers: { Authorization: `Bearer ${backend.key}`, "Content-Type": "application/json", ...(backend.headers || {}), ...(backend.name === "openrouter" ? { "HTTP-Referer": new URL(req.url).origin, "X-Title": "FIZZ" } : {}) },
+    headers: { Authorization: `Bearer ${backend.key}`, "Content-Type": "application/json", ...(backend.headers || {}), ...(backend.name === "openrouter" ? { "HTTP-Referer": new URL(req.url).origin, "X-Title": "Fizz" } : {}) },
     body: JSON.stringify({
       model: m,
       stream: true,
@@ -99,7 +99,7 @@ export async function handleChat(req, { env, ip, bump, run = null }) {
     // Include the provider's short reason (e.g. "API key not valid", unknown model); it never contains the key.
     let reason = "";
     try { const d = JSON.parse(detail); reason = String((Array.isArray(d) ? d[0] : d)?.error?.message || "").slice(0, 200); } catch {}
-    const msg = upstream.status === 429 ? "FIZZ is very busy right now. Please try again in a moment." : upstream.status === 402 ? "FIZZ AI is temporarily unavailable." : `The AI service returned an error${reason ? `: ${reason}` : ""}. Please try again.`;
+    const msg = upstream.status === 429 ? "Fizz is very busy right now. Please try again in a moment." : upstream.status === 402 ? "Fizz AI is temporarily unavailable." : `The AI service returned an error${reason ? `: ${reason}` : ""}. Please try again.`;
     return err(upstream.status === 429 ? 429 : 502, msg, "upstream");
   }
   return new Response(upstream.body, { headers });

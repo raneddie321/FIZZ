@@ -210,7 +210,7 @@ html[data-app="dev"] .switcher::before { transform: translateX(100%); }
 .switcher kbd { width: 26px; text-align: center; font: 10.5px var(--mono); color: var(--muted); border: 0; background: none; }
 .side-label { display: flex; align-items: center; justify-content: space-between; margin: 2px 12px 4px 14px; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
 
-/* FIZZ and FIZZ DEV live on one page; only the active one is shown */
+/* Fizz and Fizz DEV live on one page; only the active one is shown */
 html[data-app="chat"] #dev-app, html[data-app="dev"] #chat-app { display: none !important; }
 html[data-app] .switcher a.on { color: var(--fg); }
 ::view-transition-old(root) { animation: fizz-out .16s ease both; }
@@ -370,7 +370,7 @@ dialog.dlg::backdrop { background: rgba(20, 19, 18, .45); }
 .conn-body .conn-state { color: var(--fg); margin-top: 3px; }
 @media (hover: none) { .m-actions { opacity: 1; } }
 
-/* RanEddie ID in FIZZ: header button, signed-in name, sidebar invite */
+/* RanEddie ID in Fizz: header button, signed-in name, sidebar invite */
 .rid-signin-btn { display: inline-flex; align-items: center; gap: 8px; }
 .rid-signin-btn img { height: 16px; width: auto; }
 .hdr-user { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -409,7 +409,7 @@ svg.dots3 { stroke-width: 3; }
 .mcp-add .btn { justify-self: start; }
 
 
-/* FIZZ Settings — comfortable dialog sizing and readable connection cards */
+/* Fizz Settings — comfortable dialog sizing and readable connection cards */
 .settings-dlg { width: min(920px, calc(100vw - 48px)); max-height: min(88dvh, 920px); padding: 0; overflow: hidden; }
 .settings-dlg::backdrop { background: rgba(4, 8, 14, .62); backdrop-filter: blur(7px); }
 .settings-dlg > .dlg-body { max-height: min(88dvh, 920px); overflow: auto; padding: 0 26px 22px; gap: 20px; }
@@ -666,10 +666,10 @@ svg.dots3 { stroke-width: 3; }
   #main>.landing-hero .hero-proof{grid-template-columns:minmax(0,1fr)}
 }
 
-/* Keep the model selector readable and clickable in FIZZ's shared composer on narrow screens. */
+/* Keep the model selector readable and clickable in Fizz's shared composer on narrow screens. */
 #chat-app .composer .model-btn { display: inline-flex; flex: 0 0 auto; min-width: max-content; visibility: visible; opacity: 1; pointer-events: auto; }
 
-/* FIZZ integration logo and clarity polish */
+/* Fizz integration logo and clarity polish */
 .conn .app-mark,.conn-logo { width:28px;height:28px;flex:0 0 28px;object-fit:contain;border-radius:7px; }
 .conn .app-mark { padding:3px;background:#fff;border:1px solid var(--border); }
 .conn .conn-body small { line-height:1.55; }
@@ -794,7 +794,7 @@ dialog.settings-dlg#fizz-settings > .dlg-body { height: 100%; max-height: none; 
 .login-preview { display: flex; align-items: center; gap: 10px; min-height: 0; color: var(--muted); font-size: 13px; }
 .login-preview:empty { display: none; }
 .login-add .btn { justify-self: start; }
-/* get-app.html: FIZZ on phones */
+/* get-app.html: Fizz on phones */
 .get-app { display: grid; justify-items: center; gap: 14px; max-width: 560px; margin: 0 auto; }
 .get-app-icon { border-radius: 22px; box-shadow: 0 10px 30px rgba(255,122,26,.25); }
 .store-row { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin: 6px 0; }

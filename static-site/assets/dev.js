@@ -1,4 +1,4 @@
-/* FIZZ DEV — agent chat + Code / Terminal / Browser workspace. */
+/* Fizz DEV — agent chat + Code / Terminal / Browser workspace. */
 (function () {
   "use strict";
   const F = window.FIZZ;
@@ -216,7 +216,7 @@
     $("#proj-title").innerHTML = `${esc(p.name)}<small>${n} file${n === 1 ? "" : "s"}${p.git ? ` · ${esc(p.git.owner)}/${esc(p.git.repo)}` : ""}</small>`;
     const live = p.deploy?.url && p.deploy.state === "READY";
     $("#deploy-btn").title = live ? `Live at ${p.deploy.url}` : "Deploy to Vercel";
-    if (active()) document.title = `${p.name} · FIZZ DEV`;
+    if (active()) document.title = `${p.name} · Fizz DEV`;
     renderRepoBar();
   }
 
@@ -547,7 +547,7 @@
     if (c.canva) rows.push(`Canva: ${c.canva.connected ? "connected" : "not connected"}`);
     if (c.shopify?.oauth) rows.push(`Shopify store: ${c.shopify.connected ? `connected (${c.shopify.account}) — use <fizz-shopify>` : "not connected"}`);
     const g = F.conn?.google;
-    rows.push(`Google Workspace: ${g?.connected?.() ? `signed in (${g.account?.() || "Google account"})` : st.google?.clientId ? "available — FIZZ asks the user to sign in when a Google tool is used" : "not set up on this site"}`);
+    rows.push(`Google Workspace: ${g?.connected?.() ? `signed in (${g.account?.() || "Google account"})` : st.google?.clientId ? "available — Fizz asks the user to sign in when a Google tool is used" : "not set up on this site"}`);
     for (const a of st.apps || []) if (a.connected) rows.push(`${a.name}: connected${a.account ? ` (${a.account})` : ""} — use <fizz-api service="${a.id}">`);
     for (const sv of F.mcp?.servers?.() || []) {
       const names = (sv.tools || []).map((t) => t.name);
@@ -601,7 +601,7 @@
     // Expose the real server-side GitHub connection state to the model; never infer it from user claims.
     const gh = F.serverStatusCached?.()?.connections?.github || {};
     const githubContext = gh.connected
-      ? `GITHUB CONNECTION: connected as ${gh.account || "the authenticated user"}. FIZZ DEV can use its GitHub integration to list accessible repositories, import files, create repositories, and push project files. When the user asks to publish/push the current project, use the dedicated <fizz-push message="short commit message"/> action; do not merely describe how to do it. A confirmation step may appear before writing to GitHub. Never claim an operation succeeded until its tool result confirms it.`
+      ? `GITHUB CONNECTION: connected as ${gh.account || "the authenticated user"}. Fizz DEV can use its GitHub integration to list accessible repositories, import files, create repositories, and push project files. When the user asks to publish/push the current project, use the dedicated <fizz-push message="short commit message"/> action; do not merely describe how to do it. A confirmation step may appear before writing to GitHub. Never claim an operation succeeded until its tool result confirms it.`
       : gh.configured
         ? "GITHUB CONNECTION: OAuth is configured on the server, but no GitHub session is currently connected in this browser. Do not claim GitHub is connected. Ask the user to click the GitHub button and finish authorization; then retry."
         : "GITHUB CONNECTION: no active GitHub session is available to this chat. Do not claim GitHub is connected. Tell the user to configure the GitHub OAuth environment variables and/or connect GitHub first.";
@@ -629,9 +629,9 @@
         ? "DO MODE (personal agent). The user wants you to get something done for them, not to write code. Follow the DO MODE handbook above: plan briefly, then use the tools (browser, Google, connected services, MCP servers, search, terminal) step by step until the task is really done, verify, and report with links. You may still write files with <fizz-file> when the task needs one (a saved result, a .env value, a document to export), using the same file format as build mode."
         : mode === "ask"
         ? "ASK MODE. The user is asking a question, not asking you to build or change anything. Answer it directly and briefly. You MAY use tools to look things up (connected apps and MCP servers, Google, web search, reading files) when the answer needs real data — e.g. 'what am I connected to' means read the CONNECTIONS list below and call the connectors' own tools. Do NOT write <fizz-file> or <fizz-edit> blocks, do NOT run builds, tests or checks, and do NOT change anything; if a change would help, say so in one sentence and let the user ask for it."
-        : "BUILD MODE. Your output is executed by FIZZ DEV, not merely displayed as chat. Start with a task list in this exact format (3–10 tasks naming files):\n<fizz-plan>\n- [ ] create index.html\n- [ ] add styles\n</fizz-plan>\nThen write the actual files immediately. CRITICAL: never say you are about to create a file and then stop; every file you intend to create MUST be emitted as a complete, closed block in the same response whenever possible:\n<fizz-file path=\"relative/path.ext\">\ncomplete file content\n</fizz-file>\nText outside a file block is not saved as code. Do not use ordinary Markdown fences for files unless the opening fence includes the file path. For existing files, patch with:\n<fizz-edit path=\"relative/path.ext\">\n<<<<<<< SEARCH\nexact existing lines\n=======\nreplacement lines\n>>>>>>> REPLACE\n</fizz-edit>\nYou may put several SEARCH/REPLACE blocks in one <fizz-edit>. Never use placeholders such as '// rest unchanged'. For new projects, create index.html first and every required CSS/JS/data file in dependency order. Keep replies to a few complete files at a time to avoid output truncation. When complete, repeat the plan with finished tasks marked [x], then summarize. Do not claim success until you inspect the result.",
+        : "BUILD MODE. Your output is executed by Fizz DEV, not merely displayed as chat. Start with a task list in this exact format (3–10 tasks naming files):\n<fizz-plan>\n- [ ] create index.html\n- [ ] add styles\n</fizz-plan>\nThen write the actual files immediately. CRITICAL: never say you are about to create a file and then stop; every file you intend to create MUST be emitted as a complete, closed block in the same response whenever possible:\n<fizz-file path=\"relative/path.ext\">\ncomplete file content\n</fizz-file>\nText outside a file block is not saved as code. Do not use ordinary Markdown fences for files unless the opening fence includes the file path. For existing files, patch with:\n<fizz-edit path=\"relative/path.ext\">\n<<<<<<< SEARCH\nexact existing lines\n=======\nreplacement lines\n>>>>>>> REPLACE\n</fizz-edit>\nYou may put several SEARCH/REPLACE blocks in one <fizz-edit>. Never use placeholders such as '// rest unchanged'. For new projects, create index.html first and every required CSS/JS/data file in dependency order. Keep replies to a few complete files at a time to avoid output truncation. When complete, repeat the plan with finished tasks marked [x], then summarize. Do not claim success until you inspect the result.",
       "THE PREVIEW. Projects run in a browser preview with index.html as the entry point. Linked .css files and classic scripts are loaded from the project. ES modules work across files: <script type=\"module\" src=\"js/main.js\"></script> and import { x } from \"./state.js\" between project files (always with the .js extension). fetch(\"data/items.json\") returns project files. Bare imports (import confetti from \"canvas-confetti\") load from esm.sh automatically. Links between project pages work. Servers, build tools and npm scripts need the cloud sandbox.",
-      `TOOLS. You can use these tags; FIZZ DEV runs them after your files are written, shows each as a step, and sends you the results in the next message so you can continue:\n${tools}\nUse tools to check your own work (run the script, take a screenshot of the preview) before you say it's done. Work in small steps. When everything works, finish without any tool tags.`,
+      `TOOLS. You can use these tags; Fizz DEV runs them after your files are written, shows each as a step, and sends you the results in the next message so you can continue:\n${tools}\nUse tools to check your own work (run the script, take a screenshot of the preview) before you say it's done. Work in small steps. When everything works, finish without any tool tags.`,
       githubContext,
       brandfetchContext,
       autoActionsContext,
@@ -763,7 +763,7 @@
       if (r.stop === "max_tokens") reply.cutOff = true;
     } catch (e) {
       if (e.name === "AbortError") { reply.content += reply.content ? "\n\n*Stopped.*" : ""; stopLoop = true; }
-      else if (e.message === "NO_KEY") Object.assign(reply, { error: "Add your key in Settings → AI, or switch to FIZZ AI.", soft: true });
+      else if (e.message === "NO_KEY") Object.assign(reply, { error: "Add your key in Settings → AI, or switch to Fizz AI.", soft: true });
       else if (F.agentCore.isContextOverflow(e)) Object.assign(reply, { error: `This conversation is too long for the model (${e.message}). Start a new chat with /new, or choose a model with a bigger context in Settings → AI.`, overflow: true, soft: true });
       else Object.assign(reply, { error: e.message, soft: [404, 429, 503].includes(e.status) });
     } finally {
@@ -776,7 +776,7 @@
         // A failure while applying the reply must end the turn cleanly: files already
         // applied stay applied, and the error is shown instead of aborting this finally.
         reply.error = `Fizz Code's reply could not be fully applied: ${String(e?.message || e).slice(0, 200)}`;
-        console.error("[FIZZ DEV] Couldn't apply the reply", e);
+        console.error("[Fizz DEV] Couldn't apply the reply", e);
       }
       reply.doneAt = Date.now() + 1;
       if (c.title === "New chat") {
@@ -1020,7 +1020,7 @@
    * When Fizz Code says it's done: check the files it wrote (syntax, imports, links, JSON, CSS, runtime errors).
    * Problems go straight back to it to fix; returns true when it's working on them.
    */
-  /** The five checks FIZZ DEV runs after Fizz Code changes a project. Each reports issues (bugs to fix). */
+  /** The five checks Fizz DEV runs after Fizz Code changes a project. Each reports issues (bugs to fix). */
   const CHECKS = [
     { id: "code", name: "Code: syntax, imports, links, JSON, CSS" },
     { id: "pages", name: "Every page loads without errors" },
@@ -1173,7 +1173,7 @@
     renderAll();
     // A selected repository gets the work automatically, like a commit after every task.
     if (why === "done" && project().git?.autoPush && (reply.changes?.length || reply.tools?.length) && Object.keys(project().files).length) {
-      githubPush(chat()?.title || "Update from FIZZ DEV", { ask: false }).catch(() => {});
+      githubPush(chat()?.title || "Update from Fizz DEV", { ask: false }).catch(() => {});
     }
     const c = chat();
     // Telegram updates (Settings → Tools): only for real work, not for plain answers.
@@ -1184,7 +1184,7 @@
       F.conn.apps.call("telegram", { method: "POST", path: "/sendMessage", body: { chat_id: s.telegramChat, text: `${head} — ${c?.title || project().name}\n\n${prose || reply.error || ""}`.slice(0, 3500) } }).catch(() => {});
     }
     if (document.hidden || F.app.current() !== "dev") {
-      document.title = `${why === "question" || why === "approval" || why === "review" ? "Waiting for you" : "Done"} · FIZZ DEV`;
+      document.title = `${why === "question" || why === "approval" || why === "review" ? "Waiting for you" : "Done"} · Fizz DEV`;
       try {
         if (data.settings.notify !== false && "Notification" in window && Notification.permission === "granted") {
           const n = new Notification(why === "question" ? "Fizz Code has a question" : why === "approval" || why === "review" ? "Fizz Code is waiting for you" : reply.error ? "Fizz Code stopped with an error" : "Fizz Code finished", { body: c?.title || project().name, icon: "assets/mark-fizz-dev.png", tag: "fizz-dev" });
@@ -1193,7 +1193,7 @@
       } catch {}
     }
   }
-  document.addEventListener("visibilitychange", () => { if (!document.hidden && /· FIZZ DEV$/.test(document.title) && /^(Done|Waiting for you) ·/.test(document.title)) renderHeader(); });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && /· Fizz DEV$/.test(document.title) && /^(Done|Waiting for you) ·/.test(document.title)) renderHeader(); });
 
   // ---------- tools ----------
   async function runTools(reply) {
@@ -1556,12 +1556,12 @@
       if (!input.value && text) input.value = text;
       grow();
       renderComposer();
-      console.error("[FIZZ DEV] Couldn't send message", err);
+      console.error("[Fizz DEV] Couldn't send message", err);
       F.toast(`Couldn't send message: ${err?.message || "unexpected error"}`);
     }
   }
   /** Sends a message as the user (also used by answers, plan approval and "keep going"). */
-  /** A message FIZZ sends for the user (an automatic build fix): shown as a short notice, then Fizz Code works. */
+  /** A message Fizz sends for the user (an automatic build fix): shown as a short notice, then Fizz Code works. */
   async function sendAuto({ projectId, chatId, text, notice }) {
     while (state.controller) await new Promise((r) => setTimeout(r, 1500));
     if (projectId && projectId !== state.projectId && data.projects.some((p) => p.id === projectId)) selectProject(projectId);
@@ -1575,7 +1575,7 @@
   }
   async function sendText(text, { attachments = [], mode = null } = {}) {
     if (state.controller) return;
-    // No mode buttons: FIZZ DEV works out what the message wants (an answer, a build, a plan or a task),
+    // No mode buttons: Fizz DEV works out what the message wants (an answer, a build, a plan or a task),
     // unless the user picked a mode in the + menu.
     state.mode = mode || forcedMode() || detectMode(text);
     const p = project();
@@ -1807,7 +1807,7 @@
   }
 
   // ---------- browser preview ----------
-  // Design mode: hover outlines elements; a click sends a description of the element to FIZZ DEV.
+  // Design mode: hover outlines elements; a click sends a description of the element to Fizz DEV.
   const SELECT_BRIDGE = `var sel=false,hov=null,box=null;function outline(el){if(!box){box=document.createElement("div");box.style.cssText="position:fixed;pointer-events:none;z-index:2147483647;border:2px solid #d0612e;background:rgba(208,97,46,.10);border-radius:4px;transition:all .06s"}if(!el){box.remove();return}var r=el.getBoundingClientRect();box.style.left=r.left+"px";box.style.top=r.top+"px";box.style.width=r.width+"px";box.style.height=r.height+"px";document.documentElement.appendChild(box)}function path(el){var p=[];while(el&&el.nodeType===1&&el!==document.documentElement&&p.length<5){if(el.id){p.unshift("#"+el.id);break}var s=el.tagName.toLowerCase(),c=(el.getAttribute("class")||"").trim().split(/\\s+/).filter(Boolean).slice(0,2);if(c.length)s+="."+c.join(".");var sib=el.parentNode?[].filter.call(el.parentNode.children,function(x){return x.tagName===el.tagName}):[];if(sib.length>1)s+=":nth-of-type("+(sib.indexOf(el)+1)+")";p.unshift(s);el=el.parentElement}return p.join(" > ")}addEventListener("message",function(e){if(e.data&&e.data.fizz==="select-mode"){sel=!!e.data.on;document.documentElement.style.cursor=sel?"crosshair":"";if(!sel)outline(null)}});addEventListener("mousemove",function(e){if(!sel)return;hov=e.target;outline(hov)},true);addEventListener("click",function(e){if(!sel)return;e.preventDefault();e.stopPropagation();var el=e.target,t=(el.innerText||el.getAttribute("alt")||el.getAttribute("aria-label")||"").trim().replace(/\\s+/g," ").slice(0,60);parent.postMessage({fizz:"selected",selector:path(el),label:el.tagName.toLowerCase()+(t?" \u201c"+t+"\u201d":""),html:el.outerHTML.slice(0,1500)},"*");sel=false;document.documentElement.style.cursor="";outline(null)},true);`;
   const BRIDGE = `<script>(function(){var P=parent;function s(l,a){try{P.postMessage({fizz:"console",level:l,text:Array.prototype.map.call(a,function(v){try{return typeof v==="string"?v:v instanceof Error?(v.stack||v.message):JSON.stringify(v)}catch(e){return String(v)}}).join(" ")},"*")}catch(e){}}["log","info","warn","error","debug"].forEach(function(l){var o=console[l];console[l]=function(){s(l,arguments);return o.apply(console,arguments)}});addEventListener("error",function(e){s("error",[e.message+(e.lineno?" (line "+e.lineno+")":"")])});addEventListener("unhandledrejection",function(e){s("error",["Unhandled rejection: "+(e.reason&&e.reason.message||e.reason)])});document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[href]");if(!a)return;var h=a.getAttribute("href");if(!h||/^(https?:|mailto:|tel:|#|javascript:)/i.test(h))return;e.preventDefault();P.postMessage({fizz:"navigate",href:h},"*")},true);${F.docs.CAPTURE_BRIDGE}${SELECT_BRIDGE}})();<\/script>`;
   /** Bare ES module imports (import x from "lib") resolve to esm.sh, so npm packages work without a build step. */
@@ -1980,8 +1980,8 @@
 
   // ---------- connections ----------
   const TOKEN_HELP = {
-    vercel: { label: "Vercel token", url: "https://vercel.com/account/settings/tokens", how: "Create a token (any name, scope: your account), copy it and paste it here. FIZZ keeps it encrypted and uses it only to deploy your projects." },
-    github: { label: "GitHub token", url: "https://github.com/settings/tokens/new?scopes=repo,workflow&description=FIZZ%20DEV", how: "Create a token with the <b>repo</b> and <b>workflow</b> boxes ticked (they're pre-selected by this link), press Generate, copy it and paste it here. FIZZ keeps it encrypted and uses it only for your repositories and app builds." },
+    vercel: { label: "Vercel token", url: "https://vercel.com/account/settings/tokens", how: "Create a token (any name, scope: your account), copy it and paste it here. Fizz keeps it encrypted and uses it only to deploy your projects." },
+    github: { label: "GitHub token", url: "https://github.com/settings/tokens/new?scopes=repo,workflow&description=FIZZ%20DEV", how: "Create a token with the <b>repo</b> and <b>workflow</b> boxes ticked (they're pre-selected by this link), press Generate, copy it and paste it here. Fizz keeps it encrypted and uses it only for your repositories and app builds." },
   };
   /** GitHub and Vercel: a personal token always works; the provider's sign-in is offered too when the site has it. */
   async function connectWithToken(provider, label, st) {
@@ -2012,7 +2012,7 @@
     const connected = provider === "google" ? F.conn.google.connected() : st.connections?.[provider]?.connected;
     if (connected) return true;
     if (!configured) {
-      await dialog({ title: `${label} isn't available yet`, desc: st.server ? `The site owner hasn't configured ${label} on this server.` : `${label} needs the FIZZ server. Deploy this site from GitHub to Netlify with the environment variables from the README.`, ok: "OK" });
+      await dialog({ title: `${label} isn't available yet`, desc: st.server ? `The site owner hasn't configured ${label} on this server.` : `${label} needs the Fizz server. Deploy this site from GitHub to Netlify with the environment variables from the README.`, ok: "OK" });
       return false;
     }
     if (provider === "google") {
@@ -2046,7 +2046,7 @@
   };
 
   /** Pushes the project. With { ask: false } (app builds) a linked repository is pushed without the commit dialog. Returns { sha, owner, repo, branch } or nothing. */
-  async function githubPush(message = "Update from FIZZ DEV", { ask = true } = {}) {
+  async function githubPush(message = "Update from Fizz DEV", { ask = true } = {}) {
     const p = project();
     if (!Object.keys(p.files).length) return F.toast("This project has no files yet.");
     if (!(await needConnection("github", "GitHub"))) return;
@@ -2057,7 +2057,7 @@
       if (repo.create) {
         const v = await dialog({ title: "New GitHub repository", fields: [{ name: "name", label: "Repository name", value: p.name.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-|-$/g, ""), required: true, mono: true }, { name: "private", label: "Private repository", type: "checkbox", value: true }], ok: "Create" });
         if (!v) return;
-        try { const r = await F.conn.github.create(v.name, v.private, `Created with FIZZ DEV`); target = { owner: r.repo.owner, repo: r.repo.name, branch: r.repo.defaultBranch || "main" }; } catch (e) { return F.toast(e.message); }
+        try { const r = await F.conn.github.create(v.name, v.private, `Created with Fizz DEV`); target = { owner: r.repo.owner, repo: r.repo.name, branch: r.repo.defaultBranch || "main" }; } catch (e) { return F.toast(e.message); }
       } else target = { owner: repo.owner, repo: repo.name, branch: repo.defaultBranch || "main" };
     }
     const v = ask || !p.git
@@ -2073,7 +2073,7 @@
       save();
       renderHeader();
       const kept = Object.keys(p.files).length - publishable(p.files).length;
-      F.toast(`Pushed ${r.files} files to ${target.owner}/${target.repo}${kept ? ` · ${kept} private or ignored file${kept === 1 ? "" : "s"} (.env, .gitignore) stayed in FIZZ DEV` : ""}`);
+      F.toast(`Pushed ${r.files} files to ${target.owner}/${target.repo}${kept ? ` · ${kept} private or ignored file${kept === 1 ? "" : "s"} (.env, .gitignore) stayed in Fizz DEV` : ""}`);
       return { sha: r.sha, owner: target.owner, repo: target.repo, branch: v.branch };
     } catch (e) {
       if (e.code === "needs_workflow_scope" && (await dialog({ title: "Connect GitHub again", desc: e.message, ok: "Reconnect GitHub" }))) { await F.conn.disconnect("github").catch(() => {}); await needConnection("github", "GitHub"); }
@@ -2107,7 +2107,7 @@
     const repo = await pickFrom("Import a repository", async () => (await F.conn.github.repos()).repos, (r) => `${r.fullName}${r.private ? " (private)" : ""}`);
     if (!repo) return;
     const cloud = Boolean(F.serverStatusCached?.()?.tools?.sandbox);
-    const v = await dialog({ title: `Import ${repo.fullName}`, desc: cloud ? "Small repositories are copied into the browser (up to 200 files). Big ones stay in your cloud sandbox: Fizz Code searches and reads them there and brings in only what it works on." : "Text files are imported into a new FIZZ DEV project (up to 200 files).", fields: [{ name: "branch", label: "Branch", value: repo.defaultBranch || "main", mono: true, required: true }], ok: "Import" });
+    const v = await dialog({ title: `Import ${repo.fullName}`, desc: cloud ? "Small repositories are copied into the browser (up to 200 files). Big ones stay in your cloud sandbox: Fizz Code searches and reads them there and brings in only what it works on." : "Text files are imported into a new Fizz DEV project (up to 200 files).", fields: [{ name: "branch", label: "Branch", value: repo.defaultBranch || "main", mono: true, required: true }], ok: "Import" });
     if (!v) return;
     F.toast("Importing…");
     try {
@@ -2190,9 +2190,9 @@
     if (!(await needConnection("google", "Google"))) return;
     const p = project();
     const lastSummary = [...(chat()?.messages || [])].reverse().find((m) => m.role === "assistant" && m.content && !m.error);
-    const text = [`${p.name}`, "", `Files (${Object.keys(p.files).length}):`, ...Object.keys(p.files).sort().map((f) => `• ${f}`), "", lastSummary ? `Latest summary from Fizz Code:\n${parseAssistant(lastSummary.content).prose}` : "", "", `Exported from FIZZ DEV on ${new Date().toLocaleString()}`].join("\n");
+    const text = [`${p.name}`, "", `Files (${Object.keys(p.files).length}):`, ...Object.keys(p.files).sort().map((f) => `• ${f}`), "", lastSummary ? `Latest summary from Fizz Code:\n${parseAssistant(lastSummary.content).prose}` : "", "", `Exported from Fizz DEV on ${new Date().toLocaleString()}`].join("\n");
     try {
-      const r = await F.conn.google.createDoc(`${p.name} — FIZZ DEV summary`, text);
+      const r = await F.conn.google.createDoc(`${p.name} — Fizz DEV summary`, text);
       F.toast("Summary exported to Google Docs");
       if (r.webViewLink) window.open(r.webViewLink, "_blank", "noopener");
     } catch (e) { F.toast(e.message); }
@@ -2294,7 +2294,7 @@
     e.preventDefault();
     try { await send(); }
     catch (err) {
-      console.error("[FIZZ DEV] Couldn't send message", err);
+      console.error("[Fizz DEV] Couldn't send message", err);
       F.toast(`Couldn't send message: ${err?.message || "unexpected error"}`);
     }
   });
@@ -2322,7 +2322,7 @@
     save();
     renderComposer();
     if (m === "do") F.web?.warmUp?.();
-    F.toast(m ? `${m[0].toUpperCase() + m.slice(1)} mode is on — back to Automatic in the + menu.` : "Automatic: FIZZ DEV works out whether to answer, build, plan or do.");
+    F.toast(m ? `${m[0].toUpperCase() + m.slice(1)} mode is on — back to Automatic in the + menu.` : "Automatic: Fizz DEV works out whether to answer, build, plan or do.");
   }
   if (state.mode === "do") setTimeout(() => F.web?.warmUp?.(), 3000);
   $("#model-btn").addEventListener("click", (e) => {
@@ -2511,7 +2511,7 @@
     if (t.dataset.step) { state.expanded.has(t.dataset.step) ? state.expanded.delete(t.dataset.step) : state.expanded.add(t.dataset.step); renderThread(); return; }
     if (t.dataset.copy !== undefined) { navigator.clipboard.writeText(c.messages[+t.dataset.copy].content); F.toast("Copied"); }
     if (t.dataset.revert) revertMessage(t.dataset.revert);
-    if (t.dataset.push) { const m = c.messages.find((x) => x.id === t.dataset.push); githubPush(m?.pushMessage || c.title || "Update from FIZZ DEV"); }
+    if (t.dataset.push) { const m = c.messages.find((x) => x.id === t.dataset.push); githubPush(m?.pushMessage || c.title || "Update from Fizz DEV"); }
     if (t.dataset.dl) return F.docs.downloadFile(project().files, t.dataset.dl);
     if (t.dataset.openFile) { showTab("code"); return openFile(t.dataset.openFile); }
     const msgOf = (v) => c.messages.find((x) => x.id === v.split(":")[0]);
@@ -2688,7 +2688,7 @@
   $("#open-side").addEventListener("click", () => { app.classList.add("drawer"); $("#scrim").classList.remove("hidden"); });
   $("#scrim").addEventListener("click", () => { closeDrawer(); app.classList.remove("panel-open"); });
   $("#me-btn").addEventListener("click", async (e) => {
-    const k = await menu(e.currentTarget, [...F.rid.menuHead(user), { k: "settings", html: "Settings" }, { k: "conn", html: "Connections" }, { k: "chat", html: "Switch to FIZZ <small>Ctrl+.</small>" }, { k: "help", html: "Help & support" }, ...F.rid.menuTail(user)]);
+    const k = await menu(e.currentTarget, [...F.rid.menuHead(user), { k: "settings", html: "Settings" }, { k: "conn", html: "Connections" }, { k: "chat", html: "Switch to Fizz <small>Ctrl+.</small>" }, { k: "help", html: "Help & support" }, ...F.rid.menuTail(user)]);
     F.rid.onMenu(k);
     if (k === "settings") openSettings();
     if (k === "conn") openSettings("connections");
@@ -2884,7 +2884,7 @@
   function chatMarkdown() {
     const c = chat();
     if (!c) return "";
-    const parts = [`# ${c.title || "FIZZ DEV chat"}`, `_${project().name} · exported ${new Date().toLocaleString()}_`];
+    const parts = [`# ${c.title || "Fizz DEV chat"}`, `_${project().name} · exported ${new Date().toLocaleString()}_`];
     for (const m of c.messages) {
       if (m.role === "user" && m.auto) continue;
       if (m.role === "user") { parts.push(`## You\n\n${m.content}`); continue; }
@@ -2900,7 +2900,7 @@
     F.download(`${(chat().title || "chat").replace(/[^\w-]+/g, "-").slice(0, 60)}.md`, md);
   }
   function shortcuts() {
-    const rows = [["Ctrl K", "Command palette — every action, project and template"], ["Ctrl P", "Open a file"], ["Ctrl .", "Switch between FIZZ and FIZZ DEV"], ["Ctrl `", "Terminal"], ["Enter", "Send"], ["Shift Enter", "New line"], ["Esc", "Stop Fizz Code"], ["/", "Slash commands"], ["@", "Mention a file"], ["?", "This list"]];
+    const rows = [["Ctrl K", "Command palette — every action, project and template"], ["Ctrl P", "Open a file"], ["Ctrl .", "Switch between Fizz and Fizz DEV"], ["Ctrl `", "Terminal"], ["Enter", "Send"], ["Shift Enter", "New line"], ["Esc", "Stop Fizz Code"], ["/", "Slash commands"], ["@", "Mention a file"], ["?", "This list"]];
     dialog({ title: "Keyboard shortcuts", desc: "", extra: `<div class="kbd-list">${rows.map(([k, d]) => `<div><span>${k.split(" ").map((x) => `<kbd>${esc(x)}</kbd>`).join("")}</span><small>${esc(d)}</small></div>`).join("")}</div>`, ok: "Done" });
   }
 
@@ -2909,7 +2909,7 @@
     const list = [
       { g: "Chat", label: "New chat", run: () => newChat() },
       { g: "Chat", label: "New project", run: () => $("#new-project")?.click() },
-      { g: "Chat", label: "Automatic mode", hint: "FIZZ DEV picks answer, build, plan or task by itself", run: () => setForce("") },
+      { g: "Chat", label: "Automatic mode", hint: "Fizz DEV picks answer, build, plan or task by itself", run: () => setForce("") },
       { g: "Chat", label: "Plan mode", hint: "Plan before building", run: () => setForce("plan") },
       { g: "Chat", label: "Build mode", run: () => setForce("build") },
       { g: "Chat", label: "Ask mode", hint: "Questions, no file changes", run: () => setForce("ask") },
@@ -2933,7 +2933,7 @@
       { g: "View", label: "Show preview", run: () => { showTab("browser"); F.web?.select("preview"); } },
       { g: "View", label: "New browser tab", run: () => { showTab("browser"); F.web?.newTab(); } },
       { g: "View", label: "Show activity", run: () => showTab("activity") },
-      { g: "View", label: "Switch to FIZZ", hint: "Ctrl+.", run: () => F.app.switch("chat") },
+      { g: "View", label: "Switch to Fizz", hint: "Ctrl+.", run: () => F.app.switch("chat") },
       { g: "View", label: `Theme: ${document.documentElement.classList.contains("dark") ? "light" : "dark"}`, run: () => { F.theme.set(document.documentElement.classList.contains("dark") ? "light" : "dark"); } },
       { g: "Settings", label: "Settings", run: () => openSettings() },
       { g: "Settings", label: "Tools", hint: "Search, cloud browser, sandbox, sync", run: () => openSettings("tools") },
@@ -3096,7 +3096,7 @@
   F.web?.init({ refreshPreview: () => refreshPreview(), previewUrl: () => "/" + (state.previewPath || "index.html") });
   F.builds?.attach({ data, save, rerender: () => renderThread(), send: (text) => sendText(text), sendAuto, currentChat: () => state.chatId });
 
-  // Shown again after switching from FIZZ: refresh layout-dependent widgets and accept a hand-off prompt.
+  // Shown again after switching from Fizz: refresh layout-dependent widgets and accept a hand-off prompt.
   F.app.onShow("dev", (payload) => {
     renderHeader();
     setTimeout(() => { cm?.refresh(); term?.fit(); }, 30);
@@ -3106,7 +3106,7 @@
       renderComposer();
       $("#input").value = payload.prompt;
       grow();
-      F.toast("Brought over from FIZZ — review and press Enter");
+      F.toast("Brought over from Fizz — review and press Enter");
     }
     if (matchMedia("(hover: hover)").matches) $("#input").focus();
   });

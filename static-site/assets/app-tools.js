@@ -1,5 +1,5 @@
 /* Fizz Code's tool for the apps the user connected with a token (Notion, Trello, Linear, Airtable, Figma, Netlify,
-   Cloudflare, Discord, Telegram, Slack, Supabase). Calls go through FIZZ's server, which adds the token; Fizz Code
+   Cloudflare, Discord, Telegram, Slack, Supabase). Calls go through Fizz's server, which adds the token; Fizz Code
    never sees it. Deleting, and sending or posting messages, wait for the user's OK. */
 (function () {
   "use strict";
@@ -48,7 +48,7 @@
       const on = apps().filter((a) => a.connected);
       if (!on.length) return "";
       return [
-        '<fizz-api service="…" method="GET|POST|PUT|PATCH|DELETE" path="/api/path" query=\'{"k":"v"}\'>JSON body</fizz-api> calls an app the user connected; FIZZ adds their token. Connected now:',
+        '<fizz-api service="…" method="GET|POST|PUT|PATCH|DELETE" path="/api/path" query=\'{"k":"v"}\'>JSON body</fizz-api> calls an app the user connected; Fizz adds their token. Connected now:',
         ...on.map((a) => `  ${a.id} (${a.account || a.name}): ${NOTES[a.id] || ""}`),
         ...(apps().some((a) => !a.connected) ? [`  Not connected yet (the user can connect them in Settings → Connections → Apps): ${apps().filter((a) => !a.connected).map((a) => a.name).join(", ")}.`] : []),
         "  You get the status and the JSON back. Read before you write (find the right ids first). Deleting, sending/posting messages and DNS changes wait for the user's OK automatically.",

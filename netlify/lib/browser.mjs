@@ -1,5 +1,5 @@
 // Fizz Code's cloud browser (Browserbase): a real Chrome in the cloud that the AI drives over CDP and the
-// user sees and uses through Browserbase's live view inside FIZZ DEV. Logins are kept in a per-user
+// user sees and uses through Browserbase's live view inside Fizz DEV. Logins are kept in a per-user
 // Browserbase context. Safety: the AI can't type into password fields (the user types those in the live
 // view), and pages with a CAPTCHA are flagged so the AI hands over to the user.
 import { attach, connect, pages } from "./cdp.mjs";
@@ -41,7 +41,7 @@ export async function sessionRunning(sessionId) {
   try { const s = await bb(`/sessions/${sessionId}`); return s.status === "RUNNING"; } catch { return false; }
 }
 export const releaseSession = (sessionId) => bb(`/sessions/${sessionId}`, { method: "POST", body: JSON.stringify({ ...project(), status: "REQUEST_RELEASE" }) }).catch(() => null);
-/** Live view links for each tab, to show in FIZZ DEV (the user can click and type in them). */
+/** Live view links for each tab, to show in Fizz DEV (the user can click and type in them). */
 export async function liveViews(sessionId) {
   const d = await bb(`/sessions/${sessionId}/debug`);
   return { main: d.debuggerFullscreenUrl, pages: (d.pages || []).map((p) => ({ id: p.id, url: redactUrl(p.url), title: p.title, live: p.debuggerFullscreenUrl })) };

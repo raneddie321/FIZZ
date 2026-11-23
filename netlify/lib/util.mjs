@@ -1,4 +1,4 @@
-// Shared helpers for FIZZ Netlify Functions. No secrets are ever sent to the browser.
+// Shared helpers for Fizz Netlify Functions. No secrets are ever sent to the browser.
 import { createCipheriv, createDecipheriv, createHash, randomBytes, timingSafeEqual } from "node:crypto";
 
 /** How long sign-ins and connected apps are remembered in this browser (the most browsers allow). */

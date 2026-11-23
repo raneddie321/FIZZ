@@ -1,4 +1,4 @@
-// Web search and page reading for Fizz Code and the FIZZ DEV browser.
+// Web search and page reading for Fizz Code and the Fizz DEV browser.
 // Search: Browserbase (BROWSERBASE_API_KEY), Brave (BRAVE_SEARCH_API_KEY) or Tavily (TAVILY_API_KEY);
 // without a key, Wikipedia. Reading: Browserbase's fetch (renders JS, returns Markdown) or a direct fetch
 // that refuses private/internal addresses.

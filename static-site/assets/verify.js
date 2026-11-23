@@ -1,4 +1,4 @@
-/* Checks a project before FIZZ DEV reports it as done. */
+/* Checks a project before Fizz DEV reports it as done. */
 (function () {
   "use strict";
   const F = window.FIZZ;

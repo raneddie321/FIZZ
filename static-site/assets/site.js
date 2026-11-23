@@ -78,8 +78,8 @@
   const WORDMARK = (dev) => `<span class="wordmark"><img class="logo-img" src="assets/logo-fizz${dev ? "-dev" : ""}.png" alt="${dev ? "fizz dev" : "fizz"}" /></span>`;
 
   const NAV = [
-    ["fizz.html", "FIZZ"],
-    ["fizz-dev.html", "FIZZ DEV"],
+    ["fizz.html", "Fizz"],
+    ["fizz-dev.html", "Fizz DEV"],
     ["pricing.html", "Pricing"],
     ["faq.html", "FAQ"],
     ["contact.html", "Support"],
@@ -92,9 +92,9 @@
     const me = auth.current();
     const nav = NAV.map(([h, l]) => `<a href="${h}" ${page === h ? 'aria-current="page"' : ""}>${l}</a>`).join("");
     const actions = me.rid
-      ? `<span class="hdr-user hide-sm" title="${esc(me.email)}"><span class="avatar">${esc(initials(me.name))}</span>${esc(me.name)}</span><button type="button" class="btn btn-ghost btn-sm hide-sm" data-rid-signout>Sign out</button><a class="btn btn-sm" href="chat.html">Open FIZZ</a>`
+      ? `<span class="hdr-user hide-sm" title="${esc(me.email)}"><span class="avatar">${esc(initials(me.name))}</span>${esc(me.name)}</span><button type="button" class="btn btn-ghost btn-sm hide-sm" data-rid-signout>Sign out</button><a class="btn btn-sm" href="chat.html">Open Fizz</a>`
       : `<a class="btn btn-ghost btn-sm hide-sm rid-signin-btn" href="${esc(auth.url())}"><img src="assets/raneddie-logo.png" alt="" />Sign in with RanEddie ID</a><a class="btn btn-sm" href="signin.html?mode=signup&amp;redirect_url=%2Fchat.html">Get started</a>`;
-    return `<div class="inner"><a href="index.html" aria-label="FIZZ home" style="text-decoration:none">${WORDMARK(false)}</a>
+    return `<div class="inner"><a href="index.html" aria-label="Fizz home" style="text-decoration:none">${WORDMARK(false)}</a>
       <nav class="site-nav" aria-label="Main">${nav}</nav>
       <div class="header-actions">${actions}<button class="icon-btn mobile-toggle" aria-label="Menu" aria-expanded="false">${icon("menu")}</button></div></div>
       <nav class="mobile-nav" aria-label="Mobile">${NAV.map(([h, l]) => `<a href="${h}">${l}</a>`).join("")}${me.rid ? `<a href="#" data-rid-signout>Sign out (${esc(me.name)})</a>` : `<a href="${esc(auth.url())}">Sign in with RanEddie ID</a>`}</nav>`;
@@ -105,10 +105,10 @@
     const t = theme.get();
     return `<div class="cols"><div>${WORDMARK(false)}<p style="color:var(--muted);font-size:14px;max-width:260px">AI assistance for everyday work, and an AI workspace for building software.</p>
       <div class="theme-switch" role="group" aria-label="Theme">${["light", "dark", "system"].map((v) => `<button data-theme="${v}" aria-pressed="${t === v}">${v[0].toUpperCase() + v.slice(1)}</button>`).join("")}</div></div>
-      ${col("Products", [["fizz.html", "FIZZ"], ["fizz-dev.html", "FIZZ DEV"], ["pricing.html", "Pricing"]])}
+      ${col("Products", [["fizz.html", "Fizz"], ["fizz-dev.html", "Fizz DEV"], ["pricing.html", "Pricing"]])}
       ${col("Resources", [["product.html", "Overview"], ["faq.html", "FAQ"], ["contact.html", "Contact support"]])}
       ${col("Legal", [["terms.html", "Terms of Service"], ["privacy.html", "Privacy Policy"]])}</div>
-      <div class="bottom"><div><span><span class="raneddie">RANEDDIE</span> &nbsp;© ${new Date().getFullYear()} RANEDDIE. All rights reserved.</span><span>FIZZ and FIZZ DEV are products of RANEDDIE.</span></div></div>`;
+      <div class="bottom"><div><span><span class="raneddie">RanEddie</span> &nbsp;© ${new Date().getFullYear()} RanEddie. All rights reserved.</span><span>Fizz and Fizz DEV are products of RanEddie.</span></div></div>`;
   }
 
   function mount() {
@@ -172,14 +172,14 @@
     });
   }
 
-  // ---------- phones: FIZZ itself is in the app ----------
-  // On a phone (not desktop mode, not the FIZZ app's own web view) every way into FIZZ leads to get-app.html.
+  // ---------- phones: Fizz itself is in the app ----------
+  // On a phone (not desktop mode, not the Fizz app's own web view) every way into Fizz leads to get-app.html.
   const isPhone = () => { try { const ua = navigator.userAgent || ""; return /iPhone|iPod|Windows Phone|Android.*Mobile|BlackBerry|Opera Mini/i.test(ua) && !/iPad|Tablet/i.test(ua) && !(/; wv\)|FIZZApp|RanEddieApp|Capacitor/i.test(ua) || window.Capacitor || window.ReactNativeWebView || window.FIZZ_APP); } catch { return false; } };
   function phoneLinks(root = document) {
     if (!isPhone() || /get-app\.html$/.test(location.pathname)) return;
     for (const a of root.querySelectorAll('a[href*="chat.html"], a[href*="dev.html"], a[href*="signin.html"]')) {
       a.setAttribute("href", "/get-app.html");
-      for (const n of a.childNodes) if (n.nodeType === 3 && /Get started|Open FIZZ|Try FIZZ|Start building|Start for free/i.test(n.textContent)) n.textContent = n.textContent.replace(/Get started for free|Get started|Open FIZZ DEV|Open FIZZ|Try FIZZ DEV|Try FIZZ|Start building|Start for free/i, "Get the app");
+      for (const n of a.childNodes) if (n.nodeType === 3 && /Get started|Open Fizz|Try Fizz|Start building|Start for free/i.test(n.textContent)) n.textContent = n.textContent.replace(/Get started for free|Get started|Open Fizz DEV|Open Fizz|Try Fizz DEV|Try Fizz|Start building|Start for free/i, "Get the app");
     }
   }
   window.FIZZ.phoneLinks = phoneLinks;

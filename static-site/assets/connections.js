@@ -1,4 +1,4 @@
-/* FIZZ connections: GitHub & Vercel (server OAuth via Netlify Functions), Google (Google Identity Services). */
+/* Fizz connections: GitHub & Vercel (server OAuth via Netlify Functions), Google (Google Identity Services). */
 (function () {
   "use strict";
   const F = window.FIZZ;
@@ -41,7 +41,7 @@
     let res;
     const headers = {};
     if (opts.body) headers["Content-Type"] = "application/json";
-    // FIZZ's own tools (search, sandbox, sync) know who is calling from the RanEddie ID session.
+    // Fizz's own tools (search, sandbox, sync) know who is calling from the RanEddie ID session.
     if (opts.auth) { const t = await F.rid?.token?.(); if (t) headers.Authorization = `Bearer ${t}`; }
     // A random id for this browser: keeps each device's cloud browser and limits apart when the site runs without
     // RanEddie ID on the server.
@@ -55,11 +55,11 @@
         body: opts.body ? JSON.stringify(opts.body) : undefined,
       });
     } catch {
-      throw new Error("Can't reach the FIZZ server. Check your connection.");
+      throw new Error("Can't reach the Fizz server. Check your connection.");
     }
     const data = await res.json().catch(() => null);
     if (!res.ok) {
-      const e = new Error(data?.error?.message || (res.status === 404 ? "This feature needs the FIZZ server (deploy the site from GitHub to Netlify)." : `Request failed (${res.status}).`));
+      const e = new Error(data?.error?.message || (res.status === 404 ? "This feature needs the Fizz server (deploy the site from GitHub to Netlify)." : `Request failed (${res.status}).`));
       e.code = data?.error?.code;
       e.status = res.status;
       e.data = data;
@@ -133,7 +133,7 @@
     if (res.status === 403) {
       const j = await res.clone().json().catch(() => null);
       const msg = j?.error?.message || "";
-      if (/insufficient|scope/i.test(msg)) { gToken = null; gSave(null); throw Object.assign(new Error("Google didn't give FIZZ access to this app (it was unticked when connecting). Connect Google again and leave it ticked."), { code: "not_connected" }); }
+      if (/insufficient|scope/i.test(msg)) { gToken = null; gSave(null); throw Object.assign(new Error("Google didn't give Fizz access to this app (it was unticked when connecting). Connect Google again and leave it ticked."), { code: "not_connected" }); }
       if (/has not been used|is disabled|not enabled/i.test(msg)) throw Object.assign(new Error(`This Google API isn't turned on for the site's Google Cloud project yet. The site owner turns it on in console.cloud.google.com → APIs & Services → Library. (${msg.slice(0, 220)})`), { code: "api_disabled" });
     }
     if (res.status === 401) { gToken = null; gSave(null); throw Object.assign(new Error("Your Google connection expired. Connect again."), { code: "not_connected" }); }

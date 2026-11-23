@@ -1,7 +1,7 @@
 import { error, json, readJson, sameOrigin } from "../lib/util.mjs";
 import { clerkConfigured, readFizz, sessionUser, writeFizz } from "../lib/clerk.mjs";
 
-/** FIZZ settings saved in the signed-in user's RanEddie ID (privateMetadata.fizz). */
+/** Fizz settings saved in the signed-in user's RanEddie ID (privateMetadata.fizz). */
 export default async (req) => {
   if (!clerkConfigured()) return error(503, "RanEddie ID isn't configured on this server yet.", "not_configured");
   if (!sameOrigin(req)) return error(403, "Not allowed.");

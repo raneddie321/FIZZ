@@ -1,4 +1,4 @@
-/* RanEddie ID sign-in, sign-up and password reset for FIZZ (signin.html).
+/* RanEddie ID sign-in, sign-up and password reset for Fizz (signin.html).
    The same steps as the RanEddie ID site (raneddie-id/app/sign-in, sign-up, forgot-password),
    built on clerk-js so every RanEddie product shares one account. */
 (function () {
@@ -176,7 +176,7 @@
   // ---------- sign in ----------
   function signInView() {
     const loading = S.busy;
-    if (S.step === "email") return `<form novalidate>${heading("Sign in", "FIZZ is a RANEDDIE product. Use your RanEddie ID to continue.")}${alertBox(S.error)}
+    if (S.step === "email") return `<form novalidate>${heading("Sign in", "Fizz is a RanEddie product. Use your RanEddie ID to continue.")}${alertBox(S.error)}
       ${field({ label: "Email", name: "email", type: "email", value: S.email, error: S.fe.email, attrs: 'autocomplete="username" inputmode="email" placeholder="you@example.com" autofocus' })}
       <div class="mt6">${button("Next", { loading })}</div>
       <p class="rid-foot">New here? <a href="${withRedirect("signup")}" data-mode="signup">Create a RanEddie ID</a></p></form>`;
@@ -199,7 +199,7 @@
     const i = SU_STEPS.findIndex(([id]) => id === S.step);
     const sp = i >= 0 ? stepper(i + 1, SU_STEPS.length, SU_STEPS[i][1]) : "";
     const loading = S.busy;
-    if (S.step === "email") return `<form novalidate>${sp}${heading("Create your RanEddie ID", "One account for FIZZ and all RanEddie games. Let's start with your email.")}
+    if (S.step === "email") return `<form novalidate>${sp}${heading("Create your RanEddie ID", "One account for Fizz and all RanEddie games. Let's start with your email.")}
       ${field({ label: "Email", name: "email", type: "email", value: S.email, error: S.fe.email, attrs: 'autocomplete="email" inputmode="email" placeholder="you@example.com" autofocus' })}
       ${S.emailTaken ? alertBox(`You already have an account with this email. <a href="${withRedirect("signin", `&email=${encodeURIComponent(S.email.trim())}`)}" data-mode="signin">Sign in instead</a>`) : ""}
       <div class="mt6">${button("Next", { loading })}</div>
@@ -274,7 +274,7 @@
 
   async function sendSecondFactorCode(si) {
     const f = si.supportedSecondFactors?.find((x) => x.strategy === "email_code");
-    if (!f) throw { message: "This account needs another sign-in step that FIZZ doesn't support yet." };
+    if (!f) throw { message: "This account needs another sign-in step that Fizz doesn't support yet." };
     await si.prepareSecondFactor({ strategy: "email_code", emailAddressId: f.emailAddressId });
   }
 
@@ -301,7 +301,7 @@
         const si = await signIn().attemptFirstFactor({ strategy: "password", password: S.password });
         if (si.status === "complete") return finish(si.createdSessionId);
         if (si.status === "needs_second_factor" || si.status === "needs_client_trust") { await sendSecondFactorCode(si); return set({ busy: false, step: "verify" }); }
-        set({ busy: false, error: "This account needs another sign-in step that FIZZ doesn't support yet." });
+        set({ busy: false, error: "This account needs another sign-in step that Fizz doesn't support yet." });
       } catch (e) { fail(e); }
     },
     "signin:verify": async () => {
@@ -413,9 +413,9 @@
   F.rid.load().then((c) => {
     clerk = c;
     if (!clerk) {
-      // No RanEddie ID on this deployment: let people into FIZZ for this browser session instead of looping.
+      // No RanEddie ID on this deployment: let people into Fizz for this browser session instead of looping.
       try { sessionStorage.setItem("fizz.rid.off", "1"); } catch {}
-      card.innerHTML = `${heading("RanEddie ID isn't available here yet", "You can keep using FIZZ and FIZZ DEV without an account. Your chats and projects stay in this browser.")}<a class="rid-btn primary" href="${esc(target())}">Continue to FIZZ</a>`;
+      card.innerHTML = `${heading("RanEddie ID isn't available here yet", "You can keep using Fizz and Fizz DEV without an account. Your chats and projects stay in this browser.")}<a class="rid-btn primary" href="${esc(target())}">Continue to Fizz</a>`;
       return;
     }
     try { sessionStorage.removeItem("fizz.rid.off"); } catch {}

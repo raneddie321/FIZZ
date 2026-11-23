@@ -1,4 +1,4 @@
-/* Interactive blocks inside chat replies, for FIZZ and FIZZ DEV.
+/* Interactive blocks inside chat replies, for Fizz and Fizz DEV.
    <fizz-quiz>{ "title": "...", "questions": [{ "q": "...", "options": ["a","b"], "answer": 0, "explain": "..." }] }</fizz-quiz>
      → a quiz card: one question at a time, instant feedback, a score at the end and "Try again".
    <fizz-widget title="...">  full HTML (with <style>/<script>)  </fizz-widget>

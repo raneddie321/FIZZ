@@ -1,5 +1,5 @@
 /* Fizz Code's tool for MCP (Model Context Protocol) servers the user connects in Settings →
-   Connections → MCP servers. The handshake, the tool list and every call happen on FIZZ's server, so the
+   Connections → MCP servers. The handshake, the tool list and every call happen on Fizz's server, so the
    browser never sees the server's Authorization header. The first call to a server asks the user for
    permission and then covers the rest of the session; tools that send, post or delete always ask. */
 (function () {
@@ -173,7 +173,7 @@
     },
   });
 
-  // Load the list when FIZZ DEV is (or becomes) the visible app, so its prompt is ready before the
+  // Load the list when Fizz DEV is (or becomes) the visible app, so its prompt is ready before the
   // first message; refresh it whenever the user connects, removes or refreshes a server in Settings.
   F.mcp = {
     servers,

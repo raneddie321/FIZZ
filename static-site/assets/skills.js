@@ -1,5 +1,5 @@
-/* FIZZ DEV skills: reusable instruction packs for Fizz Code. A skill is used when you turn it on in the
-   composer, or automatically when your message matches what it's for. Built-in skills ship with FIZZ DEV;
+/* Fizz DEV skills: reusable instruction packs for Fizz Code. A skill is used when you turn it on in the
+   composer, or automatically when your message matches what it's for. Built-in skills ship with Fizz DEV;
    your own skills are saved with your data in this browser. */
 (function () {
   "use strict";

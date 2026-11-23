@@ -1,4 +1,4 @@
-/* FIZZ storage: projects and conversations live in IndexedDB, so they aren't held back by localStorage's ~5 MB.
+/* Fizz storage: projects and conversations live in IndexedDB, so they aren't held back by localStorage's ~5 MB.
    localStorage keeps the small part of a user's data — settings and the ordered lists of ids — under the same key as
    before ("fizz.data.<user>", now with v: 2). F.loadData and F.saveData work exactly as before for the apps: the data
    is one in-memory object, saving returns at once, and the changed projects/conversations are written a moment later.
@@ -88,7 +88,7 @@
     let got = null;
     try { got = await read(LISTS.flatMap(([, idsKey]) => listIds(stored, idsKey)), projectIds); } catch { got = null; }
     if (!got) {
-      console.error("[FIZZ] Couldn't open this browser's storage for projects and chats.");
+      console.error("[Fizz] Couldn't open this browser's storage for projects and chats.");
       setTimeout(() => F.toast?.("Couldn't open this browser's storage for your projects and chats. Reload the page."), 600);
       return; // stays "partial": settings can be saved, the lists are left alone
     }
@@ -200,7 +200,7 @@
         try { localStorage.removeItem(journalKey(st.uid)); } catch {}
       } catch (e) {
         if (st.mode === "legacy") { st.noIdb = true; coreSave({ id: st.uid }, st.d); } // keep working the old way
-        else { console.error("[FIZZ] Couldn't save", e); F.toast?.(e?.name === "QuotaExceededError" ? "Browser storage is full. Delete some chats or projects." : "Couldn't save your latest changes in this browser. Keep this tab open and try again."); }
+        else { console.error("[Fizz] Couldn't save", e); F.toast?.(e?.name === "QuotaExceededError" ? "Browser storage is full. Delete some chats or projects." : "Couldn't save your latest changes in this browser. Keep this tab open and try again."); }
       } finally {
         st.flushing = null;
         if (st.again) { st.again = false; schedule(st, 50); }

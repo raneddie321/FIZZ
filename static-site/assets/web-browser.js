@@ -1,5 +1,5 @@
-/* The FIZZ DEV Browser tab: the project preview plus real web tabs.
-   - Search (FIZZ's own results page), YouTube videos, and any site that allows being shown in a frame.
+/* The Fizz DEV Browser tab: the project preview plus real web tabs.
+   - Search (Fizz's own results page), YouTube videos, and any site that allows being shown in a frame.
    - Other sites open in the cloud browser (Browserbase) when it's on — a real Chrome the user sees and uses
      through the live view, and that Fizz Code can drive with <fizz-browser> — or else in a reader view.
    Fizz Code never types passwords or card details: it hands over ("Your turn") and the user types them
@@ -67,7 +67,7 @@
 
   // ---------- straight to the cloud browser ----------
   // Once the browser runs, the user's own navigation, tab list and back/forward go directly to it
-  // (one round trip) instead of through FIZZ's server, which also had to look the sandbox up each time.
+  // (one round trip) instead of through Fizz's server, which also had to look the sandbox up each time.
   function agent() {
     const t = tabs.find((x) => x.kind === "cloud" && x.stream);
     if (!t) return null;
@@ -112,11 +112,11 @@
     if (!q) return;
     let url = toUrl(q);
     // With the cloud browser, a search is a real search engine in real Chrome (DuckDuckGo: Google
-    // often answers cloud servers with a CAPTCHA). Without it, FIZZ shows its own results page.
+    // often answers cloud servers with a CAPTCHA). Without it, Fizz shows its own results page.
     if (!url && (cloudOn() || t.kind === "cloud")) url = `https://duckduckgo.com/?q=${encodeURIComponent(q)}`;
     if (!url) { push(t, { kind: "search", q }); return show(t); }
 
-    // Prefer real Chromium for every website so cookies, JS, redirects and forms work and FIZZ DEV
+    // Prefer real Chromium for every website so cookies, JS, redirects and forms work and Fizz DEV
     // can use its normal browser controls. Keep the active cloud tab when navigating within it.
     if (cloudOn() || t.kind === "cloud") {
       const wasCloud = t.kind === "cloud";
@@ -261,7 +261,7 @@
     render();
   }
 
-  // ---------- pages FIZZ draws itself (start page, search results, reader view) ----------
+  // ---------- pages Fizz draws itself (start page, search results, reader view) ----------
   const PAGE_CSS = `:root{color-scheme:light dark;--bg:#faf9f5;--fg:#1f1e1d;--muted:#6f6d66;--line:#e4e2d9;--card:#fff;--soft:#ecebe4;--btn:#1f1e1d;--btnfg:#faf9f5}@media (prefers-color-scheme:dark){:root{--bg:#262624;--fg:#f1f0eb;--muted:#a4a299;--line:#3a3936;--card:#30302e;--soft:#33322f;--btn:#ecebe6;--btnfg:#1f1e1d}}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.6 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}main{max-width:720px;margin:0 auto;padding:28px 20px 60px}a{color:var(--fg);text-decoration:none}a:hover{text-decoration:underline;text-underline-offset:3px}form{display:flex;gap:8px;padding:6px;border:1px solid var(--line);border-radius:16px;background:var(--card);box-shadow:0 6px 24px -10px rgba(0,0,0,.18)}input{flex:1;min-width:0;height:42px;border:0;outline:0;background:transparent;color:var(--fg);padding:0 12px;font:inherit;font-size:16px}button{height:42px;border-radius:11px;border:0;background:var(--btn);color:var(--btnfg);padding:0 18px;font:inherit;font-weight:600;cursor:pointer}.r{padding:14px 0;border-bottom:1px solid var(--line)}.r a{font-size:16.5px;font-weight:600}.r small{display:block;color:var(--muted);font-size:12.5px;margin-bottom:2px}.r p{margin:4px 0 0;color:var(--muted);font-size:14px}.muted{color:var(--muted)}.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-top:22px}.tiles a{display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 8px;border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--fg);font-size:13px;text-decoration:none}.tiles a:hover{background:var(--soft)}.tiles img{width:26px;height:26px;border-radius:6px}.note{padding:12px 14px;border-radius:12px;background:var(--card);border:1px solid var(--line);font-size:14px;margin:16px 0}.md h1,.md h2,.md h3{line-height:1.25}.md img{max-width:100%}.md a{text-decoration:underline;text-underline-offset:3px}.md pre{overflow:auto;background:var(--card);padding:12px;border-radius:8px}h1.logo{font-size:30px;font-weight:600;letter-spacing:-.02em;margin:48px 0 20px;text-align:center}`;
   const NAV_JS = `<script>document.addEventListener("click",function(e){var a=e.target.closest("a[href]");if(!a||a.target==="_blank")return;e.preventDefault();parent.postMessage({fizz:"web-nav",href:a.href},"*")});document.addEventListener("submit",function(e){e.preventDefault();var q=e.target.q.value;parent.postMessage({fizz:"web-nav",q:q},"*")})<\/script>`;
   const page = (body, title = "") => `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><base target="_top"><title>${esc(title)}</title><style>${PAGE_CSS}</style></head><body><main>${body}</main>${NAV_JS}</body></html>`;
@@ -327,7 +327,7 @@
     render();
   }
 
-  // ---------- FIZZ's own cloud browser: a live screen you can click, scroll and type in ----------
+  // ---------- Fizz's own cloud browser: a live screen you can click, scroll and type in ----------
   let fitTimer = 0, lastFit = "";
   function ensureScreen() {
     let el = $("#br-screen");
@@ -424,7 +424,7 @@
       if (!ft) { f.remove(); frames.delete(id); continue; }
       f.hidden = id !== active || ft.kind === "cloud";
     }
-    // Cloud tabs show the live browser: Browserbase's live view (an iframe), or FIZZ's own browser's screen.
+    // Cloud tabs show the live browser: Browserbase's live view (an iframe), or Fizz's own browser's screen.
     let live = $("#br-live");
     const screen = ensureScreen();
     const wasHidden = screen.hidden;
@@ -539,7 +539,7 @@
       return {
         text: valid ? "Fizz Code requests permission to open checkout for " + merchant + ": " + currency + " " + amount + "." : "Payment request details are incomplete or invalid.",
         ok: valid ? "Approve checkout" : "Dismiss", cancel: valid ? "Decline" : "Dismiss",
-        html: '<div class="collect"><b>' + esc(merchant || "Merchant not specified") + '</b><p class="muted-sm">' + esc(currency) + " " + esc(amount) + '</p><p>' + esc(String(t.body || "").slice(0, 500)) + '</p>' + (valid ? '<a class="btn btn-sm collect-open" href="' + esc(url) + '" target="_blank" rel="noopener">Open secure checkout</a>' : "") + '<small class="muted-sm">FIZZ never sees card details or security codes. Enter them only in the merchant secure checkout. This approval only opens checkout; final payment confirmation is yours.</small></div>'
+        html: '<div class="collect"><b>' + esc(merchant || "Merchant not specified") + '</b><p class="muted-sm">' + esc(currency) + " " + esc(amount) + '</p><p>' + esc(String(t.body || "").slice(0, 500)) + '</p>' + (valid ? '<a class="btn btn-sm collect-open" href="' + esc(url) + '" target="_blank" rel="noopener">Open secure checkout</a>' : "") + '<small class="muted-sm">Fizz never sees card details or security codes. Enter them only in the merchant secure checkout. This approval only opens checkout; final payment confirmation is yours.</small></div>'
       };
     },
     async run(t) {
@@ -568,9 +568,9 @@
       "  After each action you get the page: its numbered elements (links, buttons, fields) and text. Use those numbers; read again if the page changed.",
       "  Do the task, don't describe it: when the user asks for something on a website (sign up or log in somewhere, get an API key, fill in a form, find, compare, book…), open the site and do every step yourself with these actions. Never answer with instructions for the user to follow — the only steps you hand over are the ones only they can do (passwords, CAPTCHAs, codes from their email or phone).",
       "  When a page shows a value the user wants (an API key, a token, an order number…), read it from the page and give it to them in your reply; if it belongs to this project, also save it to .env (and make sure .gitignore lists .env).",
-      "  The browser usually runs in the background: the user isn't watching it. Work through the whole task yourself, quickly, without stopping to report each step. Only when a step needs the user — a CAPTCHA or bot check, a code you can't get (no Gmail), a password with no saved login, a field you can't fill after two tries — use action=\"handoff\" reason=\"what they need to do\": FIZZ opens the browser for them just for that step, then you continue.",
+      "  The browser usually runs in the background: the user isn't watching it. Work through the whole task yourself, quickly, without stopping to report each step. Only when a step needs the user — a CAPTCHA or bot check, a code you can't get (no Gmail), a password with no saved login, a field you can't fill after two tries — use action=\"handoff\" reason=\"what they need to do\": Fizz opens the browser for them just for that step, then you continue.",
       "  Rules — always follow them:",
-      "  • Never ask for passwords, card numbers or security codes in the chat and never type them. A site with a saved login (listed under SAVED WEBSITE LOGINS): open its login page and use action=\"login\" account=\"its host\" — FIZZ fills the email/username and password itself. Otherwise use handoff: the user types them straight into the browser, then presses Continue.",
+      "  • Never ask for passwords, card numbers or security codes in the chat and never type them. A site with a saved login (listed under SAVED WEBSITE LOGINS): open its login page and use action=\"login\" account=\"its host\" — Fizz fills the email/username and password itself. Otherwise use handoff: the user types them straight into the browser, then presses Continue.",
       '  script code="return [...document.querySelectorAll(\'h2 a\')].map(a => ({ title: a.innerText, url: a.href }))"/> (or the code inside the tag) — runs your JavaScript in the page and gives you its result as text: the fastest way to pull lists, prices, tables or links out of a page, or to do many steps at once. It can\'t run on pages with a password field.',
       '  login account="example.com" — fills a saved login (Settings → Website logins) into the login form on the open page; then click the sign-in button.',
       "  • Signing in / signing up on a site: if it has a saved login, sign in with it right away (don't ask). Otherwise first ask with <fizz-ask> whether the user already has an account there. Yes → open the login page, then handoff so they log in. No → open the sign-up page, fill in the details the user gives you (ask for them), handoff for the password, and if the site emails a code, ask the user for it with <fizz-ask> and type it in. After that you can work inside their account.",
@@ -644,7 +644,7 @@
     },
   });
 
-  // ---------- collect: the user gets a value from a website, FIZZ saves it into the project ----------
+  // ---------- collect: the user gets a value from a website, Fizz saves it into the project ----------
   // Works on every site, with or without the cloud browser. The value goes straight into the file; Fizz Code
   // is only told that it was saved.
   const collected = new WeakMap();
@@ -671,7 +671,7 @@
     icon: "key", feedback: true,
     label: (t) => `Get ${t.attrs.label || t.attrs.name || "a value"}${hostName(t.attrs.url) ? ` from ${hostName(t.attrs.url)}` : ""}`,
     summary: (k) => `saved ${k} value${k === 1 ? "" : "s"} from the user`,
-    prompt: '<fizz-collect name="TMDB_API_KEY" label="TMDB API key" url="https://www.themoviedb.org/signup" save=".env">1. Sign up and confirm your email\n2. Open https://www.themoviedb.org/settings/api and create a key\n3. Copy the API Key and paste it here</fizz-collect> shows the user a card with a button that opens the site in a new tab, your short steps, and a field where they paste what they got (an API key, a token, a code). FIZZ saves it into the project: save=".env" (NAME=value, kept out of GitHub and deploys), save="js/config.js" (export const NAME = "…", for keys the front end must use, like TMDB\'s), or a .json file. You never see the value, only that it was saved — then use it by name in the code. Use it when the user has to get something from a website that you can\'t get with the browser (no cloud browser here, or the site blocks it). Give the real page URLs in the steps.',
+    prompt: '<fizz-collect name="TMDB_API_KEY" label="TMDB API key" url="https://www.themoviedb.org/signup" save=".env">1. Sign up and confirm your email\n2. Open https://www.themoviedb.org/settings/api and create a key\n3. Copy the API Key and paste it here</fizz-collect> shows the user a card with a button that opens the site in a new tab, your short steps, and a field where they paste what they got (an API key, a token, a code). Fizz saves it into the project: save=".env" (NAME=value, kept out of GitHub and deploys), save="js/config.js" (export const NAME = "…", for keys the front end must use, like TMDB\'s), or a .json file. You never see the value, only that it was saved — then use it by name in the code. Use it when the user has to get something from a website that you can\'t get with the browser (no cloud browser here, or the site blocks it). Give the real page URLs in the steps.',
     needsApproval: () => true,
     waiting: (t) => {
       const url = safeUrl(t.attrs.url || "");
@@ -700,7 +700,7 @@
         if (!/^\.env\b/m.test(gi)) ctx.writeFile(".gitignore", (gi && !gi.endsWith("\n") ? gi + "\n" : gi) + ".env\n", { source: "agent" });
         note = " .env stays out of GitHub pushes and deploys.";
       }
-      return { ok: true, text: `The user pasted the ${t.attrs.label || name} (${value.length} characters). FIZZ saved it to ${file} as ${name}.${note} Use it by that name; don't print it.`, html: `<p class="muted-sm">Saved ${esc(t.attrs.label || name)} to ${esc(file)}.</p>` };
+      return { ok: true, text: `The user pasted the ${t.attrs.label || name} (${value.length} characters). Fizz saved it to ${file} as ${name}.${note} Use it by that name; don't print it.`, html: `<p class="muted-sm">Saved ${esc(t.attrs.label || name)} to ${esc(file)}.</p>` };
     },
   });
 

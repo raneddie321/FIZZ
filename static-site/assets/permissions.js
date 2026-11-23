@@ -1,4 +1,4 @@
-/* FIZZ DEV permissions: one gate every agent action goes through.
+/* Fizz DEV permissions: one gate every agent action goes through.
    The decision itself (modes, rules, floors) is in the shared agent core (netlify/lib/agent-core.mjs →
    F.agentCore.decidePermission); this file knows what each tool does, keeps the user's and the project's rules,
    and logs every decision for the Activity tab. See docs/roadmap/phase-0.md. */

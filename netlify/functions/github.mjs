@@ -93,12 +93,12 @@ export default async (req, context) => {
         });
         // base_tree keeps repository files that aren't part of this project.
         const newTree = await gh(t, `${base}/git/trees`, { method: "POST", body: JSON.stringify({ tree: baseTree ? [...tree, ...deletions] : tree, ...(baseTree ? { base_tree: baseTree } : {}) }) });
-        const c = await gh(t, `${base}/git/commits`, { method: "POST", body: JSON.stringify({ message: String(body.message || "Update from FIZZ DEV").slice(0, 500), tree: newTree.sha, parents: parent ? [parent] : [] }) });
+        const c = await gh(t, `${base}/git/commits`, { method: "POST", body: JSON.stringify({ message: String(body.message || "Update from Fizz DEV").slice(0, 500), tree: newTree.sha, parents: parent ? [parent] : [] }) });
         if (parent && !body.newBranch) await gh(t, `${base}/git/refs/heads/${encodeURIComponent(body.branch)}`, { method: "PATCH", body: JSON.stringify({ sha: c.sha }) });
         else await gh(t, `${base}/git/refs`, { method: "POST", body: JSON.stringify({ ref: `refs/heads/${body.branch}`, sha: c.sha }) });
         return json({ sha: c.sha, url: `https://github.com/${body.owner}/${body.repo}/commit/${c.sha}`, files: tree.length });
       }
-      // GitHub Actions — used by FIZZ DEV to build Android (APK/AAB) and desktop apps in the user's repo.
+      // GitHub Actions — used by Fizz DEV to build Android (APK/AAB) and desktop apps in the user's repo.
       case "runs": {
         const q = new URL(req.url).searchParams;
         if (!validName(q.get("owner")) || !validName(q.get("repo"))) return error(400, "Invalid repository.");
@@ -152,7 +152,7 @@ export default async (req, context) => {
         }
         return json({ ok: true });
       }
-      // ---------- pull requests and CI (FIZZ DEV's Git workflow) ----------
+      // ---------- pull requests and CI (Fizz DEV's Git workflow) ----------
       case "prs": {
         const q = new URL(req.url).searchParams;
         if (!validName(q.get("owner")) || !validName(q.get("repo"))) return error(400, "Invalid repository.");
@@ -165,7 +165,7 @@ export default async (req, context) => {
         const body = await readJson(req);
         if (!validName(body.owner) || !validName(body.repo) || !validBranch(body.head) || !validBranch(body.base)) return error(400, "Invalid repository or branches.");
         if (body.head === body.base) return error(400, "A pull request needs a branch other than the one it goes into.");
-        const pr = await gh(t, `/repos/${body.owner}/${body.repo}/pulls`, { method: "POST", body: JSON.stringify({ title: String(body.title || "Changes from FIZZ DEV").slice(0, 250), body: String(body.body || "").slice(0, 60000), head: body.head, base: body.base, draft: Boolean(body.draft) }) });
+        const pr = await gh(t, `/repos/${body.owner}/${body.repo}/pulls`, { method: "POST", body: JSON.stringify({ title: String(body.title || "Changes from Fizz DEV").slice(0, 250), body: String(body.body || "").slice(0, 60000), head: body.head, base: body.base, draft: Boolean(body.draft) }) });
         return json({ pr: prJson(pr) });
       }
       case "pr": {
@@ -223,7 +223,7 @@ export default async (req, context) => {
         return error(404, "Unknown action.");
     }
   } catch (e) {
-    if (/without `?workflow`? scope/i.test(e.message || "")) return error(403, "To push app build workflows, connect GitHub again — FIZZ needs permission to update workflows.", "needs_workflow_scope");
+    if (/without `?workflow`? scope/i.test(e.message || "")) return error(403, "To push app build workflows, connect GitHub again — Fizz needs permission to update workflows.", "needs_workflow_scope");
     const status = e.status === 401 ? 401 : e.status && e.status < 500 ? e.status : 502;
     return error(status, status === 401 ? "Your GitHub connection expired. Connect GitHub again." : e.message, status === 401 ? "not_connected" : "github_error");
   }

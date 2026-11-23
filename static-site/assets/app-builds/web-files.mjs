@@ -1,4 +1,4 @@
-// FIZZ DEV app builds: collects the project's web files (its build output when it has an
+// Fizz DEV app builds: collects the project's web files (its build output when it has an
 // `npm run build` script, otherwise the project itself) into a folder for Capacitor or Electron.
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { execSync } from "node:child_process";
@@ -29,5 +29,5 @@ export function copyWebFiles(dest) {
   console.log(`Web files from ${web === "." ? "the project" : web + "/"} → ${dest}`);
 }
 
-/** The project's app icon, if it has one (FIZZ DEV's "Make app icons" writes icons/icon-512.png). */
+/** The project's app icon, if it has one (Fizz DEV's "Make app icons" writes icons/icon-512.png). */
 export const findIcon = () => ["icons/icon-512.png", "icon.png", "logo.png", "assets/icon.png", "icons/icon-192.png"].find((f) => existsSync(f)) || null;

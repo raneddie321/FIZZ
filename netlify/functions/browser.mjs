@@ -4,11 +4,11 @@ import { kvConfigured, quotaCounter, redis, today } from "../lib/kv.mjs";
 import { act, browserConfigured, createContext, createSession, liveViews, loginHost, releaseSession, sessionRunning } from "../lib/browser.mjs";
 import { cdpUrl, ensureBrowser, sandboxBrowserEnabled, sandboxTabs } from "../lib/sandbox-browser.mjs";
 
-/** Which cloud browser this site uses: Browserbase when its key is set, else FIZZ's own (Vercel Sandbox). */
+/** Which cloud browser this site uses: Browserbase when its key is set, else Fizz's own (Vercel Sandbox). */
 export const browserEngine = () => (browserConfigured() ? "browserbase" : sandboxBrowserEnabled() ? "sandbox" : null);
 const pageJson = (out) => ({ text: out.text, page: { url: out.page.url, title: out.page.title, captcha: out.page.captcha }, elements: out.page.elements.map((e) => ({ id: e.id, label: e.label, tag: e.tag, type: e.type })), screenshot: out.screenshot });
 
-/** FIZZ's own cloud browser in the user's sandbox. The active tab is remembered in a cookie. */
+/** Fizz's own cloud browser in the user's sandbox. The active tab is remembered in a cookie. */
 async function sandboxEngine(req, uid, body, headers) {
   const action = String(body.action || "");
   let st = unseal(getCookie(req, "fizz_br2"));
@@ -51,7 +51,7 @@ async function sandboxEngine(req, uid, body, headers) {
   return json({ ...pageJson(out), tabs, engine: "sandbox" }, { headers });
 }
 
-// The cloud browser for Fizz Code and the FIZZ DEV Browser tab: Browserbase, or FIZZ's own in Vercel Sandbox.
+// The cloud browser for Fizz Code and the Fizz DEV Browser tab: Browserbase, or Fizz's own in Vercel Sandbox.
 // The session lives in an encrypted cookie on this device; the login context (saved cookies of the
 // sites the user signed in to) is kept per RanEddie ID user in Upstash when it's connected.
 const COOKIE = "fizz_br";

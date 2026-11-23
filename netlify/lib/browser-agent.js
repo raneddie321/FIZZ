@@ -1,11 +1,11 @@
-// FIZZ cloud browser agent — runs inside the user's Vercel Sandbox next to Chromium.
+// Fizz cloud browser agent — runs inside the user's Vercel Sandbox next to Chromium.
 // It never exposes Chromium directly: every request needs the user's token.
 //   GET  /health                 → { ok, chrome }
 //   GET  /tabs                   → [{ id, title, url }]
 //   GET  /frame.jpg?target=ID    → one screenshot
 //   GET  /stream?target=ID       → live MJPEG stream of a tab (screencast)
-//   POST /input?target=ID        → the user's clicks, scrolls and typing from FIZZ DEV
-//   WS   /cdp                    → Chrome DevTools Protocol, for FIZZ's server (Fizz Code's actions)
+//   POST /input?target=ID        → the user's clicks, scrolls and typing from Fizz DEV
+//   WS   /cdp                    → Chrome DevTools Protocol, for Fizz's server (Fizz Code's actions)
 // Started by netlify/lib/sandbox-browser.mjs; netlify/lib/browser-agent-src.mjs is generated from this file.
 import http from "node:http";
 import net from "node:net";
@@ -221,7 +221,7 @@ const server = http.createServer(async (req, res) => {
   } catch (e) { json(res, 500, { error: String(e && e.message || e) }); }
 });
 
-// Chrome DevTools Protocol for FIZZ's server, behind the token.
+// Chrome DevTools Protocol for Fizz's server, behind the token.
 server.on("upgrade", async (req, socket, head) => {
   const url = new URL(req.url, "http://x");
   if (url.pathname !== "/cdp" || !authed(req, url)) { socket.end("HTTP/1.1 401 Unauthorized\r\n\r\n"); return; }

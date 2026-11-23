@@ -6,7 +6,7 @@ import { env } from "./util.mjs";
 const API = "https://api.clerk.com/v1";
 /** Clerk allows 8 KB of metadata per user, shared by every RanEddie product. */
 export const METADATA_LIMIT = 8192;
-/** FIZZ keeps only a few small settings (Snake Brawl already uses most of the space). */
+/** Fizz keeps only a few small settings (Snake Brawl already uses most of the space). */
 export const FIZZ_LIMIT = 500;
 
 export const clerkConfigured = () => Boolean(env("CLERK_SECRET_KEY"));
@@ -64,7 +64,7 @@ export async function sessionUser(req) {
   return typeof payload.sub === "string" && payload.sub.startsWith("user_") ? payload.sub : null;
 }
 
-/** The FIZZ settings that may be stored in the account. Everything else is dropped. */
+/** The Fizz settings that may be stored in the account. Everything else is dropped. */
 const FIELDS = {
   theme: (v) => ["light", "dark", "system"].includes(v),
   style: (v) => ["balanced", "concise", "detailed"].includes(v),
@@ -86,7 +86,7 @@ export async function readFizz(userId) {
 }
 
 /**
- * Saves FIZZ's settings under privateMetadata.fizz. Reads the current metadata first and only
+ * Saves Fizz's settings under privateMetadata.fizz. Reads the current metadata first and only
  * merges the `fizz` key (Clerk's metadata endpoint merges), so other products' data is never touched.
  */
 export async function writeFizz(userId, input) {
@@ -95,7 +95,7 @@ export async function writeFizz(userId, input) {
   if (size > FIZZ_LIMIT) throw Object.assign(new Error("These settings are too large to save to your RanEddie ID."), { status: 413 });
   const user = await clerkApi(`/users/${encodeURIComponent(userId)}`);
   const merged = { ...(user.private_metadata || {}), fizz };
-  if (Buffer.byteLength(JSON.stringify(merged)) > METADATA_LIMIT) throw Object.assign(new Error("Your RanEddie ID has no room left for FIZZ settings."), { status: 507 });
+  if (Buffer.byteLength(JSON.stringify(merged)) > METADATA_LIMIT) throw Object.assign(new Error("Your RanEddie ID has no room left for Fizz settings."), { status: 507 });
   await clerkApi(`/users/${encodeURIComponent(userId)}/metadata`, { method: "PATCH", body: JSON.stringify({ private_metadata: { fizz } }) });
   return fizz;
 }

@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>FIZZ</title>
+<title>Fizz</title>
 <script>
-/* Phones get the FIZZ app (get-app.html). Computers, tablets, a phone browser in desktop mode (it sends a desktop
-   user agent) and FIZZ's own app (its web view) open FIZZ here. ?web=1 skips the check. */
+/* Phones get the Fizz app (get-app.html). Computers, tablets, a phone browser in desktop mode (it sends a desktop
+   user agent) and Fizz's own app (its web view) open Fizz here. ?web=1 skips the check. */
 (function(){try{var ua=navigator.userAgent||"";var phone=/iPhone|iPod|Windows Phone|Android.*Mobile|BlackBerry|Opera Mini/i.test(ua)&&!/iPad|Tablet/i.test(ua);var app=/; wv\)|FIZZApp|RanEddieApp|Capacitor/i.test(ua)||!!window.Capacitor||!!window.ReactNativeWebView||!!window.FIZZ_APP;if(phone&&!app&&!/[?&]web=1/.test(location.search))location.replace("/get-app.html")}catch(e){}})();
 </script>
 <link rel="icon" href="/favicon.ico" sizes="any" />
@@ -16,10 +16,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" />
-<link rel="stylesheet" href="assets/site.css?v=20261123-mp" />
+<link rel="stylesheet" href="assets/site.css?v=20261123-name" />
 <link rel="stylesheet" href="vendor/codemirror/codemirror.css" />
 <link rel="stylesheet" href="vendor/xterm/xterm.css" />
-<link rel="stylesheet" href="assets/dev.css?v=20261117-wa" />
+<link rel="stylesheet" href="assets/dev.css?v=20261123-name" />
 <script>document.documentElement.dataset.app=/\/dev(\.html)?$/.test(location.pathname)?"dev":"chat";try{var t=localStorage.getItem("fizz.theme");t=t?JSON.parse(t):"system";if(t==="dark"||(t!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}</script>
 <script src="vendor/marked.min.js"></script>
 <script src="vendor/purify.min.js"></script>
@@ -37,38 +37,38 @@
 <script src="vendor/codemirror/addon/active-line.js"></script>
 <script src="vendor/xterm/xterm.js"></script>
 <script src="vendor/xterm/addon-fit.js"></script>
-<script src="assets/core.js?v=20261123-mp"></script>
-<script src="assets/interactive.js?v=20261113-ix"></script>
-<script src="assets/idb.js?v=20261111-p0"></script>
-<script src="assets/agent-core.js?v=20261117-wa"></script>
-<script src="assets/raneddie-id.js?v=20261110-console1"></script>
-<script src="assets/site.js?v=20261123-mp"></script>
-<script src="assets/connections.js?v=20261122-gall2"></script>
-<script src="assets/logins.js?v=20261117-login"></script>
-<script src="assets/settings.js?v=20261117-login"></script>
+<script src="assets/core.js?v=20261123-name"></script>
+<script src="assets/interactive.js?v=20261123-name"></script>
+<script src="assets/idb.js?v=20261123-name"></script>
+<script src="assets/agent-core.js?v=20261123-name"></script>
+<script src="assets/raneddie-id.js?v=20261123-name"></script>
+<script src="assets/site.js?v=20261123-name"></script>
+<script src="assets/connections.js?v=20261123-name"></script>
+<script src="assets/logins.js?v=20261123-name"></script>
+<script src="assets/settings.js?v=20261123-name"></script>
 <script src="assets/shell.js"></script>
-<script src="assets/terminal.js?v=20261112-p4"></script>
+<script src="assets/terminal.js?v=20261123-name"></script>
 <script src="assets/blobs.js"></script>
-<script src="assets/model-picker.js?v=20261123-mp"></script>
-<script src="assets/agent-tools.js?v=20261111-p0"></script>
-<script src="assets/permissions.js?v=20261121-pay1"></script>
-<script src="assets/code-tools.js?v=20261115-big"></script>
-<script src="assets/hooks.js?v=20261112-p3"></script>
-<script src="assets/git-tools.js?v=20261112-p4"></script>
-<script src="assets/canva-tools.js?v=20261112-canva"></script>
-<script src="assets/whatsapp-tools.js?v=20261117-wa"></script>
-<script src="assets/shopify-tools.js?v=20261112-shop"></script>
-<script src="assets/auth-links.js?v=20261112-p4"></script>
+<script src="assets/model-picker.js?v=20261123-name"></script>
+<script src="assets/agent-tools.js?v=20261123-name"></script>
+<script src="assets/permissions.js?v=20261123-name"></script>
+<script src="assets/code-tools.js?v=20261123-name"></script>
+<script src="assets/hooks.js?v=20261123-name"></script>
+<script src="assets/git-tools.js?v=20261123-name"></script>
+<script src="assets/canva-tools.js?v=20261123-name"></script>
+<script src="assets/whatsapp-tools.js?v=20261123-name"></script>
+<script src="assets/shopify-tools.js?v=20261123-name"></script>
+<script src="assets/auth-links.js?v=20261123-name"></script>
 <script src="assets/docs.js"></script>
 <script src="assets/skills.js"></script>
-<script src="assets/cloud-tools.js?v=20261112-p4"></script>
+<script src="assets/cloud-tools.js?v=20261123-name"></script>
 <script src="assets/builds.js"></script>
-<script src="assets/sync.js?v=20261111-p2"></script>
-<script src="assets/web-browser.js?v=20261121-pay1"></script>
-<script src="assets/google-tools.js?v=20261122-gall2"></script>
+<script src="assets/sync.js?v=20261123-name"></script>
+<script src="assets/web-browser.js?v=20261123-name"></script>
+<script src="assets/google-tools.js?v=20261123-name"></script>
 <script src="assets/app-tools.js"></script>
-<script src="assets/mcp-tools.js?v=20261111-p0"></script>
-<script src="assets/custom-connectors.js?v=20261110-vault"></script>
+<script src="assets/mcp-tools.js?v=20261123-name"></script>
+<script src="assets/custom-connectors.js?v=20261123-name"></script>
 <script src="assets/fizz-brain.js"></script>
 <script src="assets/brain-design.js"></script>
 <script src="assets/brain-code.js"></script>
@@ -81,10 +81,10 @@
   <div class="scrim hidden" id="scrim"></div>
   <aside class="chat-side" aria-label="Conversations">
     <div class="head">
-      <a href="index.html" class="logo" aria-label="FIZZ home"><img src="assets/logo-fizz.png" alt="fizz" /></a>
+      <a href="index.html" class="logo" aria-label="Fizz home"><img src="assets/logo-fizz.png" alt="fizz" /></a>
       <button class="icon-btn" id="new-chat" title="New chat (Ctrl+Shift+O)" aria-label="New chat"><span data-icon="pen"></span></button>
     </div>
-    <nav class="switcher" aria-label="Switch product" title="Switch instantly — Ctrl+."><a data-switch="chat" href="chat.html"><img src="assets/logo-fizz.png" alt="" />FIZZ</a><a data-switch="dev" href="dev.html"><img src="assets/logo-fizz-dev.png" alt="" />FIZZ DEV</a></nav>
+    <nav class="switcher" aria-label="Switch product" title="Switch instantly — Ctrl+."><a data-switch="chat" href="chat.html"><img src="assets/logo-fizz.png" alt="" />Fizz</a><a data-switch="dev" href="dev.html"><img src="assets/logo-fizz-dev.png" alt="" />Fizz DEV</a></nav>
     <label class="side-search"><span data-icon="search"></span><input id="search" placeholder="Search chats" aria-label="Search conversations" /></label>
     <div class="conv-list" id="conv-list"></div>
     <div class="side-foot">
@@ -95,7 +95,7 @@
   <main class="chat-main" id="main">
     <div class="chat-top">
       <button class="icon-btn" id="open-side" aria-label="Open conversations"><span data-icon="menu"></span></button>
-      <span class="title">FIZZ</span>
+      <span class="title">Fizz</span>
       <button class="icon-btn" id="new-chat-m" aria-label="New chat"><span data-icon="pen"></span></button>
     </div>
     <div class="scroll" id="scroll"><div class="thread" id="thread"></div></div>
@@ -104,15 +104,15 @@
         <div id="key-notice"></div>
         <form class="composer" id="composer">
           <div class="chips" id="pending"></div>
-          <textarea id="input" rows="1" placeholder="Message FIZZ" aria-label="Message"></textarea>
+          <textarea id="input" rows="1" placeholder="Message Fizz" aria-label="Message"></textarea>
           <div class="row">
             <button type="button" class="icon-btn attach-plus" id="attach" title="Attach files" aria-label="Attach files"><span aria-hidden="true">+</span></button>
             <input type="file" id="file" multiple hidden accept="image/png,image/jpeg,image/gif,image/webp,.txt,.md,.csv,.json,.xml,.html,.css,.js,.ts,.tsx,.jsx,.py,.java,.c,.cpp,.go,.rs,.rb,.php,.sh,.yaml,.yml,.sql,.log" />
-            <button type="button" class="model-btn" id="model-btn" aria-haspopup="menu">FIZZ 1.0</button>
+            <button type="button" class="model-btn" id="model-btn" aria-haspopup="menu">Fizz 1.0</button>
             <button type="button" class="send" id="send" aria-label="Send"><svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
           </div>
         </form>
-        <p class="disclaimer">FIZZ can make mistakes. Check important information.</p>
+        <p class="disclaimer">Fizz can make mistakes. Check important information.</p>
       </div>
     </div>
   </main>
@@ -126,13 +126,13 @@
 <div class="dev-app" id="dev-app" data-view="chat">
   <div class="scrim hidden" id="scrim"></div>
 
-  <!-- Sidebar (same structure as FIZZ) -->
+  <!-- Sidebar (same structure as Fizz) -->
   <aside class="chat-side" aria-label="Projects">
     <div class="head">
-      <a href="index.html" class="logo" aria-label="FIZZ DEV home"><img src="assets/logo-fizz-dev.png" alt="fizz dev" /></a>
+      <a href="index.html" class="logo" aria-label="Fizz DEV home"><img src="assets/logo-fizz-dev.png" alt="fizz dev" /></a>
       <button class="pill-btn" id="new-project" title="New project"><span data-icon="plus"></span>New project</button>
     </div>
-    <nav class="switcher" aria-label="Switch product" title="Switch instantly — Ctrl+."><a data-switch="chat" href="chat.html"><img src="assets/logo-fizz.png" alt="" />FIZZ</a><a data-switch="dev" href="dev.html"><img src="assets/logo-fizz-dev.png" alt="" />FIZZ DEV</a></nav>
+    <nav class="switcher" aria-label="Switch product" title="Switch instantly — Ctrl+."><a data-switch="chat" href="chat.html"><img src="assets/logo-fizz.png" alt="" />Fizz</a><a data-switch="dev" href="dev.html"><img src="assets/logo-fizz-dev.png" alt="" />Fizz DEV</a></nav>
     <div class="side-label"><span>Projects</span></div>
     <label class="side-search"><span data-icon="search"></span><input id="search" placeholder="Search projects" aria-label="Search projects and chats" /></label>
     <div class="conv-list" id="project-list"></div>
@@ -240,6 +240,6 @@
   if (S) return S.boot(list);
   // idb.js didn't load: start the apps anyway (data stays in localStorage, as before).
   list.forEach(function (src) { var s = document.createElement("script"); s.src = src; s.async = false; document.body.appendChild(s); });
-})(["assets/chat.js?v=20261123-mp", "assets/dev.js?v=20261123-mp"]);</script>
+})(["assets/chat.js?v=20261123-name", "assets/dev.js?v=20261123-name"]);</script>
 </body>
 </html>

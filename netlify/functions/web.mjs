@@ -3,7 +3,7 @@ import { requireUser } from "../lib/auth.mjs";
 import { quotaCounter, today } from "../lib/kv.mjs";
 import { frameable, read, search, searchProvider } from "../lib/web.mjs";
 
-/** Web search, page reading and frame checks for Fizz Code and the FIZZ DEV browser. */
+/** Web search, page reading and frame checks for Fizz Code and the Fizz DEV browser. */
 export default async (req, context) => {
   const action = context.params.action;
   // Fizz Code's cloud runner searches and reads pages with its sealed run token (only these two actions).
