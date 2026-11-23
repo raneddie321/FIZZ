@@ -392,7 +392,7 @@
       }
       if (m.role === "user") {
         const chips = [...(m.attachments || []).map((a) => `<span class="chip">${esc(a.name)}</span>`), ...(m.mentions || []).map((f) => `<span class="chip mention">@${esc(f)}</span>`), ...(m.mcpMentions || []).map((s) => `<span class="chip mention">MCP · @${esc(s)}</span>`), ...(m.selection ? [`<span class="chip mention">${F.icon("target")}${esc(m.selection.label)}</span>`] : [])].join("");
-        return `<div class="u-wrap">${chips ? `<div class="chips">${chips}</div>` : ""}${state.editing === m.id ? `<form class="u-edit" data-edit-form="${m.id}"><textarea class="textarea" name="text" rows="3">${esc(m.content)}</textarea><div class="u-edit-bar"><button type="button" class="btn btn-outline btn-sm" data-edit-cancel>Cancel</button><button class="btn btn-sm">Send</button></div></form>` : `<div class="u-msg">${esc(m.content)}</div>`}<div class="meta"><span>${{ ask: "Ask", plan: "Plan", do: "Do" }[m.mode] || "Build"}</span><span>${t}</span>${state.controller || state.editing ? "" : `<button type="button" data-edit-msg="${m.id}">Edit</button>`}</div></div>`;
+        return `<div class="u-wrap">${chips ? `<div class="chips">${chips}</div>` : ""}${state.editing === m.id ? `<form class="u-edit" data-edit-form="${m.id}"><textarea class="textarea" name="text" rows="3">${esc(m.content)}</textarea><div class="u-edit-bar"><button type="button" class="btn btn-outline btn-sm" data-edit-cancel>Cancel</button><button class="btn btn-sm">Send</button></div></form>` : `<div class="u-msg" dir="auto">${esc(m.content)}</div>`}<div class="meta"><span>${{ ask: "Ask", plan: "Plan", do: "Do" }[m.mode] || "Build"}</span><span>${t}</span>${state.controller || state.editing ? "" : `<button type="button" data-edit-msg="${m.id}">Edit</button>`}</div></div>`;
       }
       const { html, prose, asks, cards } = stepsHtml(m);
       const last = m === lastAssistant;
@@ -1495,7 +1495,17 @@
       default: return false;
     }
   }
-  let slashIdx = 0;
+  let slashIdx = 0, slashAt = -1;
+  /** Puts "/skill " where the typed "/…" is, keeping the rest of the message. */
+  function insertSkill(cmd) {
+    const el = $("#input");
+    const end = el.selectionStart ?? el.value.length;
+    const at = slashAt >= 0 ? slashAt : end;
+    el.value = `${el.value.slice(0, at)}${cmd} ${el.value.slice(end).replace(/^\s+/, "")}`;
+    const pos = at + cmd.length + 1;
+    $("#slash").classList.add("hidden");
+    el.focus(); el.setSelectionRange(pos, pos);
+  }
   /** The popup above the composer: /commands, or @files while typing a mention. */
   function mentionAt() {
     const el = $("#input");
@@ -1518,12 +1528,18 @@
       box.classList.remove("hidden");
       return;
     }
-    if (!v.startsWith("/") || v.includes(" ") || v.includes("\n")) { box.classList.add("hidden"); return; }
-    const q = v.toLowerCase().slice(1);
+    // "/" at the start lists commands and skills; "/" later in the message (after a space) lists skills.
+    const el = $("#input");
+    const before = v.slice(0, el.selectionStart ?? v.length);
+    const mid = /(^|\s)\/([\p{L}\p{N}-]*)$/u.exec(before);
+    const atStart = v.startsWith("/") && !v.includes(" ") && !v.includes("\n");
+    if (!atStart && !mid) { box.classList.add("hidden"); slashAt = -1; return; }
+    slashAt = atStart ? 0 : before.length - mid[2].length - 1;
+    const q = (atStart ? v.slice(1) : mid[2]).toLowerCase();
     // Letters in order, so a typo like "/fronted" still finds /frontend-design.
     const fuzzy = (c) => { let i = 0; for (const ch of c) if (ch === q[i]) i++; return i === q.length; };
     const skillItems = F.skills.all(data).filter((k) => k.enabled).map((k) => [`/${F.skills.slug(k.name)}`, `Skill · ${esc(k.name)}${k.description ? ` — ${esc(k.description.slice(0, 90))}` : ""}`, true]);
-    const all = [...SLASH, ...skillItems];
+    const all = [...(atStart ? SLASH : []), ...skillItems];
     const items = [...all.filter(([c]) => c.slice(1).startsWith(q)), ...all.filter(([c]) => !c.slice(1).startsWith(q) && (c.includes(q) || fuzzy(c.slice(1))))].slice(0, 12);
     if (!items.length) { box.classList.add("hidden"); return; }
     slashIdx = Math.min(slashIdx, items.length - 1);
@@ -2311,7 +2327,7 @@
     if (slashOpen && (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey))) {
       const b = $("#slash .on");
       if (b?.dataset.mention || b?.dataset.mentionMcp) { e.preventDefault(); insertMention(b.dataset.mentionMcp || b.dataset.mention); return; }
-      if (b?.hasAttribute("data-skill-cmd")) { e.preventDefault(); $("#input").value = `${b.dataset.slash} `; $("#slash").classList.add("hidden"); $("#input").focus(); return; }
+      if (b?.hasAttribute("data-skill-cmd")) { e.preventDefault(); insertSkill(b.dataset.slash); return; }
       if (b) { e.preventDefault(); $("#input").value = b.dataset.slash; $("#slash").classList.add("hidden"); if (e.key === "Enter") send(); return; }
     }
     if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); }
@@ -2320,7 +2336,7 @@
     const mb = e.target.closest("[data-mention],[data-mention-mcp]");
     if (mb) return insertMention(mb.dataset.mentionMcp || mb.dataset.mention);
     const b = e.target.closest("[data-slash]");
-    if (b?.hasAttribute("data-skill-cmd")) { const el = $("#input"); el.value = `${b.dataset.slash} `; $("#slash").classList.add("hidden"); el.focus(); el.setSelectionRange(el.value.length, el.value.length); return; }
+    if (b?.hasAttribute("data-skill-cmd")) return insertSkill(b.dataset.slash);
     if (b) { $("#input").value = b.dataset.slash; $("#slash").classList.add("hidden"); send(); }
   });
   $("#input").addEventListener("click", () => renderSlash());

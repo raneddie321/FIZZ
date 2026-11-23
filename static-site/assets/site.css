@@ -839,3 +839,8 @@ h1 .md-logo, h2 .md-logo, h3 .md-logo, h4 .md-logo { width: 1em; height: 1em; ve
 .mp-settings:hover { color: var(--fg); }
 .skill-up { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 12px; }
 .skill-pastebox { display: grid; gap: 8px; margin-bottom: 12px; }
+/* Mixed Hebrew/English replies: each block picks its own direction (dir="auto"); code is always LTR. */
+.md pre, .md code, .md pre * { direction: ltr; unicode-bidi: isolate; text-align: left; }
+.md [dir="auto"] { text-align: start; }
+.bubble { unicode-bidi: plaintext; text-align: start; }
+#input { unicode-bidi: plaintext; }

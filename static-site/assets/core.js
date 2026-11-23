@@ -572,6 +572,9 @@
       return `<figure class="gen-figure">${el}<figcaption><a class="btn btn-outline btn-sm" href="${esc(src)}" download="${esc(name)}">Download</a></figcaption></figure>`;
     });
     if (logos.length) clean = clean.replace(/FIZZLOGO(\d+)X/g, (_m, i) => { const [n, d] = logos[i] || []; return d ? logoImg(n, logoUrls(d), "md-logo") : ""; });
+    // Each paragraph, heading, list and table takes its own direction from its first letter, so Hebrew stays
+    // right-to-left and English left-to-right even when a reply mixes both. Code stays left-to-right (CSS).
+    clean = clean.replace(/<(p|li|h[1-6]|ul|ol|blockquote|table|dl|dt|dd|td|th)(?=[\s>])(?![^>]*\sdir=)/g, '<$1 dir="auto"');
     return clean.replace(/<a /g, '<a target="_blank" rel="noopener noreferrer nofollow" ');
   }
 

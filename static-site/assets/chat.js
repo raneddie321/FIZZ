@@ -102,7 +102,7 @@
     const t = new Date(m.at || Date.now()).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
     if (m.role === "user") {
       const chips = (m.attachments || []).map((a) => `<span class="chip">${icon(a.type === "image" ? "image" : "file")}${esc(a.name)}</span>`).join("");
-      return `<div class="m-user" data-i="${i}">${chips ? `<div class="chips">${chips}</div>` : ""}${m.content ? `<div class="bubble">${esc(m.content)}</div>` : ""}
+      return `<div class="m-user" data-i="${i}">${chips ? `<div class="chips">${chips}</div>` : ""}${m.content ? `<div class="bubble" dir="auto">${esc(m.content)}</div>` : ""}
         <div class="m-actions"><span>${t}</span><button data-copy="${i}">Copy</button>${state.streamingId ? "" : `<button data-edit="${i}">Edit</button>`}</div></div>`;
     }
     let body;
