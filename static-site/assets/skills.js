@@ -80,6 +80,7 @@
   const byId = (data, id) => all(data).find((s) => s.id === id);
 
   function matches(skill, text) {
+    if (new RegExp(`(^|\\s)/${slug(skill.name).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}\\p{N}-])`, "iu").test(String(text || ""))) return true;
     if (skill.source === "md") return relevant(skill, text);
     if (!skill.match) return false;
     try { return new RegExp(skill.match, "i").test(text); } catch { return false; }

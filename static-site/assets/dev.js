@@ -1519,10 +1519,15 @@
       return;
     }
     if (!v.startsWith("/") || v.includes(" ") || v.includes("\n")) { box.classList.add("hidden"); return; }
-    const items = SLASH.filter(([c]) => c.startsWith(v.toLowerCase()));
+    const q = v.toLowerCase().slice(1);
+    // Letters in order, so a typo like "/fronted" still finds /frontend-design.
+    const fuzzy = (c) => { let i = 0; for (const ch of c) if (ch === q[i]) i++; return i === q.length; };
+    const skillItems = F.skills.all(data).filter((k) => k.enabled).map((k) => [`/${F.skills.slug(k.name)}`, `Skill · ${esc(k.name)}${k.description ? ` — ${esc(k.description.slice(0, 90))}` : ""}`, true]);
+    const all = [...SLASH, ...skillItems];
+    const items = [...all.filter(([c]) => c.slice(1).startsWith(q)), ...all.filter(([c]) => !c.slice(1).startsWith(q) && (c.includes(q) || fuzzy(c.slice(1))))].slice(0, 12);
     if (!items.length) { box.classList.add("hidden"); return; }
     slashIdx = Math.min(slashIdx, items.length - 1);
-    box.innerHTML = items.map(([c, d], i) => `<button type="button" data-slash="${c}" class="${i === slashIdx ? "on" : ""}" role="option"><code>${c}</code><span>${d}</span></button>`).join("");
+    box.innerHTML = items.map(([c, d, sk], i) => `<button type="button" data-slash="${esc(c)}"${sk ? " data-skill-cmd" : ""} class="${i === slashIdx ? "on" : ""}" role="option"><code>${esc(c)}</code><span>${d}</span></button>`).join("");
     box.classList.remove("hidden");
   }
   function insertMention(path) {
@@ -2306,6 +2311,7 @@
     if (slashOpen && (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey))) {
       const b = $("#slash .on");
       if (b?.dataset.mention || b?.dataset.mentionMcp) { e.preventDefault(); insertMention(b.dataset.mentionMcp || b.dataset.mention); return; }
+      if (b?.hasAttribute("data-skill-cmd")) { e.preventDefault(); $("#input").value = `${b.dataset.slash} `; $("#slash").classList.add("hidden"); $("#input").focus(); return; }
       if (b) { e.preventDefault(); $("#input").value = b.dataset.slash; $("#slash").classList.add("hidden"); if (e.key === "Enter") send(); return; }
     }
     if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); }
@@ -2314,6 +2320,7 @@
     const mb = e.target.closest("[data-mention],[data-mention-mcp]");
     if (mb) return insertMention(mb.dataset.mentionMcp || mb.dataset.mention);
     const b = e.target.closest("[data-slash]");
+    if (b?.hasAttribute("data-skill-cmd")) { const el = $("#input"); el.value = `${b.dataset.slash} `; $("#slash").classList.add("hidden"); el.focus(); el.setSelectionRange(el.value.length, el.value.length); return; }
     if (b) { $("#input").value = b.dataset.slash; $("#slash").classList.add("hidden"); send(); }
   });
   $("#input").addEventListener("click", () => renderSlash());
