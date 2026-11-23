@@ -74,6 +74,8 @@ export async function handleChat(req, { env, ip, bump, run = null }) {
       stream: true,
       max_tokens: Math.min(Number(env("FIZZ_MAX_TOKENS") || 16000), 32000),
       messages: [{ role: "system", content: String(body.system || "").slice(0, 200_000) }, ...body.messages],
+      // Image and video models answer with media (OpenRouter sends it as delta.images / delta.videos).
+      ...(/image|imagen|flux|dall-?e|gpt-image|seedream|nano-?banana|riverflow/i.test(m) ? { modalities: ["image", "text"] } : /veo|sora|kling|wan-?2|hailuo|video/i.test(m) ? { modalities: ["video", "text"] } : {}),
     }),
     signal: req.signal,
   }).catch(() => null);

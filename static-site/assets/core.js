@@ -272,7 +272,37 @@
   const serverStatusCached = () => statusCache;
 
   // ---------- OpenAI-compatible streaming (FIZZ server proxy and OpenRouter) ----------
+  /** Image/video generation models (OpenRouter and similar): they answer with media instead of (or with) text. */
+  const MEDIA_MODEL_RE = /image|imagen|flux|dall-?e|gpt-image|seedream|nano-?banana|riverflow|veo|sora|kling|wan-?2|hailuo|video/i;
+  const isMediaModel = (m) => MEDIA_MODEL_RE.test(String(m || ""));
+  /** A generated image or video becomes a <fizz-media> tag in the reply text (shown by markdown()). */
+  const mediaTag = (src, kind) => `\n\n<fizz-media kind="${kind || (/^data:video|\.(mp4|webm|mov)(\?|$)/i.test(src) ? "video" : "image")}" src="${String(src).replace(/"/g, "%22")}"></fizz-media>\n\n`;
+  /** Google AI Studio image models (Gemini "image" / Imagen): their native API returns the picture as inline data. */
+  async function geminiImage(headers, payload, signal, onText) {
+    const key = String(headers.Authorization || headers.authorization || "").replace(/^Bearer\s+/i, "");
+    const model = String(payload.model).replace(/^models\//, "");
+    const parts = (c) => (typeof c === "string" ? [{ text: c }] : (c || []).map((p) => p.type === "image_url" ? (/^data:([^;]+);base64,(.*)$/.exec(p.image_url?.url || "") ? { inlineData: { mimeType: RegExp.$1, data: RegExp.$2 } } : { text: "" }) : { text: p.text || "" }));
+    const msgs = (payload.messages || []).filter((m) => m.role !== "system");
+    const sys = (payload.messages || []).find((m) => m.role === "system");
+    let res;
+    if (/^imagen/i.test(model)) {
+      const prompt = [...msgs].reverse().find((m) => m.role === "user");
+      res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:predict`, { method: "POST", signal, headers: { "content-type": "application/json", "x-goog-api-key": key }, body: JSON.stringify({ instances: [{ prompt: parts(prompt?.content).map((p) => p.text || "").join(" ").slice(0, 4000) }], parameters: { sampleCount: 1 } }) });
+    } else {
+      res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, { method: "POST", signal, headers: { "content-type": "application/json", "x-goog-api-key": key }, body: JSON.stringify({ ...(sys ? { systemInstruction: { parts: [{ text: String(sys.content).slice(0, 20000) }] } } : {}), contents: msgs.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: parts(m.content) })), generationConfig: { responseModalities: ["TEXT", "IMAGE"] } }) });
+    }
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error?.message || `Google AI Studio returned an error (${res.status}).`);
+    let text = "";
+    const emit = (t) => { text += t; onText?.(t, text); };
+    for (const p of j.candidates?.[0]?.content?.parts || []) { if (p.text) emit(p.text); else if (p.inlineData?.data) emit(mediaTag(`data:${p.inlineData.mimeType || "image/png"};base64,${p.inlineData.data}`, "image")); }
+    for (const p of j.predictions || []) if (p.bytesBase64Encoded) emit(mediaTag(`data:${p.mimeType || "image/png"};base64,${p.bytesBase64Encoded}`, "image"));
+    if (!text) emit("The model didn't return an image. Try describing it differently.");
+    return { text, stop: "end_turn" };
+  }
   async function streamOpenAI(url, headers, payload, signal, onText) {
+    if (url.includes("generativelanguage") && isMediaModel(payload?.model) && /image|imagen|nano-?banana/i.test(payload.model)) return geminiImage(headers, payload, signal, onText);
+    if (isMediaModel(payload?.model) && !payload.modalities && !url.includes("/api/ai/chat")) payload = { ...payload, modalities: /video|veo|sora|kling|wan-?2|hailuo/i.test(payload.model) ? ["video", "text"] : ["image", "text"] };
     const res = await fetchWithTransientRetry(url, { method: "POST", signal, credentials: "same-origin", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify(payload) }).catch((e) => {
       if (e.name === "AbortError") throw e;
       throw new Error("Couldn't reach the AI service. Check your internet connection.");
@@ -325,14 +355,23 @@
         const ch = ev.choices?.[0];
         const delta = ch?.delta?.content;
         if (delta) { text += delta; onText?.(delta, text); }
+        for (const [list, kind] of [[ch?.delta?.images || ch?.message?.images, "image"], [ch?.delta?.videos || ch?.message?.videos, "video"]]) {
+          for (const it of Array.isArray(list) ? list : []) {
+            const src = it?.image_url?.url || it?.video_url?.url || it?.url || "";
+            if (!/^(data:(image|video)\/[\w.+-]+;base64,|https:\/\/)/.test(src)) continue;
+            const add = mediaTag(src, kind);
+            text += add; onText?.(add, text);
+          }
+        }
         if (ch?.finish_reason) stop = ch.finish_reason === "length" ? "max_tokens" : ch.finish_reason === "content_filter" ? "refusal" : "end_turn";
       }
     }
     return { text, stop };
   }
 
+  const stripMedia = (t) => String(t || "").replace(/<fizz-media\s+kind="(image|video)"[^>]*>(?:<\/fizz-media>)?/g, "[$1 generated]");
   function toOpenAI(m) {
-    if (m.role === "assistant") return { role: "assistant", content: m.content };
+    if (m.role === "assistant") return { role: "assistant", content: stripMedia(m.content) };
     const parts = [];
     for (const a of m.attachments || []) {
       if (a.type === "image") parts.push({ type: "image_url", image_url: { url: `data:${a.mime};base64,${a.data}` } });
@@ -489,7 +528,7 @@
       : `<span class="chip">${esc(a.name)}<button type="button" data-rm="${i}" aria-label="Remove ${esc(a.name)}"><svg viewBox="0 0 24 24" class="i"><path d="M6 6l12 12M18 6L6 18"/></svg></button></span>`).join("");
   }
   function toApiContent(m) {
-    if (m.role === "assistant") return { role: "assistant", content: m.content };
+    if (m.role === "assistant") return { role: "assistant", content: stripMedia(m.content) };
     const parts = [];
     for (const a of m.attachments || []) {
       if (a.type === "image") parts.push({ type: "image", source: { type: "base64", media_type: a.mime, data: a.data } });
@@ -516,10 +555,22 @@
   function markdown(text) {
     if (!window.marked || !window.DOMPurify) return esc(text).replace(/\n/g, "<br>");
     if (window.FIZZ?.interactive && /<fizz-(quiz|widget)\b/.test(text)) { const r = window.FIZZ.interactive.render(text, markdown); if (r !== null) return r; }
+    const media = [];
+    if (String(text).includes("<fizz-media")) text = String(text).replace(/<fizz-media\s+kind="(image|video)"\s+src="([^"]+)"\s*(?:\/>|><\/fizz-media>)/g, (_m, kind, src) => {
+      if (!/^(data:(image|video)\/[\w.+-]+;base64,[A-Za-z0-9+/=]+|https:\/\/[^\s"<>]+)$/.test(src)) return "";
+      media.push([kind, src]); return `\n\nFIZZMEDIA${media.length - 1}X\n\n`;
+    });
     const logos = [];
     if (String(text).includes("<fizz-logo")) text = String(text).split(/(```[\s\S]*?(?:```|$)|`[^`\n]*`)/).map((part, i) => (i % 2 ? part : part.replace(LOGO_RE, (_m, v) => { const d = logoDomain(v); if (!d) return ""; logos.push([v, d]); return `FIZZLOGO${logos.length - 1}X`; }))).join("");
     const html = marked.parse(text, { gfm: true });
     let clean = DOMPurify.sanitize(html, { FORBID_TAGS: ["style", "iframe", "form", "img"], FORBID_ATTR: ["style"] });
+    if (media.length) clean = clean.replace(/(?:<p>)?FIZZMEDIA(\d+)X(?:<\/p>)?/g, (_m, i) => {
+      const [kind, src] = media[i] || [];
+      if (!src) return "";
+      const name = `fizz-${kind}-${i}.${kind === "video" ? "mp4" : (/^data:image\/(\w+)/.exec(src)?.[1] || "png").replace("jpeg", "jpg")}`;
+      const el = kind === "video" ? `<video class="gen-media" src="${esc(src)}" controls playsinline preload="metadata"></video>` : `<img class="gen-media" src="${esc(src)}" alt="Generated image" loading="lazy" />`;
+      return `<figure class="gen-figure">${el}<figcaption><a class="btn btn-outline btn-sm" href="${esc(src)}" download="${esc(name)}">Download</a></figcaption></figure>`;
+    });
     if (logos.length) clean = clean.replace(/FIZZLOGO(\d+)X/g, (_m, i) => { const [n, d] = logos[i] || []; return d ? logoImg(n, logoUrls(d), "md-logo") : ""; });
     return clean.replace(/<a /g, '<a target="_blank" rel="noopener noreferrer nofollow" ');
   }
@@ -586,6 +637,6 @@
     });
   }
 
-  window.FIZZ = { aiTarget, pendingHtml, logoImg, logoNext, LOGO_PROMPT, faviconUrls, app, serverStatus, serverStatusCached, aiStream, providerLabel, openrouterConnect, openrouterFinish, toOpenAI, store, esc, uid, theme, auth, loadData, saveData, MODELS, streamChat, readAttachment, toApiContent, markdown, toast, download, validEmail };
+  window.FIZZ = { aiTarget, pendingHtml, logoImg, logoNext, LOGO_PROMPT, isMediaModel, stripMedia, faviconUrls, app, serverStatus, serverStatusCached, aiStream, providerLabel, openrouterConnect, openrouterFinish, toOpenAI, store, esc, uid, theme, auth, loadData, saveData, MODELS, streamChat, readAttachment, toApiContent, markdown, toast, download, validEmail };
   theme.init();
 })();

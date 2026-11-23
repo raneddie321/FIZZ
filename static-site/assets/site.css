@@ -816,3 +816,6 @@ html.is-phone .hero-app .store-row { justify-content: center; }
 .get-app-links { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
 .md-logo { display: inline-block; width: 1.15em; height: 1.15em; vertical-align: -0.2em; margin-inline: 0 .3em; border-radius: 4px; object-fit: contain; }
 h1 .md-logo, h2 .md-logo, h3 .md-logo, h4 .md-logo { width: 1em; height: 1em; vertical-align: -0.12em; }
+.gen-figure { margin: 10px 0; display: grid; gap: 8px; justify-items: start; }
+.gen-media { display: block; max-width: min(100%, 640px); max-height: 70vh; border-radius: 14px; border: 1px solid var(--border, #333); background: #111; }
+.gen-figure figcaption { display: flex; gap: 8px; }
