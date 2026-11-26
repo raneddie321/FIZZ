@@ -263,6 +263,8 @@ export async function agentStart({ userId, projectId, files = {}, input, runId, 
 export async function agentPoll({ userId, projectId, runId, from = 0 }) {
   if (!validRunId(runId)) throw Object.assign(new Error("Bad run id."), { status: 400 });
   const sbx = await open(userId, projectId);
+  // Polling renews the sandbox lease while a long task is actively followed.
+  try { await sbx.extendTimeout?.(30 * 60 * 1000); } catch {}
   const buf = await sbx.readFileToBuffer({ path: `${RUNS}/${runId}/state.json` }).catch(() => null);
   if (!buf) {
     const log = await sbx.readFileToBuffer({ path: `${RUNS}/${runId}/log.txt` }).catch(() => null);
@@ -282,4 +284,30 @@ export async function agentStop({ userId, projectId, runId }) {
   const sbx = await open(userId, projectId);
   await sbx.writeFiles([{ path: `${RUNS}/${runId}/stop`, content: Buffer.from("1") }]);
   return { stopping: true };
+}
+
+/** Resume a paused run from its last completed step and persisted conversation checkpoint. */
+export async function agentResume({ userId, projectId, runId, token, origin }) {
+  if (!validRunId(runId)) throw Object.assign(new Error("Bad run id."), { status: 400 });
+  const { AGENT_CORE_SOURCE, RUNNER_SOURCE } = await import("./runner/bundle.mjs");
+  const sbx = await open(userId, projectId);
+  try { await sbx.extendTimeout?.(30 * 60 * 1000); } catch {}
+  const dir = `${RUNS}/${runId}`;
+  const [stateBuf, inputBuf, checkpointBuf] = await Promise.all([
+    sbx.readFileToBuffer({ path: `${dir}/state.json` }).catch(() => null),
+    sbx.readFileToBuffer({ path: `${dir}/input.json` }).catch(() => null),
+    sbx.readFileToBuffer({ path: `${dir}/checkpoint.json` }).catch(() => null),
+  ]);
+  if (!stateBuf || !inputBuf || !checkpointBuf) throw Object.assign(new Error("This run has no saved checkpoint to resume."), { status: 409 });
+  const state = JSON.parse(stateBuf.toString("utf8"));
+  if (state.status !== "paused") throw Object.assign(new Error("Only a paused run can be resumed."), { status: 409 });
+  const input = JSON.parse(inputBuf.toString("utf8"));
+  input.resume = true; input.token = token; input.origin = origin;
+  await sbx.writeFiles([
+    { path: `${dir}/input.json`, content: Buffer.from(JSON.stringify(input)) },
+    { path: `${RUNS}/agent-core.mjs`, content: Buffer.from(AGENT_CORE_SOURCE) },
+    { path: `${RUNS}/agent-runner.mjs`, content: Buffer.from(RUNNER_SOURCE) },
+  ]);
+  await sbx.runCommand({ cmd: "bash", args: ["-c", `rm -f ${dir}/stop && cd ${dir} && exec node ${RUNS}/agent-runner.mjs ${dir} >> ${dir}/log.txt 2>&1`], detached: true });
+  return { runId, resumed: true };
 }
