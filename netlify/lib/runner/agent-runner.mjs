@@ -134,14 +134,20 @@ async function web(path) {
 function sh(cmd, { timeoutMs = 6 * 60 * 60_000, background = false } = {}) {
   return new Promise((resolve) => {
     const script = `cd ${APP} && touch /tmp/fizz-run-start && (${cmd}) 2>&1; code=$?; find . -newer /tmp/fizz-run-start -type f -not -path './node_modules/*' -not -path './.git/*' -not -path '*/__pycache__/*' -size -400k 2>/dev/null | head -100 > /tmp/fizz-run-changed; exit $code`;
-    const child = spawn("bash", ["-lc", script], { detached: background, stdio: background ? "ignore" : ["ignore", "pipe", "pipe"] });
+    const child = spawn("bash", ["-lc", script], { detached: true, stdio: background ? "ignore" : ["ignore", "pipe", "pipe"] });
     if (background) { child.unref(); return resolve({ code: 0, out: `Started in the background.${input.sandboxUrl ? ` If it serves on port 3000, it's at ${input.sandboxUrl}` : ""}` }); }
-    let out = "";
+    let out = "", pauseSent = false;
     const add = (b) => { out += b.toString(); if (out.length > 200_000) out = out.slice(-100_000); };
     child.stdout.on("data", add);
     child.stderr.on("data", add);
-    const timer = setTimeout(() => { try { process.kill(-child.pid); } catch {} child.kill("SIGKILL"); out += `\n[Stopped after ${Math.round(timeoutMs / 60000)} minutes.]`; }, timeoutMs);
-    child.on("close", (code) => { clearTimeout(timer); resolve({ code: code ?? 124, out: out.slice(-20_000) }); });
+    const stopWatcher = setInterval(async () => {
+      if (pauseSent || !(await stopped())) return;
+      pauseSent = true;
+      try { process.kill(-child.pid, "SIGTERM"); } catch { try { child.kill("SIGTERM"); } catch {} }
+    }, 1000);
+    stopWatcher.unref?.();
+    const timer = setTimeout(() => { try { process.kill(-child.pid, "SIGKILL"); } catch {} child.kill("SIGKILL"); out += `\n[Stopped after ${Math.round(timeoutMs / 60000)} minutes.]`; }, timeoutMs);
+    child.on("close", (code) => { clearTimeout(timer); clearInterval(stopWatcher); resolve({ code: code ?? 124, out: out.slice(-20_000) }); });
   });
 }
 /** A short read-only command in the project folder (git grep, ls-files): → its output. */
