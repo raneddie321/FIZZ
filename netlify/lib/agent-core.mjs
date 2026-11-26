@@ -206,7 +206,7 @@ export function nextStep({ asked = false, waiting = false, stopped = false, mode
   // A build with no persisted artifact or completed tool result is not verified work.
   // Ask the model to produce the actual implementation instead of reporting a false success.
   if (!cut && !results && !editErrors) {
-    if (mode === "build" && !hasArtifacts && step < maxSteps && retries < 2) {
+    if (mode === "build" && !hasArtifacts && !narrationFailed && step < maxSteps && retries < 2) {
       return { action: "retry-narration", cut, narrationFailed: true };
     }
     return { action: "check", cut, narrationFailed };
