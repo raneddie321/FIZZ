@@ -2222,11 +2222,12 @@
       Object.assign(note.deploy, { id: d.id, url: d.url, state: d.state || "BUILDING" });
       p.deploy = { name: v.name, id: d.id, url: d.url, state: note.deploy.state, at: Date.now() };
       renderAll();
-      for (let i = 0; i < 40 && !["READY", "ERROR", "CANCELED"].includes(note.deploy.state); i++) {
+      for (let i = 0; i < 200 && !["READY", "ERROR", "CANCELED"].includes(note.deploy.state); i++) {
         await new Promise((r) => setTimeout(r, 3000));
-        const s = await F.conn.vercel.deployment(d.id);
-        Object.assign(note.deploy, { state: s.state, url: s.alias || s.url });
-        renderThread();
+        const status = await F.conn.vercel.deployment(d.id);
+        Object.assign(note.deploy, { state: status.state, url: status.alias || status.url });
+        p.deploy = { ...p.deploy, url: note.deploy.url, state: note.deploy.state };
+        save(); renderThread();
       }
       p.deploy = { ...p.deploy, url: note.deploy.url, state: note.deploy.state };
       note.content = note.deploy.state === "READY" ? `Deployed **${p.name}** — live at ${note.deploy.url}` : note.deploy.state === "ERROR" ? "The Vercel deployment failed. Check the deployment logs in Vercel." : `Deployment status: ${note.deploy.state}. Check Vercel for updates.`;
