@@ -143,9 +143,10 @@ console.log("Cloud runner tests passed");
 // ---------- starting, following and stopping a run in the sandbox ----------
 {
   const lib = await import("../../netlify/lib/sandbox.mjs");
-  const written = {}, cmds = [];
+  const written = {}, cmds = [], extended = [];
   const sbx = {
     async writeFiles(list) { for (const f of list) written[f.path] = String(f.content); },
+    async extendTimeout(ms) { extended.push(ms); },
     async runCommand(p) { cmds.push(p); return { cmdId: "c", wait: async () => ({ exitCode: 0 }) }; },
     async readFileToBuffer({ path }) { return written[path] !== undefined ? Buffer.from(written[path]) : null; },
     domain: () => "https://sb.example",
@@ -167,6 +168,7 @@ console.log("Cloud runner tests passed");
   written[`${dir}/state.json`] = JSON.stringify({ status: "running", updatedAt: Date.now(), steps: [{ reply: { id: "r1" } }, { auto: { id: "a1" } }, { reply: { id: "r2" } }] });
   let r = await lib.agentPoll({ ...A, runId: "abcdef1234", from: 2 });
   assert.deepEqual([r.status, r.total, r.from, r.steps.length], ["running", 3, 2, 1]);
+  assert.ok(extended.includes(30 * 60 * 1000), "active polling renews the sandbox lease");
   written[`${dir}/state.json`] = JSON.stringify({ status: "running", updatedAt: Date.now() - 10 * 60_000, steps: [] });
   r = await lib.agentPoll({ ...A, runId: "abcdef1234" });
   assert.equal(r.status, "error");
@@ -174,6 +176,13 @@ console.log("Cloud runner tests passed");
   assert.equal(r.status, "lost");
   await lib.agentStop({ ...A, runId: "abcdef1234" });
   assert.equal(written[`${dir}/stop`], "1");
+  written[`${dir}/state.json`] = JSON.stringify({ status: "paused", steps: [], error: "" });
+  written[`${dir}/input.json`] = JSON.stringify({ messages: [], origin: "https://fizz.test" });
+  written[`${dir}/checkpoint.json`] = JSON.stringify({ messages: [{ role: "user", content: "continue" }], turn: { continues: 1, emptyBuildRetries: 0 }, nextStep: 4 });
+  r = await lib.agentResume({ ...A, runId: "abcdef1234", token, origin: "https://fizz.test" });
+  assert.equal(r.resumed, true);
+  assert.equal(JSON.parse(written[`${dir}/input.json`]).resume, true, "resume loads the saved checkpoint instead of starting over");
+  assert.ok(cmds.at(-1).detached && cmds.at(-1).args[1].includes("rm -f"), "resume clears the pause marker and starts the runner");
 }
 // A clone that outlives the request keeps going; its status is read later.
 {
