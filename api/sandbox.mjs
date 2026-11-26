@@ -2,7 +2,7 @@ import { env, error, getBigCookie, getCookie, json, readJson, sameOrigin, seal, 
 import { requireUser } from "../netlify/lib/auth.mjs";
 import { quotaCounter, today } from "../netlify/lib/kv.mjs";
 import { Sandbox } from "@vercel/sandbox";
-import { agentPoll, agentStart, agentStop, clone, cloneStatus, look, run, sandboxEnabled, setSandboxModule, stop, wait } from "../netlify/lib/sandbox.mjs";
+import { agentPoll, agentResume, agentStart, agentStop, clone, cloneStatus, look, run, sandboxEnabled, setSandboxModule, stop, wait } from "../netlify/lib/sandbox.mjs";
 import { randomBytes } from "node:crypto";
 
 // Imported statically so Vercel bundles the SDK with this function.
@@ -50,6 +50,11 @@ export async function POST(req) {
     }
     if (body.action === "agent-poll") return json(await agentPoll({ ...args, runId: String(body.runId || ""), from: Number(body.from) || 0 }));
     if (body.action === "agent-stop") return json(await agentStop({ ...args, runId: String(body.runId || "") }));
+    if (body.action === "agent-resume") {
+      const runId = String(body.runId || "");
+      const token = seal({ kind: "run", u: who.userId, p: projectId, r: runId, ai: aiTarget(body.ai), exp: Date.now() + 2 * 3600_000 });
+      return json(await agentResume({ ...args, runId, token, origin: new URL(req.url).origin }));
+    }
     return error(400, "Unknown action.");
   } catch (e) {
     console.error("[sandbox]", e);
@@ -65,7 +70,7 @@ function runInput(r) {
   return {
     kind: r.kind === "chat" ? "chat" : "dev", web: Boolean(r.web), replyId: str(r.replyId, 60).replace(/[^\w-]/g, ""),
     system: str(r.system, 400_000), messages, mode: ["build", "plan", "ask", "do"].includes(r.mode) ? r.mode : "build",
-    step: Math.max(1, Math.min(40, Number(r.step) || 1)), maxSteps: Math.max(1, Math.min(40, Number(r.maxSteps) || 20)),
+    step: Math.max(1, Math.min(40, Number(r.step) || 1)), maxSteps: Math.max(1, Math.min(200, Number(r.maxSteps) || 40)),
     model: str(r.model, 200), modelLabel: str(r.modelLabel, 120),
     perm: { mode: ["auto", "ask", "plan", "read-only"].includes(perm.mode) ? perm.mode : "auto", rules: perm.rules || null, project: perm.project || null, projectTrusted: Boolean(perm.projectTrusted) },
   };
