@@ -494,8 +494,9 @@
     $("#pending").innerHTML = F.pendingHtml(state.pending);
     $("#pending").classList.toggle("hidden", !state.pending.length);
     const busy = Boolean(state.controller);
-    $("#send").innerHTML = busy ? '<svg class="i" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor"/></svg>' : '<svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg>';
-    $("#send").setAttribute("aria-label", busy ? "Stop" : "Send");
+    const paused = Boolean(chat()?.cloud?.paused);
+    $("#send").innerHTML = busy ? '<svg class="i" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor"/></svg>' : paused ? '<svg class="i" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>' : '<svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg>';
+    $("#send").setAttribute("aria-label", busy ? "Stop" : paused ? "Resume" : "Send");
     const s = data.settings;
     const missing = ({
       openrouter: !s.openrouterKey, anthropic: !s.apiKey, gemini: !s.geminiKey,
@@ -658,7 +659,7 @@
   }
 
   // ---------- the agent loop ----------
-  const MAX_STEPS = () => Math.min(40, Math.max(1, Number(data.settings.agentSteps) || 20));
+  const MAX_STEPS = () => Math.min(200, Math.max(1, Number(data.settings.agentSteps) || 40));
   let stopLoop = false;
   // Per turn: how many times a cut-off reply was continued and how many self-checks ran.
   let turn = { continues: 0, verifies: 0, emptyBuildRetries: 0 };
@@ -930,6 +931,17 @@
     save();
     return pollCloud(c);
   }
+  async function resumeCloud(c) {
+    const run = c?.cloud;
+    if (!run?.paused) return;
+    try {
+      await F.conn.sandbox({ action: "agent-resume", projectId: run.projectId, runId: run.runId, ai: F.aiTarget(data.settings) });
+      run.paused = false; run.stopping = false;
+      state.controller = new AbortController();
+      save(); renderComposer();
+      return pollCloud(c);
+    } catch (e) { F.toast(`Could not resume this task: ${e.message}`); }
+  }
   async function pollCloud(c) {
     const run = c.cloud;
     if (!run || cloudPolling.has(run.runId)) return;
@@ -978,19 +990,24 @@
         if (m.changes?.length) changed = true;
       }
       const done = new Set(m.cloudFiles || []);
-      m.tools = (src.tools || []).map((t, k) => {
+      m.tools = await Promise.all((src.tools || []).map(async (t, k) => {
         const res = t.result ? { ...t.result } : undefined;
         if (res?.files && !done.has(k)) {
           done.add(k);
           for (const [path, v] of Object.entries(res.files)) {
             if (!validPath(path)) continue;
             if (typeof v === "string") { if (writeFile(path, v, { source: "agent", msgId: m.id })) changed = true; }
-            else if (v?.base64) { const bin = atob(v.base64); const bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i); F.blobs.put(bytes, F.blobs.mimeFor(path)).then((ref) => { writeFile(path, ref, { source: "agent", msgId: m.id }); save(); }); }
+            else if (v?.base64) {
+              const bin = atob(v.base64), bytes = new Uint8Array(bin.length);
+              for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+              const ref = await F.blobs.put(bytes, F.blobs.mimeFor(path));
+              if (writeFile(path, ref, { source: "agent", msgId: m.id })) changed = true;
+            }
           }
         }
         if (res?.files) res.files = Object.keys(res.files);
         return { ...t, result: res };
-      });
+      }));
       m.cloudFiles = [...done];
     }
     // Only the last step can still change: read from there next time.
@@ -1001,6 +1018,14 @@
     if (changed) refreshPreview();
   }
   async function finishCloud(c, run, r) {
+    if (r.status === "paused") {
+      c.messages = c.messages.filter((m) => !m.cloudPlaceholder);
+      run.paused = true; run.stopping = false;
+      state.controller = null;
+      save(); renderAll();
+      F.toast("Task paused. Press Resume to continue from the last completed step.");
+      return;
+    }
     c.messages = c.messages.filter((m) => !m.cloudPlaceholder);
     delete c.cloud;
     state.controller = null;
@@ -1027,7 +1052,7 @@
     return continueIfNeeded(last);
   }
   // A run started before the page was closed or reloaded: follow it again.
-  setInterval(() => { const c = chat(); if (c?.cloud && !cloudPolling.has(c.cloud.runId)) pollCloud(c); }, 2500);
+  setInterval(() => { const c = chat(); if (c?.cloud && !c.cloud.paused && !cloudPolling.has(c.cloud.runId)) pollCloud(c); }, 2500);
 
   /** Paths Fizz Code wrote since the user's last message. */
   function turnChanges() {
@@ -1581,6 +1606,7 @@
 
   async function send() {
     if (state.controller) { state.controller.abort(); return; }
+    if (chat()?.cloud?.paused) { await resumeCloud(chat()); return; }
     const input = $("#input");
     const text = input.value.trim();
     if (!text && !state.pending.length) return;
