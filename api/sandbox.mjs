@@ -51,6 +51,7 @@ export async function POST(req) {
     if (body.action === "agent-poll") return json(await agentPoll({ ...args, runId: String(body.runId || ""), from: Number(body.from) || 0 }));
     if (body.action === "agent-stop") return json(await agentStop({ ...args, runId: String(body.runId || "") }));
     if (body.action === "agent-resume") {
+      if (!(await quotaCounter()(`${today()}/sandbox/${who.userId}`, Number(env("FIZZ_SANDBOX_LIMIT") || 60)))) return error(429, "You've reached today's sandbox limit. Try again tomorrow.", "quota");
       const runId = String(body.runId || "");
       const token = seal({ kind: "run", u: who.userId, p: projectId, r: runId, ai: aiTarget(body.ai), exp: Date.now() + 24 * 3600_000 });
       return json(await agentResume({ ...args, runId, token, origin: new URL(req.url).origin }));
