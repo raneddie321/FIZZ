@@ -20,10 +20,13 @@ const SUPPORTED = new Set(["run", "sandbox", "search", "fetch", "tree", "grep", 
 const FEEDBACK = SUPPORTED; // every tool the runner runs sends its result back
 const SECRET = /(^|\/)\.env(\.(?!example$|sample$|template$)[^/]*)?$/;
 const files = { ...input.files };
-const state = { status: "running", steps: [], error: "", startedAt: Date.now(), updatedAt: Date.now() };
+const resumedState = input.resume ? JSON.parse(await readFile(join(DIR, "state.json"), "utf8").catch(() => "null") || "null") : null;
+const checkpoint = input.resume ? JSON.parse(await readFile(join(DIR, "checkpoint.json"), "utf8").catch(() => "null") || "null") : null;
+const state = resumedState || { status: "running", steps: [], error: "", startedAt: Date.now(), updatedAt: Date.now() };
+state.status = "running"; state.error = "";
 const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
-let saving = null, again = false;
+let saving = null, again = false, checkpointData = null;
 async function save() {
   state.updatedAt = Date.now();
   if (saving) { again = true; return saving; }
@@ -33,6 +36,11 @@ async function save() {
       const tmp = join(DIR, `state.${process.pid}.tmp`);
       await writeFile(tmp, JSON.stringify(state));
       await rename(tmp, join(DIR, "state.json"));
+      if (checkpointData) {
+        const checkpointTmp = join(DIR, `checkpoint.${process.pid}.tmp`);
+        await writeFile(checkpointTmp, JSON.stringify(checkpointData()));
+        await rename(checkpointTmp, join(DIR, "checkpoint.json"));
+      }
     } while (again);
   })().finally(() => { saving = null; });
   return saving;
@@ -338,8 +346,10 @@ async function chatRun() {
 if (input.kind === "chat") await chatRun().catch((e) => finish("error", e.message || String(e)));
 
 // ---------- the loop ----------
-const messages = input.messages.slice();
-const turn = { continues: 0, emptyBuildRetries: 0 };
+const messages = checkpoint?.messages || input.messages.slice();
+const turn = checkpoint?.turn || { continues: 0, emptyBuildRetries: 0 };
+let nextStep = Math.max(1, Number(checkpoint?.nextStep || input.step) || 1);
+checkpointData = () => ({ messages, turn, nextStep });
 const pushAuto = (label, content) => {
   const m = { id: uid(), role: "user", auto: true, autoLabel: label, content, mode: input.mode, at: Date.now() };
   state.steps.push({ auto: m });
@@ -348,8 +358,8 @@ const pushAuto = (label, content) => {
 async function finish(status, error = "") { state.status = status; state.error = error; await save(); process.exit(0); }
 
 try {
-  for (let step = input.step || 1; ; step++) {
-    if (await stopped()) await finish("stopped");
+  for (let step = nextStep; ; step++) {
+    if (await stopped()) await finish("paused");
     const reply = { id: uid(), role: "assistant", content: "", pending: true, mode: input.mode, step, model: input.modelLabel || "", at: Date.now(), cloud: true };
     state.steps.push({ reply });
     await save();
@@ -376,7 +386,6 @@ try {
     let handoff = false;
     for (const t of reply.tools) {
       if (!SUPPORTED.has(t.type) || !allowed(t)) { handoff = true; break; }
-      if (await stopped()) await finish("stopped");
       t.status = "running";
       await save();
       try {
@@ -420,6 +429,7 @@ try {
       tail = `Continue exactly where you stopped.${open.length ? ` First write ${open.join(", ")} again completely, from the first line, in a new <fizz-file> block.` : ""} Then carry on with the remaining tasks. Keep each reply to a few files.`;
     }
     pushAuto(next.cut ? "The reply was cut off — continuing" : `Sent ${parts.length} result${parts.length === 1 ? "" : "s"} back to Fizz Code`, `${parts.join("\n\n")}\n\n${tail}`);
+    nextStep = step + 1;
     await save();
   }
 } catch (e) {
