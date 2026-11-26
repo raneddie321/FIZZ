@@ -131,7 +131,7 @@ async function web(path) {
   return j;
 }
 
-function sh(cmd, { timeoutMs = 10 * 60_000, background = false } = {}) {
+function sh(cmd, { timeoutMs = 6 * 60 * 60_000, background = false } = {}) {
   return new Promise((resolve) => {
     const script = `cd ${APP} && touch /tmp/fizz-run-start && (${cmd}) 2>&1; code=$?; find . -newer /tmp/fizz-run-start -type f -not -path './node_modules/*' -not -path './.git/*' -not -path '*/__pycache__/*' -size -400k 2>/dev/null | head -100 > /tmp/fizz-run-changed; exit $code`;
     const child = spawn("bash", ["-lc", script], { detached: background, stdio: background ? "ignore" : ["ignore", "pipe", "pipe"] });
