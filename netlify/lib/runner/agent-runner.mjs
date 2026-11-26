@@ -56,6 +56,7 @@ async function callModel(messages, onText) {
     throw Object.assign(new Error(error?.name === "AbortError" ? "The AI response timed out after 8 minutes." : (error?.message || "Could not reach the AI service.")), { status: 408 });
   }
   if (!res.ok) {
+    clearTimeout(timeout);
     let msg = `The AI service returned an error (${res.status}).`;
     try { msg = (await res.json()).error?.message || msg; } catch {}
     throw Object.assign(new Error(msg), { status: res.status });
