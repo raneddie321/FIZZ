@@ -209,7 +209,7 @@
     // A build with no persisted artifact or completed tool result is not verified work.
     // Ask the model to produce the actual implementation instead of reporting a false success.
     if (!cut && !results && !editErrors) {
-      if (mode === "build" && !hasArtifacts && step < maxSteps && retries < 2) {
+      if (mode === "build" && !hasArtifacts && !narrationFailed && step < maxSteps && retries < 2) {
         return { action: "retry-narration", cut, narrationFailed: true };
       }
       return { action: "check", cut, narrationFailed };
@@ -546,5 +546,5 @@
     return { text: out };
   }
 
-  window.FIZZ.agentCore = { TOOL_TYPES, parseTools, detectMode, estimateTokens, PERM_KINDS, PERM_MODES, parseRule, normalizeRules, splitCommand, readOnlyCommand, ruleMatches, decidePermission, narratesWork, nextStep, contextSize, isContextOverflow, messagesTokens, compactPlan, SUMMARY_SYSTEM, summaryTranscript, shrinkMessages, BIG_PROJECT, isBigProject, treeText, readLines, pathGlob, grepFiles, symbolsOf, ignoreMatcher, validPath, fencedFiles, parseReply, applyHunks };
+  window.FIZZ.agentCore = { T, p, d, e, P, P, p, n, s, r, r, d, n, n, c, i, m, c, S, s, s, B, i, t, r, p, g, s, i, v, f, p, a };
 })();
