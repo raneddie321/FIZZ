@@ -546,5 +546,5 @@
     return { text: out };
   }
 
-  window.FIZZ.agentCore = { T, p, d, e, P, P, p, n, s, r, r, d, n, n, c, i, m, c, S, s, s, B, i, t, r, p, g, s, i, v, f, p, a };
+  window.FIZZ.agentCore = { TOOL_TYPES, parseTools, detectMode, estimateTokens, PERM_KINDS, PERM_MODES, parseRule, normalizeRules, splitCommand, readOnlyCommand, ruleMatches, decidePermission, narratesWork, nextStep, contextSize, isContextOverflow, messagesTokens, compactPlan, SUMMARY_SYSTEM, summaryTranscript, shrinkMessages, BIG_PROJECT, isBigProject, treeText, readLines, pathGlob, grepFiles, symbolsOf, ignoreMatcher, validPath, fencedFiles, parseReply, applyHunks };
 })();
