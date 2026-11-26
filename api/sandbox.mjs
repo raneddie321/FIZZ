@@ -43,16 +43,16 @@ export async function POST(req) {
       if (!(await quotaCounter()(`${today()}/sandbox/${who.userId}`, Number(env("FIZZ_SANDBOX_LIMIT") || 60)))) return error(429, "You've reached today's sandbox limit. Try again tomorrow.", "quota");
       const runId = randomBytes(10).toString("hex");
       const input = runInput(body.run || {});
-      // The runner gets a token that only allows model calls and web searches for this user, for 2 hours.
+      // The runner gets a limited token for model calls and web searches, valid for up to 24 hours of long-running work.
       // A key the user brought (Settings → AI) travels sealed inside it: the sandbox never sees it.
-      const token = seal({ kind: "run", u: who.userId, p: projectId, r: runId, ai: aiTarget(body.ai), exp: Date.now() + 2 * 3600_000 });
+      const token = seal({ kind: "run", u: who.userId, p: projectId, r: runId, ai: aiTarget(body.ai), exp: Date.now() + 24 * 3600_000 });
       return json(await agentStart({ ...args, files: body.files || {}, input, runId, token, origin: new URL(req.url).origin, remote: Boolean(body.remote) }));
     }
     if (body.action === "agent-poll") return json(await agentPoll({ ...args, runId: String(body.runId || ""), from: Number(body.from) || 0 }));
     if (body.action === "agent-stop") return json(await agentStop({ ...args, runId: String(body.runId || "") }));
     if (body.action === "agent-resume") {
       const runId = String(body.runId || "");
-      const token = seal({ kind: "run", u: who.userId, p: projectId, r: runId, ai: aiTarget(body.ai), exp: Date.now() + 2 * 3600_000 });
+      const token = seal({ kind: "run", u: who.userId, p: projectId, r: runId, ai: aiTarget(body.ai), exp: Date.now() + 24 * 3600_000 });
       return json(await agentResume({ ...args, runId, token, origin: new URL(req.url).origin }));
     }
     return error(400, "Unknown action.");
