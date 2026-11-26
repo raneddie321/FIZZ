@@ -41,11 +41,20 @@ const stopped = async () => { try { await access(join(DIR, "stop")); return true
 
 // ---------- the model, through Fizz ----------
 async function callModel(messages, onText) {
-  const res = await fetch(`${input.origin}/api/ai/chat`, {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-fizz-run": input.token },
-    body: JSON.stringify({ system: input.system, messages, model: input.model || undefined }),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(new Error("The AI response timed out after 8 minutes.")), 8 * 60_000);
+  let res;
+  try {
+    res = await fetch(`${input.origin}/api/ai/chat`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-fizz-run": input.token },
+      body: JSON.stringify({ system: input.system, messages, model: input.model || undefined }),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    clearTimeout(timeout);
+    throw Object.assign(new Error(error?.name === "AbortError" ? "The AI response timed out after 8 minutes." : (error?.message || "Could not reach the AI service.")), { status: 408 });
+  }
   if (!res.ok) {
     let msg = `The AI service returned an error (${res.status}).`;
     try { msg = (await res.json()).error?.message || msg; } catch {}
@@ -54,6 +63,7 @@ async function callModel(messages, onText) {
   const reader = res.body.getReader();
   const dec = new TextDecoder();
   let buf = "", text = "", stop = null;
+  try {
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -74,6 +84,13 @@ async function callModel(messages, onText) {
       if (fin) stop = fin === "length" || fin === "max_tokens" ? "max_tokens" : fin;
       if (piece) { text += piece; onText(text); }
     }
+  }
+  } catch (error) {
+    if (controller.signal.aborted) throw Object.assign(new Error("The AI response timed out after 8 minutes."), { status: 408 });
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+    try { reader.releaseLock(); } catch {}
   }
   return { text, stop };
 }
@@ -381,11 +398,16 @@ try {
     const next = C.nextStep({ mode: reply.mode, hasArtifacts, narratedIntent: C.narratesWork(parsed.prose), cutOff: reply.cutOff, results: results.length, editErrors: errs.length, step, maxSteps: input.maxSteps || 20, turn });
     if (next.action === "retry-narration") {
       turn.emptyBuildRetries++;
-      pushAuto("Asked Fizz Code to apply the work instead of narrating", "Your previous response only described work but did not create a project file or run a tool. Do the work now. For each file, output a complete <fizz-file path=\"relative/path.ext\">...</fizz-file> block. Do not say what you are going to do; output the actual file blocks or tool calls now.");
+      const insist = next.narrationFailed
+        ? "Your previous replies did not persist any implementation. Do not claim completion. Produce at least one complete, closed <fizz-file> block or a supported executable tool call now. If you cannot proceed, state the precise blocker."
+        : "Your previous response only described work but did not create a project file or run a tool. Do the work now. For each file, output a complete <fizz-file path=\"relative/path.ext\">...</fizz-file> block. Do not say what you are going to do; output the actual file blocks or tool calls now.";
+      pushAuto("Asked Fizz Code to apply the work instead of narrating", insist);
+      await save();
       continue;
     }
-    // Finished (the page runs its checks when it's back) or out of steps: hand back to the page.
-    if (next.action === "check" || next.action === "finish") await finish(next.action === "check" ? "done" : "handoff");
+    // The web UI performs the actual project checks after importing the cloud run.
+    if (next.action === "check") await finish("handoff");
+    if (next.action === "finish") await finish("handoff");
 
     const parts = results.map((t) => `<tool-result tool="${t.type}" request="${first(t.body || t.attrs.path || t.attrs.url || "").replace(/"/g, "&quot;").slice(0, 200)}" ok="${t.status === "done"}">\n${String(t.result?.text || "").slice(0, 12_000)}\n</tool-result>`);
     for (const [path, err] of errs) parts.push(`<tool-result tool="edit" request="${path}" ok="false">\n${err}\n</tool-result>`);
