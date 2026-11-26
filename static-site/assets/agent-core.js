@@ -206,7 +206,14 @@
     const narrationFailed = narrating && retries >= 1;
     const cut = Boolean(cutOff && mode === "build");
     if (cut && (continues >= maxContinues || step >= maxSteps)) return { action: "finish", why: "limit", cut, narrationFailed };
-    if (!cut && !results && !editErrors) return { action: "check", cut, narrationFailed };
+    // A build with no persisted artifact or completed tool result is not verified work.
+    // Ask the model to produce the actual implementation instead of reporting a false success.
+    if (!cut && !results && !editErrors) {
+      if (mode === "build" && !hasArtifacts && step < maxSteps && retries < 2) {
+        return { action: "retry-narration", cut, narrationFailed: true };
+      }
+      return { action: "check", cut, narrationFailed };
+    }
     if (step >= maxSteps) return { action: "finish", why: "limit", cut, narrationFailed };
     return { action: "continue", cut, narrationFailed };
   }
