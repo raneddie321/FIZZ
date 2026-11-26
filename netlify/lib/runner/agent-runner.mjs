@@ -45,6 +45,9 @@ async function save() {
   })().finally(() => { saving = null; });
   return saving;
 }
+// Keep the poller's liveness timestamp fresh during long commands and slow model responses.
+const heartbeat = setInterval(() => { if (state.status === "running") save().catch(() => {}); }, 30_000);
+heartbeat.unref?.();
 const stopped = async () => { try { await access(join(DIR, "stop")); return true; } catch { return false; } };
 
 // ---------- the model, through Fizz ----------
