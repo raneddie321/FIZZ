@@ -27,6 +27,9 @@ jobs:
           node --check static-site/assets/settings.js
           node --check netlify/lib/ai-chat-core.mjs
           node --check api/ai/chat.mjs
+          node --check api/sandbox.mjs
+          node --check netlify/lib/sandbox.mjs
+          node --check netlify/lib/runner/agent-runner.mjs
           node --check tests/netlify/functions.test.mjs
       - name: Test server routes and AI fallback behaviour
         run: node tests/netlify/functions.test.mjs
