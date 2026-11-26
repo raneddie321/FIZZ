@@ -4,7 +4,11 @@ import { vercelToken } from "../lib/providers.mjs";
 const API = "https://api.vercel.com";
 
 async function vc(token, path, init = {}) {
-  const res = await fetch(`${API}${path}`, { ...init, headers: { Authorization: `Bearer ${token}`, ...(init.body ? { "Content-Type": "application/json" } : {}) } });
+  const res = await fetch(`${API}${path}`, {
+    ...init,
+    headers: { Authorization: `Bearer ${token}`, ...(init.body ? { "Content-Type": "application/json" } : {}) },
+    signal: init.signal ?? AbortSignal.timeout(45_000),
+  });
   const data = await res.json().catch(() => null);
   if (!res.ok) throw Object.assign(new Error(data?.error?.message || `Vercel error ${res.status}`), { status: res.status, code: data?.error?.code });
   return data;
@@ -41,7 +45,8 @@ export default async (req, context) => {
         method: "POST",
         body: JSON.stringify({ name, files, target: body.production ? "production" : undefined, projectSettings: { framework: null } }),
       });
-      return json({ id: d.id, url: `https://${d.url}`, state: d.readyState ?? d.status, inspectorUrl: d.inspectorUrl ?? null }, { headers });
+      if (!d?.id || !d?.url) return error(502, "Vercel did not confirm a deployment ID and URL. No deployment success was reported.", "deployment_unconfirmed");
+      return json({ id: d.id, url: `https://${d.url}`, state: d.readyState ?? d.status ?? "QUEUED", inspectorUrl: d.inspectorUrl ?? null }, { headers });
     }
     if (context.params.action === "deployment") {
       const id = new URL(req.url).searchParams.get("id");
