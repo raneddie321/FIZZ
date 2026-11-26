@@ -135,7 +135,7 @@
       action = !ready ? "" : s.connected ? `<button type="button" class="btn btn-outline btn-sm" data-disconnect="${c.id}">Disconnect</button>` : `<button type="button" class="btn btn-sm" data-connect="${c.id}">Connect</button>`;
       if (s.connected && s.scopes?.length) state += ` <span class="mono muted-sm">(${esc(s.scopes.join(", "))})</span>`;
       if ((c.id === "vercel" || c.id === "github") && s.configured && !s.connected) {
-        const help = c.id === "github" ? `<a href="https://github.com/settings/tokens/new?scopes=repo,workflow&description=FIZZ%20DEV" target="_blank" rel="noopener">Create a GitHub token</a> with <b>repo</b> and <b>workflow</b> ticked` : `Create one at <a href="https://vercel.com/account/settings/tokens" target="_blank" rel="noopener">vercel.com/account/settings/tokens</a>`;
+        const help = c.id === "github" ? `<a href="https://github.com/settings/tokens/new?scopes=repo,workflow&description=FIZZ%20DEV" target="_blank" rel="noopener">Create a GitHub token</a> with <b>repo</b> and <b>workflow</b> ticked` : `Create one at <a href="https://vercel.com/account/settings/tokens" target="_blank" rel="noopener">vercel.com/account/settings/tokens</a>. Choose the correct personal account or team.`;
         action = s.oauth ? `<button type="button" class="btn btn-outline btn-sm" data-connect="${c.id}">Sign in</button>` : "";
         return `<div class="conn">${c.icon}<div class="conn-body"><b>${c.name}</b><small>${c.desc}</small><small class="conn-state">${state}</small>
           <div class="vtoken"><input class="input mono" type="password" data-token="${c.id}" placeholder="Paste a ${c.name} token" autocomplete="off" spellcheck="false" /><button type="button" class="btn btn-sm" data-token-save="${c.id}">Connect</button></div>
@@ -393,7 +393,16 @@
         const v = d.querySelector(`[data-token="${t.dataset.tokenSave}"]`)?.value.trim();
         if (!v) { F.toast("Paste the token first."); return; }
         t.disabled = true;
-        try { const r = await F.conn.connectToken(t.dataset.tokenSave, v); F.toast(`Connected${r.account ? ` · ${r.account}` : ""}`); renderConnections(d); } catch (err) { F.toast(err.message); t.disabled = false; }
+        try {
+          const r = await F.conn.connectToken(t.dataset.tokenSave, v);
+          const field = d.querySelector(`[data-token="${t.dataset.tokenSave}"]`);
+          if (field) field.value = "";
+          F.toast(`Connected${r.account ? ` · ${r.account}` : ""}`);
+          renderConnections(d);
+        } catch (err) {
+          F.toast(err.message);
+          t.disabled = false;
+        }
       }
       if (t.dataset.connect === "shopify") {
         // Each store signs in on its own: ask which one.
